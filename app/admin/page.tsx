@@ -30,8 +30,8 @@ type SchemaData = {
   [tableName: string]: ColumnInfo[];
 };
 
-// --- [추가] 컬러셋 탬플릿 정의 (디자인 수정 없이 로직으로만 교체 가능) ---
-type ColorSet = {
+// --- [업그레이드] 컬러 테마와 디자인 스타일의 분리 ---
+type ColorTheme = {
   name: string;
   primary: string;      // 메인 포인트 (버튼, 아이콘)
   primaryHover: string; // 버튼 호버
@@ -44,7 +44,14 @@ type ColorSet = {
   accent: string;       // 강조 (PK 아이콘)
 };
 
-const COLOR_TEMPLATES: Record<string, ColorSet> = {
+type DesignStyle = {
+  name: string;
+  radius: string;
+  shadow: string;
+  borderWidth: string;
+};
+
+const COLOR_THEMES: Record<string, ColorTheme> = {
   linear: {
     name: "Linear (Trending)",
     primary: "#5e6ad2",      // Linear Signature Violet
@@ -143,6 +150,33 @@ const COLOR_TEMPLATES: Record<string, ColorSet> = {
   }
 };
 
+const DESIGN_STYLES: Record<string, DesignStyle> = {
+  modern: {
+    name: "Modern Default",
+    radius: "10px",
+    shadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+    borderWidth: "1px",
+  },
+  sharp: {
+    name: "Sharp & Flat",
+    radius: "0px",
+    shadow: "none",
+    borderWidth: "1px",
+  },
+  soft: {
+    name: "Soft & Rounded",
+    radius: "20px",
+    shadow: "0 10px 15px -3px rgba(0, 0, 0, 0.05)",
+    borderWidth: "1px",
+  },
+  bold: {
+    name: "Bold & 3D",
+    radius: "12px",
+    shadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2)",
+    borderWidth: "2px",
+  }
+};
+
 // --- [핵심 컴포넌트 1] 편집 가능한 셀 (스프레드시트 스타일) ---
 // React.memo를 사용하여 2000줄 데이터 렌더링 성능 최적화
 const EditableCell = memo(({ getValue, row: { index }, column: { id }, table }: any) => {
@@ -183,7 +217,8 @@ export default function AdminDashboardPage() {
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [themeKey, setThemeKey] = useState<string>("emerald"); // 테마 상태 추가
+  const [themeKey, setThemeKey] = useState<string>("linear");
+  const [styleKey, setStyleKey] = useState<string>("modern");
 
   // 복사/붙여넣기 상태 (성능을 위해 ref 사용)
   const gridRef = useRef<HTMLDivElement>(null);
@@ -213,7 +248,19 @@ export default function AdminDashboardPage() {
       setIsLoadingSchema(false);
     }
     fetchSchema();
+
+    // 저장된 테마/스타일 불러오기
+    const savedTheme = localStorage.getItem("dashboard-theme");
+    const savedStyle = localStorage.getItem("dashboard-style");
+    if (savedTheme && COLOR_THEMES[savedTheme]) setThemeKey(savedTheme);
+    if (savedStyle && DESIGN_STYLES[savedStyle]) setStyleKey(savedStyle);
   }, []);
+
+  // 테마/스타일 변경 시 저장
+  useEffect(() => {
+    localStorage.setItem("dashboard-theme", themeKey);
+    localStorage.setItem("dashboard-style", styleKey);
+  }, [themeKey, styleKey]);
 
   // 2. 테이블 데이터 로딩 (테이블 선택 시)
   const fetchTableData = useCallback(async (tableName: string) => {
@@ -360,7 +407,8 @@ export default function AdminDashboardPage() {
   const filteredTables = Object.keys(schemaData).filter(t => t.toLowerCase().includes(searchTerm.toLowerCase()));
   const currentColumns = selectedTable ? schemaData[selectedTable] : [];
 
-  const currentTheme = COLOR_TEMPLATES[themeKey];
+  const currentTheme = COLOR_THEMES[themeKey];
+  const currentStyle = DESIGN_STYLES[styleKey];
 
   return (
     <div className="flex h-screen w-full bg-zinc-50 font-sans dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden">
@@ -408,17 +456,29 @@ export default function AdminDashboardPage() {
                 <h2 className="text-xl font-semibold text-zinc-950 dark:text-white">{selectedTable}</h2>
                 <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500">public</span>
               </div>
-              <div className="flex gap-2.5">
-                {/* [로직 업그레이드] 테마 선택기 추가 */}
-                <select 
-                  value={themeKey}
-                  onChange={(e) => setThemeKey(e.target.value)}
-                  className="px-3 py-2 text-xs rounded-lg bg-zinc-100 dark:bg-zinc-800 border-none outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer font-medium text-zinc-600 dark:text-zinc-400"
-                >
-                  {Object.entries(COLOR_TEMPLATES).map(([key, t]) => (
-                    <option key={key} value={key}>{t.name}</option>
-                  ))}
-                </select>
+              <div className="flex items-center gap-2">
+                {/* [로직 업그레이드] 테마 및 디자인 분리 선택기 */}
+                <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl items-center gap-1 border border-zinc-200 dark:border-zinc-700">
+                  <select 
+                    value={themeKey}
+                    onChange={(e) => setThemeKey(e.target.value)}
+                    className="px-2 py-1.5 text-[11px] rounded-lg bg-transparent border-none outline-none cursor-pointer font-bold text-zinc-600 dark:text-zinc-300 hover:bg-white dark:hover:bg-zinc-700 transition-all"
+                  >
+                    {Object.entries(COLOR_THEMES).map(([key, t]) => (
+                      <option key={key} value={key}>🎨 {t.name}</option>
+                    ))}
+                  </select>
+                  <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-600 mx-1" />
+                  <select 
+                    value={styleKey}
+                    onChange={(e) => setStyleKey(e.target.value)}
+                    className="px-2 py-1.5 text-[11px] rounded-lg bg-transparent border-none outline-none cursor-pointer font-bold text-zinc-600 dark:text-zinc-300 hover:bg-white dark:hover:bg-zinc-700 transition-all"
+                  >
+                    {Object.entries(DESIGN_STYLES).map(([key, s]) => (
+                      <option key={key} value={key}>📐 {s.name}</option>
+                    ))}
+                  </select>
+                </div>
 
                 <button onClick={() => fetchTableData(selectedTable)} className="p-2.5 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
                   <RefreshCw className={`w-4 h-4 ${isLoadingData ? 'animate-spin' : ''}`} />
@@ -540,6 +600,10 @@ export default function AdminDashboardPage() {
           --text-primary: ${currentTheme.textPrimary};
           --text-secondary: ${currentTheme.textSecondary};
           --border-color: ${currentTheme.border};
+          /* [디자인 스타일 변수] */
+          --ui-radius: ${currentStyle.radius};
+          --ui-shadow: ${currentStyle.shadow};
+          --ui-border-width: ${currentStyle.borderWidth};
         }
 
         /* 배경색 오버라이드 */
@@ -555,6 +619,11 @@ export default function AdminDashboardPage() {
         .text-emerald-500, .text-emerald-600 { color: var(--brand-primary) !important; }
         .text-amber-500 { color: ${currentTheme.accent} !important; }
         .border-zinc-200, .dark\\:border-zinc-800, .border-r, .border-b, .border { border-color: var(--border-color) !important; }
+
+        /* 형태 및 입체감 오버라이드 */
+        .rounded-lg, .rounded-xl, .rounded-full { border-radius: var(--ui-radius) !important; }
+        .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl { box-shadow: var(--ui-shadow) !important; }
+        .border, .border-b, .border-r { border-width: var(--ui-border-width) !important; }
       `}</style>
     </div>
   );
