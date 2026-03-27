@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Database, Table, Columns, Key, Settings, Search, Loader2, Save, RefreshCw, ClipboardPaste, Trash2 } from "lucide-react";
 import {
@@ -12,9 +12,10 @@ import {
 import Papa from "papaparse"; // 복사/붙여넣기 파싱용
 
 // 1. Supabase 클라이언트 초기화
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+);
 
 // --- 타입 정의 ---
 type ColumnInfo = {
@@ -29,11 +30,100 @@ type SchemaData = {
   [tableName: string]: ColumnInfo[];
 };
 
+// --- [추가] 컬러셋 탬플릿 정의 (디자인 수정 없이 로직으로만 교체 가능) ---
+type ColorSet = {
+  name: string;
+  primary: string;      // 메인 포인트 (버튼, 아이콘)
+  primaryHover: string; // 버튼 호버
+  primarySoft: string;  // 강조 배경 (선택된 행 등)
+  bgPage: string;       // 전체 배경
+  bgSurface: string;    // 카드, 사이드바, 헤더 배경
+  textPrimary: string;  // 기본 글자색
+  textSecondary: string;// 보조 글자색 (설명, Muted)
+  border: string;       // 테두리 및 구분선
+  accent: string;       // 강조 (PK 아이콘)
+};
+
+const COLOR_TEMPLATES: Record<string, ColorSet> = {
+  emerald: {
+    name: "Emerald (Light)",
+    primary: "#10b981",
+    primaryHover: "#059669",
+    primarySoft: "#ecfdf5",
+    bgPage: "#f9fafb",
+    bgSurface: "#ffffff",
+    textPrimary: "#111827",
+    textSecondary: "#6b7280",
+    border: "#e5e7eb",
+    accent: "#f59e0b",
+  },
+  midnight: {
+    name: "Midnight (Dark)",
+    primary: "#6366f1",
+    primaryHover: "#4f46e5",
+    primarySoft: "#1e1b4b",
+    bgPage: "#020617",
+    bgSurface: "#0f172a",
+    textPrimary: "#f1f5f9",
+    textSecondary: "#94a3b8",
+    border: "#1e293b",
+    accent: "#fbbf24",
+  },
+  ocean: {
+    name: "Ocean Blue",
+    primary: "#3b82f6",
+    primaryHover: "#2563eb",
+    primarySoft: "#eff6ff",
+    bgPage: "#f0f9ff",
+    bgSurface: "#ffffff",
+    textPrimary: "#0c4a6e",
+    textSecondary: "#64748b",
+    border: "#bae6fd",
+    accent: "#ef4444",
+  },
+  nordic: {
+    name: "Nordic Frost",
+    primary: "#88c0d0",
+    primaryHover: "#81a1c1",
+    primarySoft: "#3b4252",
+    bgPage: "#2e3440",
+    bgSurface: "#3b4252",
+    textPrimary: "#eceff4",
+    textSecondary: "#d8dee9",
+    border: "#434c5e",
+    accent: "#ebcb8b",
+  },
+  forest: {
+    name: "Deep Forest",
+    primary: "#22c55e",
+    primaryHover: "#16a34a",
+    primarySoft: "#064e3b",
+    bgPage: "#052e16",
+    bgSurface: "#064e3b",
+    textPrimary: "#ecfdf5",
+    textSecondary: "#a7f3d0",
+    border: "#065f46",
+    accent: "#fcd34d",
+  },
+  clay: {
+    name: "Warm Clay",
+    primary: "#d97706",
+    primaryHover: "#b45309",
+    primarySoft: "#fef3c7",
+    bgPage: "#fff7ed",
+    bgSurface: "#fffcf2",
+    textPrimary: "#451a03",
+    textSecondary: "#92400e",
+    border: "#fed7aa",
+    accent: "#059669",
+  }
+};
+
 // --- [핵심 컴포넌트 1] 편집 가능한 셀 (스프레드시트 스타일) ---
-const EditableCell = ({ getValue, row: { index }, column: { id }, table }: any) => {
+// React.memo를 사용하여 2000줄 데이터 렌더링 성능 최적화
+const EditableCell = memo(({ getValue, row: { index }, column: { id }, table }: any) => {
   const initialValue = getValue();
   const [value, setValue] = useState(initialValue);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // 외부에서 데이터가 변경되었을 때(예: 붙여넣기) 로컬 상태 업데이트
   useEffect(() => {
@@ -48,7 +138,6 @@ const EditableCell = ({ getValue, row: { index }, column: { id }, table }: any) 
   // 구글 시트 느낌의 스타일링 (노보더, 포커스 시 그린 보더)
   return (
     <input
-      ref={inputRef}
       value={value as string || ""}
       onChange={e => setValue(e.target.value)}
       onBlur={onBlur}
@@ -56,7 +145,8 @@ const EditableCell = ({ getValue, row: { index }, column: { id }, table }: any) 
       placeholder="NULL"
     />
   );
-};
+});
+EditableCell.displayName = "EditableCell";
 
 // --- [핵심 컴포넌트 2] 메인 대시보드 ---
 export default function AdminDashboardPage() {
@@ -69,6 +159,7 @@ export default function AdminDashboardPage() {
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [themeKey, setThemeKey] = useState<string>("emerald"); // 테마 상태 추가
 
   // 복사/붙여넣기 상태 (성능을 위해 ref 사용)
   const gridRef = useRef<HTMLDivElement>(null);
@@ -76,7 +167,10 @@ export default function AdminDashboardPage() {
   // 1. 스키마 로딩 (최초 1회)
   useEffect(() => {
     async function fetchSchema() {
-      if (!supabaseUrl || !supabaseKey) return;
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (!url || !key) return;
+
       setIsLoadingSchema(true);
       const { data, error } = await supabase.rpc("get_schema_info");
       if (error) console.error("Error:", error);
@@ -100,7 +194,8 @@ export default function AdminDashboardPage() {
   // 2. 테이블 데이터 로딩 (테이블 선택 시)
   const fetchTableData = useCallback(async (tableName: string) => {
     setIsLoadingData(true);
-    const { data, error } = await supabase.from(tableName).select("*").limit(500); // 안전을 위해 500개 제한
+    // 요청하신 대로 2000줄 데이터를 모두 불러오도록 수정
+    const { data, error } = await supabase.from(tableName).select("*").limit(2000); 
     if (error) {
       console.error("Data fetch error:", error);
       setRecords([]);
@@ -151,7 +246,7 @@ export default function AdminDashboardPage() {
     meta: {
       // 단일 셀 업데이트
       updateData: (rowIndex: number, columnId: string, value: any) => {
-        setRecords(old => old.map((row, index) => index === rowIndex ? { ...old[rowIndex], [columnId]: value } : row));
+        setRecords(old => old.map((row, index) => index === rowIndex ? { ...row, [columnId]: value } : row));
       },
       // [스프레드시트 기능] 대량 붙여넣기 처리
       handlePaste: (pastedData: any[][], startRowIndex: number, startColIndex: number) => {
@@ -194,28 +289,20 @@ export default function AdminDashboardPage() {
       const pastedData = result.data as any[][];
 
       if (pastedData.length === 0) return;
-
-      // 현재 포커스된 셀의 위치 찾기 (매우 중요)
       const activeElement = document.activeElement as HTMLInputElement;
       if (activeElement.tagName !== 'INPUT') return;
 
-      const cellParams = table.getAllLeafColumns().reduce((acc, col, colIdx) => {
-        const rowIdx = records.findIndex((_, rIdx) => {
-             // TanStack Table의 내부 ID 구조를 활용해 현재 포커스된 input의 row/col index 추출
-             // 이 부분은 구현 방식에 따라 조정이 필요할 수 있습니다.
-             // 간단한 구현을 위해 여기서는 activeElement가 속한 tr, td의 index를 가져옵니다.
-             return activeElement.closest('tr')?.rowIndex! - 1 === rIdx; // -1 for header
-        });
-        
-        if (rowIdx !== -1 && activeElement.closest('td')?.cellIndex! === colIdx + 1) { // +1 for row number col
-            return { rowIdx, colIdx };
-        }
-        return acc;
-      }, { rowIdx: -1, colIdx: -1 });
+      // O(N^2) 성능 문제를 해결하기 위해 DOM 인덱스를 직접 참조 (O(1))
+      const td = activeElement.closest('td');
+      const tr = activeElement.closest('tr');
+      if (!td || !tr) return;
 
-      if (cellParams.rowIdx !== -1) {
+      const colIdx = (td as HTMLTableCellElement).cellIndex - 1; // # 열 제외
+      const rowIdx = (tr as HTMLTableRowElement).rowIndex - 1;   // 헤더 제외
+
+      if (rowIdx >= 0 && colIdx !== -1) {
         event.preventDefault(); // 브라우저 기본 붙여넣기 방지
-        (table.options.meta as any).handlePaste(pastedData, cellParams.rowIdx, cellParams.colIdx);
+        (table.options.meta as any).handlePaste(pastedData, rowIdx, colIdx);
       }
     };
 
@@ -248,6 +335,8 @@ export default function AdminDashboardPage() {
   // 사이드바 테이블 검색 필터링
   const filteredTables = Object.keys(schemaData).filter(t => t.toLowerCase().includes(searchTerm.toLowerCase()));
   const currentColumns = selectedTable ? schemaData[selectedTable] : [];
+
+  const currentTheme = COLOR_TEMPLATES[themeKey];
 
   return (
     <div className="flex h-screen w-full bg-zinc-50 font-sans dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden">
@@ -296,6 +385,17 @@ export default function AdminDashboardPage() {
                 <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500">public</span>
               </div>
               <div className="flex gap-2.5">
+                {/* [로직 업그레이드] 테마 선택기 추가 */}
+                <select 
+                  value={themeKey}
+                  onChange={(e) => setThemeKey(e.target.value)}
+                  className="px-3 py-2 text-xs rounded-lg bg-zinc-100 dark:bg-zinc-800 border-none outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer font-medium text-zinc-600 dark:text-zinc-400"
+                >
+                  {Object.entries(COLOR_TEMPLATES).map(([key, t]) => (
+                    <option key={key} value={key}>{t.name}</option>
+                  ))}
+                </select>
+
                 <button onClick={() => fetchTableData(selectedTable)} className="p-2.5 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
                   <RefreshCw className={`w-4 h-4 ${isLoadingData ? 'animate-spin' : ''}`} />
                 </button>
@@ -400,11 +500,37 @@ export default function AdminDashboardPage() {
         )}
       </main>
 
-      {/* 대량 붙여넣기를 위한 전역 CSS 스타일 (Tailwind로 처리 힘든 부분) */}
+      {/* [업그레이드] 대량 붙여넣기 및 동적 컬러셋 테마 오버라이드 */}
       <style jsx global>{`
         .input-grid-container table { border-collapse: separate; }
         .input-grid-container td, .input-grid-container th { border-right-width: 1px; border-bottom-width: 1px; }
         .text-xxs { font-size: 0.65rem; }
+
+        /* [스키마 로직 업그레이드] 템플릿 변수 기반 전역 스타일 오버라이드 */
+        :root {
+          --brand-primary: ${currentTheme.primary};
+          --brand-hover: ${currentTheme.primaryHover};
+          --brand-soft: ${currentTheme.primarySoft};
+          --bg-page: ${currentTheme.bgPage};
+          --bg-surface: ${currentTheme.bgSurface};
+          --text-primary: ${currentTheme.textPrimary};
+          --text-secondary: ${currentTheme.textSecondary};
+          --border-color: ${currentTheme.border};
+        }
+
+        /* 배경색 오버라이드 */
+        .bg-zinc-50, .dark\\:bg-zinc-950, .bg-zinc-100, .dark\\:bg-zinc-900 { background-color: var(--bg-page) !important; }
+        .bg-white, .dark\\:bg-black, .input-grid-container td.sticky { background-color: var(--bg-surface) !important; }
+        .bg-emerald-50, .dark\\:bg-emerald-950\\/40 { background-color: var(--brand-soft) !important; }
+        .bg-emerald-600 { background-color: var(--brand-primary) !important; }
+        .hover\\:bg-emerald-700:hover { background-color: var(--brand-hover) !important; }
+
+        /* 텍스트 및 테두리 오버라이드 */
+        .text-zinc-900, .dark\\:text-zinc-100, .text-zinc-950, .dark\\:text-white, .text-zinc-700, .dark\\:text-zinc-300 { color: var(--text-primary) !important; }
+        .text-zinc-500, .text-zinc-400, .text-zinc-600, .dark\\:text-zinc-400 { color: var(--text-secondary) !important; }
+        .text-emerald-500, .text-emerald-600 { color: var(--brand-primary) !important; }
+        .text-amber-500 { color: ${currentTheme.accent} !important; }
+        .border-zinc-200, .dark\\:border-zinc-800, .border-r, .border-b, .border { border-color: var(--border-color) !important; }
       `}</style>
     </div>
   );
