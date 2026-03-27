@@ -45,17 +45,41 @@ type ColorSet = {
 };
 
 const COLOR_TEMPLATES: Record<string, ColorSet> = {
-  emerald: {
-    name: "Emerald (Light)",
-    primary: "#10b981",
-    primaryHover: "#059669",
-    primarySoft: "#ecfdf5",
-    bgPage: "#f9fafb",
-    bgSurface: "#ffffff",
-    textPrimary: "#111827",
-    textSecondary: "#6b7280",
-    border: "#e5e7eb",
-    accent: "#f59e0b",
+  linear: {
+    name: "Linear (Trending)",
+    primary: "#5e6ad2",      // Linear Signature Violet
+    primaryHover: "#4c55a5",
+    primarySoft: "rgba(94, 106, 210, 0.1)",
+    bgPage: "#000212",       // Linear Midnight
+    bgSurface: "#08091a",
+    textPrimary: "#f7f8f8",
+    textSecondary: "#b4b4b8",
+    border: "#1f2033",
+    accent: "#ffa500",
+  },
+  carbon: {
+    name: "Vercel Carbon",
+    primary: "#ffffff",      // High Contrast White
+    primaryHover: "#e2e2e2",
+    primarySoft: "#111111",
+    bgPage: "#000000",       // True Black
+    bgSurface: "#0a0a0a",
+    textPrimary: "#ffffff",
+    textSecondary: "#888888",
+    border: "#222222",
+    accent: "#0070f3",
+  },
+  rosepine: {
+    name: "Rose Pine",
+    primary: "#ebbcba",      // Rose
+    primaryHover: "#e2a3a1",
+    primarySoft: "#1f1d2e",
+    bgPage: "#191724",       // Base Dark
+    bgSurface: "#1f1d2e",
+    textPrimary: "#e0def4",
+    textSecondary: "#908caa",
+    border: "#26233a",
+    accent: "#f6c177",
   },
   midnight: {
     name: "Midnight (Dark)",
