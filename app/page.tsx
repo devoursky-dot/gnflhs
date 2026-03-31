@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Database, Table, Columns, Key, Settings, Search, Loader2, Save, RefreshCw, ClipboardPaste, Trash2 } from "lucide-react";
 import {
@@ -30,10 +30,9 @@ type SchemaData = {
 };
 
 // --- [핵심 컴포넌트 1] 편집 가능한 셀 (스프레드시트 스타일) ---
-const EditableCell = ({ getValue, row: { index }, column: { id }, table }: any) => {
+const EditableCell = memo(({ getValue, row: { index }, column: { id }, table }: any) => {
   const initialValue = getValue();
   const [value, setValue] = useState(initialValue);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // 외부에서 데이터가 변경되었을 때(예: 붙여넣기) 로컬 상태 업데이트
   useEffect(() => {
@@ -48,7 +47,6 @@ const EditableCell = ({ getValue, row: { index }, column: { id }, table }: any) 
   // 구글 시트 느낌의 스타일링 (노보더, 포커스 시 그린 보더)
   return (
     <input
-      ref={inputRef}
       value={value as string || ""}
       onChange={e => setValue(e.target.value)}
       onBlur={onBlur}
@@ -56,7 +54,8 @@ const EditableCell = ({ getValue, row: { index }, column: { id }, table }: any) 
       placeholder="NULL"
     />
   );
-};
+});
+EditableCell.displayName = "EditableCell";
 
 // --- [핵심 컴포넌트 2] 메인 대시보드 ---
 export default function AdminDashboardPage() {
@@ -199,23 +198,17 @@ export default function AdminDashboardPage() {
       const activeElement = document.activeElement as HTMLInputElement;
       if (activeElement.tagName !== 'INPUT') return;
 
-      const cellParams = table.getAllLeafColumns().reduce((acc, col, colIdx) => {
-        const rowIdx = records.findIndex((_, rIdx) => {
-             // TanStack Table의 내부 ID 구조를 활용해 현재 포커스된 input의 row/col index 추출
-             // 이 부분은 구현 방식에 따라 조정이 필요할 수 있습니다.
-             // 간단한 구현을 위해 여기서는 activeElement가 속한 tr, td의 index를 가져옵니다.
-             return activeElement.closest('tr')?.rowIndex! - 1 === rIdx; // -1 for header
-        });
-        
-        if (rowIdx !== -1 && activeElement.closest('td')?.cellIndex! === colIdx + 1) { // +1 for row number col
-            return { rowIdx, colIdx };
-        }
-        return acc;
-      }, { rowIdx: -1, colIdx: -1 });
+      // DOM 인덱스를 사용하여 O(1) 속도로 위치 계산
+      const td = activeElement.closest('td');
+      const tr = activeElement.closest('tr');
+      if (!td || !tr) return;
 
-      if (cellParams.rowIdx !== -1) {
-        event.preventDefault(); // 브라우저 기본 붙여넣기 방지
-        (table.options.meta as any).handlePaste(pastedData, cellParams.rowIdx, cellParams.colIdx);
+      const colIdx = (td as HTMLTableCellElement).cellIndex - 1; // # (행번호) 열 제외
+      const rowIdx = (tr as HTMLTableRowElement).rowIndex - 1;   // 헤더 제외
+
+      if (rowIdx >= 0 && colIdx !== -1) {
+        event.preventDefault();
+        (table.options.meta as any).handlePaste(pastedData, rowIdx, colIdx);
       }
     };
 
