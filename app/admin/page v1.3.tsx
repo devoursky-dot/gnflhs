@@ -65,10 +65,8 @@ const ImageUploadModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
       setQueue(prev => prev.map(item => item.id === nextItem.id ? { ...item, status: 'uploading' } : item));
 
       const file = nextItem.file;
-      
-      // 🌟 [완벽 수정] 한글, 영문, 숫자, 마침표(.), 하이픈(-), 언더바(_)만 허용하고 괄호 등 모든 특수문자 제거
-      const safeOriginalName = file.name.replace(/[^a-zA-Z0-9가-힣._-]/g, ''); 
-      const fileName = `${Date.now()}_${safeOriginalName}`; 
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
 
       try {
         const { data, error } = await supabase.storage.from('photos').upload(fileName, file);
@@ -167,8 +165,7 @@ const ImageUploadModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
                   <div className="flex items-center gap-2">
                     <p className="text-xs font-bold truncate dark:text-zinc-200">{item.file.name}</p>
                     {item.status === 'success' && <Check className="w-3 h-3 text-emerald-500" />}
-                    {/* 🌟 실패 시 마우스를 올리면 정확한 에러 원인을 툴팁으로 볼 수 있도록 title 추가 */}
-                    {item.status === 'error' && <span className="text-[10px] text-red-500 font-bold" title={item.error}>실패</span>}
+                    {item.status === 'error' && <span className="text-[10px] text-red-500 font-bold">실패</span>}
                   </div>
                   <p className="text-[10px] text-zinc-500 truncate font-mono mt-0.5">
                     {item.url || (item.status === 'uploading' ? '업로드 중...' : '대기 중')}
@@ -243,7 +240,10 @@ export default function AdminDashboardPage() {
   const [styleKey, setStyleKey] = useState<string>("modern");
   const [isCreatingTable, setIsCreatingTable] = useState(false);
   
+  // [신규] 이미지 모달 상태
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+
+  // 🌟 [추가] 되돌리기(Undo)를 위한 상태 저장
   const [lastDeleted, setLastDeleted] = useState<{ index: number, record: any } | null>(null);
 
   const gridRef = useRef<HTMLDivElement>(null);
@@ -332,6 +332,7 @@ export default function AdminDashboardPage() {
     setRecords(prev => [...prev, {}]);
   }, []);
 
+  // 🌟 [수정] 삭제 시 확인창 & 상태 저장 로직 추가
   const handleDeleteRow = useCallback((indexToDelete: number) => {
     if (window.confirm("정말로 이 행을 삭제하시겠습니까?\n(삭제 후 우측 하단에서 5초 내에 되돌릴 수 있습니다)")) {
       setRecords(prev => {
@@ -342,16 +343,19 @@ export default function AdminDashboardPage() {
     }
   }, []);
 
+  // 🌟 [추가] 되돌리기 함수
   const handleUndoDelete = useCallback(() => {
     if (!lastDeleted) return;
     setRecords(prev => {
       const newRecords = [...prev];
+      // 원래 위치에 삭제했던 데이터 다시 삽입
       newRecords.splice(lastDeleted.index, 0, lastDeleted.record);
       return newRecords;
     });
-    setLastDeleted(null);
+    setLastDeleted(null); // 복구 후 토스트 창 닫기
   }, [lastDeleted]);
 
+  // 🌟 [추가] 5초 후 되돌리기 기회 소멸 타이머
   useEffect(() => {
     if (lastDeleted) {
       const timer = setTimeout(() => {
@@ -556,6 +560,7 @@ export default function AdminDashboardPage() {
         )}
       </main>
 
+      {/* 🌟 [추가] 삭제 되돌리기(Undo) 토스트 알림창 */}
       {lastDeleted && (
         <div className="fixed bottom-8 right-8 bg-zinc-800 dark:bg-zinc-200 text-white dark:text-zinc-900 px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-4 z-50 animate-in slide-in-from-bottom-5 duration-300">
           <span className="text-sm font-semibold tracking-wide">행이 삭제되었습니다.</span>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import * as LucideIcons from 'lucide-react';
 import { 
@@ -19,12 +19,14 @@ const supabase = createClient(
 
 const ICON_GALLERY = ['User', 'Calendar', 'FileText', 'MapPin', 'Bell', 'MessageSquare', 'Check', 'AlertTriangle', 'Home', 'Settings', 'Star', 'Heart', 'Image'];
 
+// 안전한 아이콘 렌더러
 const DynamicIcon = ({ name, size = 18, className = "" }: { name: string, size?: number, className?: string }) => {
   const formattedName = name.charAt(0).toUpperCase() + name.slice(1);
   const IconComponent = (LucideIcons as any)[formattedName] || LucideIcons.HelpCircle;
   return <IconComponent size={size} className={className} />;
 };
 
+// 이미지 URL 판별 헬퍼
 const isImageUrl = (value: any) => {
   if (typeof value !== 'string') return false;
   return value.match(/\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i) != null || value.startsWith('http');
@@ -33,9 +35,8 @@ const isImageUrl = (value: any) => {
 export default function NoCodeStudio() {
   // --- [상태 관리 1] 프로젝트 및 앱 관리 ---
   const [savedApps, setSavedApps] = useState<any[]>([]);
-  const [currentAppId, setCurrentAppId] = useState<number | null>(null); // DB의 int8에 맞춰 null(새 앱) 또는 숫자
+  const [currentAppId, setCurrentAppId] = useState<string>(`app_${Date.now()}`);
   const [appName, setAppName] = useState('나만의 첫 번째 앱');
-  const [isSaving, setIsSaving] = useState(false);
   
   // --- [상태 관리 2] Supabase 데이터 ---
   const [schemaData, setSchemaData] = useState<Record<string, string[]>>({});
@@ -60,20 +61,16 @@ export default function NoCodeStudio() {
   const [isCopied, setIsCopied] = useState(false);
 
   // ==========================================
-  // 🚀 초기 로드: Supabase 스키마 및 저장된 앱 목록 조회
+  // 🚀 초기 로드: 로컬스토리지 앱 로드 & 스키마 조회
   // ==========================================
-  const fetchSavedApps = async () => {
-    const { data, error } = await supabase
-      .from('apps')
-      .select('id, name, selected_table, app_config')
-      .order('created_at', { ascending: false });
-      
-    if (data && !error) setSavedApps(data);
-  };
-
   useEffect(() => {
-    fetchSavedApps();
+    // 1. 저장된 앱 불러오기
+    const stored = localStorage.getItem('noCodeSavedApps');
+    if (stored) {
+      setSavedApps(JSON.parse(stored));
+    }
 
+    // 2. Supabase 스키마 불러오기
     async function fetchSchema() {
       try {
         const { data, error } = await supabase.rpc("get_schema_info");
@@ -111,6 +108,7 @@ export default function NoCodeStudio() {
       
       setRows(data || []);
       
+      // 테이블 변경 시 기본 설정 세팅 (새로운 앱일 경우에만 덮어쓰기)
       setAppConfig(prev => ({
         ...prev,
         header: { ...prev.header, title: tableName.toUpperCase() },
@@ -129,52 +127,29 @@ export default function NoCodeStudio() {
   };
 
   // ==========================================
-  // 🚀 기능: 프로젝트(앱) Supabase 저장 및 로드
+  // 🚀 기능: 프로젝트(앱) 관리
   // ==========================================
-  const handleSaveApp = async () => {
-    setIsSaving(true);
-    const appPayload = {
+  const handleSaveApp = () => {
+    const newApp = {
+      id: currentAppId,
       name: appName,
-      selected_table: selectedTable,
-      app_config: appConfig
+      selectedTable,
+      appConfig,
+      updatedAt: new Date().toISOString()
     };
-
-    let newSavedId = currentAppId;
-
-    try {
-      if (currentAppId) {
-        // 기존 앱 업데이트
-        const { error } = await supabase.from('apps').update(appPayload).eq('id', currentAppId);
-        if (error) throw error;
-      } else {
-        // 새 앱 생성 (Insert 시 생성된 id 반환받기)
-        const { data, error } = await supabase.from('apps').insert(appPayload).select('id').single();
-        if (error) throw error;
-        newSavedId = data.id;
-        setCurrentAppId(data.id);
-      }
-      
-      await fetchSavedApps(); // 목록 새로고침
-      alert('앱 프로젝트가 Supabase에 성공적으로 저장되었습니다!');
-    } catch (error: any) {
-      alert(`저장 중 오류가 발생했습니다: ${error.message}`);
-    } finally {
-      setIsSaving(false);
-    }
-
-    return newSavedId; // 배포 시 id를 사용하기 위해 반환
+    
+    const updatedApps = savedApps.filter(app => app.id !== currentAppId).concat(newApp);
+    setSavedApps(updatedApps);
+    localStorage.setItem('noCodeSavedApps', JSON.stringify(updatedApps));
+    alert('앱 프로젝트가 성공적으로 저장되었습니다.');
   };
 
-  const handleLoadApp = async (appId: number) => {
-    const targetApp = savedApps.find(a => a.id === appId);
-    if (!targetApp) return;
-
-    setCurrentAppId(targetApp.id);
-    setAppName(targetApp.name);
-    setAppConfig(targetApp.app_config);
-    
-    if (targetApp.selected_table) {
-      handleSelectTable(targetApp.selected_table);
+  const handleLoadApp = (app: any) => {
+    setCurrentAppId(app.id);
+    setAppName(app.name);
+    setAppConfig(app.appConfig);
+    if (app.selectedTable) {
+      handleSelectTable(app.selectedTable);
     } else {
       setSelectedTable(null);
       setRows([]);
@@ -183,7 +158,7 @@ export default function NoCodeStudio() {
   };
 
   const handleCreateNewApp = () => {
-    setCurrentAppId(null);
+    setCurrentAppId(`app_${Date.now()}`);
     setAppName('새로운 프로젝트');
     setSelectedTable(null);
     setRows([]);
@@ -196,13 +171,11 @@ export default function NoCodeStudio() {
     });
   };
 
-  const handleDeploy = async () => {
-    // 1. 배포 전 무조건 먼저 저장 수행하여 최신 ID를 가져옴
-    const savedId = await handleSaveApp();
-    if (!savedId) return; // 저장 실패 시 중단
-
-    // 2. DB 고유 ID를 이용해 URL 생성
-    const generatedUrl = `${window.location.origin}/preview/${savedId}`;
+  const handleDeploy = () => {
+    // 실제 환경에서는 백엔드에 배포 데이터를 전송하고 고유 ID를 받음
+    // 여기서는 클라이언트 측 시뮬레이션
+    handleSaveApp();
+    const generatedUrl = `${window.location.origin}/preview/${currentAppId}`;
     setDeployUrl(generatedUrl);
     setIsDeployModalOpen(true);
     setIsCopied(false);
@@ -238,13 +211,17 @@ export default function NoCodeStudio() {
           
           <div className="h-6 w-px bg-slate-200" />
           
+          {/* 프로젝트 리스트 드롭다운 시뮬레이션 (단순화) */}
           <div className="flex items-center gap-3">
             <select 
               className="text-sm font-bold bg-slate-50 border border-slate-200 text-slate-700 py-1.5 px-3 rounded-lg outline-none focus:border-indigo-500"
-              value={currentAppId || 'new'}
+              value={currentAppId}
               onChange={(e) => {
                 if (e.target.value === 'new') handleCreateNewApp();
-                else handleLoadApp(Number(e.target.value));
+                else {
+                  const targetApp = savedApps.find(a => a.id === e.target.value);
+                  if (targetApp) handleLoadApp(targetApp);
+                }
               }}
             >
               <option value="new">✨ 새 프로젝트 만들기...</option>
@@ -253,6 +230,7 @@ export default function NoCodeStudio() {
               ))}
             </select>
             
+            {/* 앱 이름 수정 */}
             <input 
               type="text" 
               value={appName}
@@ -264,11 +242,10 @@ export default function NoCodeStudio() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button onClick={handleSaveApp} disabled={isSaving} className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-white border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-all shadow-sm disabled:opacity-50">
-            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} 
-            {isSaving ? '저장 중...' : '저장'}
+          <button onClick={handleSaveApp} className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-white border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-all shadow-sm">
+            <Save size={16} /> 저장
           </button>
-          <button onClick={handleDeploy} disabled={isSaving} className="flex items-center gap-2 text-sm font-bold text-white bg-indigo-600 px-5 py-2 rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all disabled:opacity-50">
+          <button onClick={handleDeploy} className="flex items-center gap-2 text-sm font-bold text-white bg-indigo-600 px-5 py-2 rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all">
             <Rocket size={16} /> 배포하기
           </button>
         </div>
@@ -287,6 +264,7 @@ export default function NoCodeStudio() {
           </div>
           
           <div className="flex-1 overflow-y-auto p-6 space-y-8">
+            {/* 테이블 목록 */}
             <div>
               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">연결된 테이블</h3>
               {isLoadingSchema ? (
@@ -320,6 +298,7 @@ export default function NoCodeStudio() {
 
             {selectedTable && <div className="h-px w-full bg-slate-200"></div>}
 
+            {/* 컬럼 목록 */}
             {selectedTable && (
               <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div className="flex items-center justify-between mb-4">
@@ -414,10 +393,12 @@ export default function NoCodeStudio() {
           <div className="bg-[#1e293b] p-3 rounded-[3.5rem] shadow-2xl border-4 border-slate-300 w-[340px] h-[720px] relative">
             <div className="bg-slate-50 w-full h-full rounded-[2.5rem] overflow-hidden flex flex-col relative">
               
+              {/* 모바일 앱 헤더 */}
               <header className={`${appConfig.header.color} ${appConfig.header.textColor} px-6 py-5 shadow-sm flex items-center justify-center shrink-0`}>
                 <h1 className="font-extrabold text-lg tracking-tight">{appName || appConfig.header.title}</h1>
               </header>
 
+              {/* 데이터 리스트 렌더링 영역 */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24 scrollbar-hide">
                 {rows.map((row) => (
                   <div key={row.id || Math.random()} className="bg-white p-5 rounded-3xl shadow-[0_4px_16px_rgba(0,0,0,0.04)] border border-slate-100">
@@ -433,6 +414,7 @@ export default function NoCodeStudio() {
                             <div className="flex flex-col flex-1 w-full min-w-0">
                               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{field.field}</span>
                               
+                              {/* 이미지 렌더링 최적화 */}
                               {isImage && row[field.field] ? (
                                 <div className="w-full h-40 bg-slate-100 rounded-xl overflow-hidden mt-1 border border-slate-100">
                                   <img 
@@ -485,7 +467,7 @@ export default function NoCodeStudio() {
             </div>
             <h2 className="text-2xl font-extrabold text-slate-900 mb-2 tracking-tight">앱 배포 준비 완료!</h2>
             <p className="text-sm font-medium text-slate-500 mb-6 leading-relaxed">
-              Supabase에 성공적으로 데이터가 기록되었습니다. 아래 링크를 통해 스마트폰에서 직접 확인해보세요.
+              성공적으로 웹앱 구조가 생성되었습니다. 아래 고유 링크를 통해 스마트폰 브라우저에서 직접 확인해보세요.
             </p>
             
             <div className="flex flex-col gap-3">

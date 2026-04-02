@@ -6,11 +6,15 @@ import { createClient } from '@supabase/supabase-js';
 import * as LucideIcons from 'lucide-react';
 import { Loader2, Database } from 'lucide-react';
 
+// ==========================================
+// 🔧 Supabase 설정 (기존과 동일하게 유지)
+// ==========================================
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
 
+// --- 헬퍼 함수 ---
 const DynamicIcon = ({ name, size = 18, className = "" }: { name: string, size?: number, className?: string }) => {
   const formattedName = name.charAt(0).toUpperCase() + name.slice(1);
   const IconComponent = (LucideIcons as any)[formattedName] || LucideIcons.HelpCircle;
@@ -34,14 +38,20 @@ export default function PreviewPage() {
   useEffect(() => {
     async function fetchAppAndData() {
       try {
-        // 1. Supabase apps 테이블에서 해당 앱 정보 가져오기
+        // 1. Supabase apps 테이블에서 해당 앱 정보 가져오기 (문자열인 appId를 숫자로 변환: Number(appId))
         const { data: targetApp, error: appError } = await supabase
           .from('apps')
           .select('*')
-          .eq('id', appId)
+          .eq('id', Number(appId)) // 👈 숫자로 변환하여 검색하도록 수정된 부분입니다.
           .single();
 
-        if (appError || !targetApp) {
+        // 🚨 에러 확인용 디버깅 코드
+        if (appError) {
+          console.error("Supabase 앱 정보 조회 에러:", appError);
+          throw new Error('존재하지 않거나 삭제된 앱입니다.');
+        }
+
+        if (!targetApp) {
           throw new Error('존재하지 않거나 삭제된 앱입니다.');
         }
 
@@ -52,13 +62,18 @@ export default function PreviewPage() {
           const { data: tableData, error: tableError } = await supabase
             .from(targetApp.selected_table)
             .select("*")
-            .limit(100);
+            .limit(100); // 프리뷰에서는 최대 100개 노출
 
-          if (tableError) throw new Error('연결된 테이블 데이터를 불러오는데 실패했습니다.');
+          // 🚨 에러 확인용 디버깅 코드
+          if (tableError) {
+            console.error("Supabase 테이블 조회 에러:", tableError);
+            throw new Error('연결된 테이블 데이터를 불러오는데 실패했습니다.');
+          }
+          
           setRows(tableData || []);
         }
       } catch (err: any) {
-        console.error(err);
+        console.error("전체 에러:", err);
         setError(err.message || '데이터를 불러오는데 실패했습니다.');
       } finally {
         setIsLoading(false);
@@ -68,6 +83,7 @@ export default function PreviewPage() {
     if (appId) fetchAppAndData();
   }, [appId]);
 
+  // 로딩 중 화면
   if (isLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-slate-50">
@@ -76,6 +92,7 @@ export default function PreviewPage() {
     );
   }
 
+  // 에러 화면 (앱이 없거나 데이터 로드 실패시)
   if (error || !appData) {
     return (
       <div className="flex flex-col h-screen w-full items-center justify-center bg-slate-50 text-slate-500">
@@ -92,12 +109,17 @@ export default function PreviewPage() {
 
   return (
     <div className="min-h-screen w-full bg-slate-100 flex justify-center sm:py-8">
+      {/* 모바일 앱 느낌을 주기 위해 데스크톱에서는 가운데 정렬된 모바일 사이즈로 렌더링하고, 
+        실제 스마트폰(모바일 기기)에서는 전체 화면(100%)을 꽉 채우도록 반응형으로 설계했습니다. 
+      */}
       <main className="w-full sm:w-[400px] h-[100dvh] sm:h-[800px] bg-slate-50 sm:rounded-[2.5rem] sm:shadow-2xl sm:border-[8px] sm:border-slate-800 overflow-hidden flex flex-col relative">
         
+        {/* 앱 헤더 */}
         <header className={`${appConfig.header.color} ${appConfig.header.textColor} px-6 py-5 shadow-sm flex items-center justify-center shrink-0 z-10`}>
           <h1 className="font-extrabold text-lg tracking-tight truncate">{name || appConfig.header.title}</h1>
         </header>
 
+        {/* 데이터 리스트 영역 */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24 bg-slate-50">
           {rows.map((row) => (
             <div key={row.id || Math.random()} className="bg-white p-5 rounded-3xl shadow-[0_4px_16px_rgba(0,0,0,0.04)] border border-slate-100">
@@ -133,6 +155,7 @@ export default function PreviewPage() {
                 })}
               </div>
               
+              {/* 상세보기(액션) 버튼 */}
               {appConfig.cardLayout.length > 0 && (
                 <button className={`mt-5 w-full py-3 rounded-xl text-sm font-extrabold flex items-center justify-center gap-1.5 transition-colors ${appConfig.actions.inline.color}`}>
                   <DynamicIcon name={appConfig.actions.inline.icon} size={16}/> {appConfig.actions.inline.label}
