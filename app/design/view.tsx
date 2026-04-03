@@ -1,7 +1,8 @@
 // view.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import { View, SchemaData, LayoutRow, LayoutCell, Action } from './types';
-import { Database, LayoutTemplate, Plus, Columns, Rows, ChevronLeft, ChevronRight, X, MousePointerClick } from 'lucide-react';
+import { Database, LayoutTemplate, Plus, Columns, Rows, ChevronLeft, ChevronRight, X, MousePointerClick, Star } from 'lucide-react';
+import IconPicker, { IconMap } from './picker'; // [신규] 피커 임포트
 
 interface ViewEditorProps {
   view: View;
@@ -11,6 +12,8 @@ interface ViewEditorProps {
 }
 
 export default function ViewEditor({ view, schemaData, actions, onUpdate }: ViewEditorProps) {
+  // 🔥 아이콘 피커 모달 상태 관리
+  const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
   const availableColumns = view.tableName ? schemaData[view.tableName] || [] : [];
 
   const mutate = (callback: (rows: LayoutRow[]) => void) => {
@@ -114,8 +117,36 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
   );
 
   return (
-    <div className="min-h-full p-10 bg-[#F1F5F9] pb-32 text-slate-900"> 
+    <div className="min-h-full p-10 bg-[#F1F5F9] pb-32 text-slate-900 relative"> 
       <div className="max-w-5xl mx-auto space-y-10">
+        
+        {/* 🔥 핵심 해결: 뷰 이름 및 아이콘 설정 영역 추가 */}
+        <section className="bg-white p-8 rounded-3xl shadow-xl border border-slate-200">
+          <label className="block text-xs font-black text-slate-400 mb-3 uppercase">현재 뷰(View)의 아이콘과 이름</label>
+          <div className="flex items-center gap-4">
+            
+            {/* 아이콘 피커 트리거 버튼 */}
+            <button 
+              onClick={() => setIsIconPickerOpen(true)}
+              className="w-16 h-16 shrink-0 flex items-center justify-center bg-indigo-50 border-2 border-indigo-100 rounded-2xl hover:border-indigo-400 hover:shadow-md transition-all group"
+            >
+              {view.icon && IconMap[view.icon] ? 
+                React.createElement(IconMap[view.icon], { className: "text-indigo-600 group-hover:scale-110 transition-transform", size: 32 }) : 
+                <Star className="text-indigo-300 group-hover:text-indigo-600 transition-colors" size={32} />
+              }
+            </button>
+
+            {/* 뷰 이름 수정 텍스트 입력창 */}
+            <input
+              type="text"
+              value={view.name}
+              onChange={(e) => onUpdate({ ...view, name: e.target.value })}
+              placeholder="화면 이름을 입력하세요"
+              className="flex-1 p-4 rounded-2xl border-2 border-slate-200 text-2xl font-black text-slate-900 focus:border-indigo-600 outline-none transition-all"
+            />
+          </div>
+        </section>
+
         <section className="bg-white p-8 rounded-3xl shadow-xl border border-slate-200">
           <div className="flex items-center gap-4 mb-6 text-slate-900">
             <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg"><Database size={28}/></div>
@@ -128,7 +159,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-black text-slate-400 mb-2 uppercase">연결 테이블</label>
-              <select value={view.tableName || ''} onChange={(e) => onUpdate({ ...view, tableName: e.target.value, layoutRows: [] })} className="w-full p-4 rounded-2xl border-2 border-slate-200 font-black text-slate-800 focus:border-indigo-600 outline-none">
+              <select value={view.tableName || ''} onChange={(e) => onUpdate({ ...view, tableName: e.target.value, layoutRows: [] })} className="w-full p-4 rounded-2xl border-2 border-slate-200 font-black text-slate-800 focus:border-indigo-600 outline-none bg-white">
                 <option value="">테이블 선택</option>
                 {Object.keys(schemaData).map(table => <option key={table} value={table}>{table}</option>)}
               </select>
@@ -146,7 +177,6 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
                 <option value={4}>4열 (요약형)</option>
               </select>
             </div>
-            {/* [신규 추가] 카드 클릭 시 실행될 액션 설정 */}
             <div className="col-span-2 mt-2">
               <label className="flex items-center gap-2 text-xs font-black text-slate-400 mb-2 uppercase">
                 <MousePointerClick size={14} className="text-indigo-500"/> 카드 클릭 시 실행될 액션
@@ -175,6 +205,14 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           </div>
         </section>
       </div>
+
+      {/* 🔥 모달 렌더링 영역 */}
+      <IconPicker 
+        isOpen={isIconPickerOpen} 
+        onClose={() => setIsIconPickerOpen(false)}
+        selectedIcon={view.icon}
+        onSelect={(iconName) => onUpdate({ ...view, icon: iconName })}
+      />
     </div>
   );
 }

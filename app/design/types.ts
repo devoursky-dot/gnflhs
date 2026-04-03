@@ -2,6 +2,7 @@
 export type AppState = {
   id: number | null;
   name: string;
+  icon?: string | null; // [신규] 앱 아이콘
   views: View[];
   actions: Action[];
 };
@@ -9,6 +10,7 @@ export type AppState = {
 export type View = {
   id: string;
   name: string;
+  icon?: string | null; // [신규] 뷰 아이콘
   tableName: string | null;
   cardHeight: number;
   columnCount: number;
@@ -34,22 +36,19 @@ export type LayoutCell = {
 export type InsertMapping = {
   id: string;
   targetColumn: string;
-  mappingType: 'card_data' | 'static' | 'prompt'; // [추가] prompt: 팝업으로 입력받기
+  mappingType: 'card_data' | 'static' | 'prompt';
   sourceValue: string;
 };
 
 export type Action = {
   id: string;
   name: string;
+  icon?: string | null; // [신규] 액션 아이콘
   type: 'navigate' | 'alert' | 'link' | 'insert_row';
   targetViewId: string | null;
   message: string | null;
-  
-  // 데이터 추가 액션을 위한 속성
   insertTableName?: string | null;
   insertMappings?: InsertMapping[];
-  
-  // [신규 추가] 액션 실행 전 확인 여부
   requireConfirmation?: boolean;
   confirmationMessage?: string | null;
 };

@@ -5,14 +5,14 @@ import { createClient } from '@supabase/supabase-js';
 import { AppState, View, Action, SchemaData, LayoutRow, LayoutCell } from './types';
 import ViewEditor from './view';
 import ActionEditor from './action';
-import { Plus, RefreshCw, Send, Loader2, ExternalLink, Trash2, FolderOpen, X } from 'lucide-react';
+import { Plus, RefreshCw, Send, Loader2, ExternalLink, Trash2, FolderOpen, X, Star } from 'lucide-react';
+import IconPicker, { IconMap } from './picker'; // [신규] 앱 아이콘 설정용
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
 
-// --- 프리뷰 렌더러 ---
 const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) => {
   const isImageUrl = (url: any) => {
     if (typeof url !== 'string') return false;
@@ -43,8 +43,12 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
                 )}
                 {cell.contentType === 'action' && (() => {
                   const act = actions.find((a: Action) => a.id === cell.contentValue);
+                  // [추가] 액션에 아이콘이 있으면 렌더링
+                  const ActIcon = act?.icon && IconMap[act.icon] ? IconMap[act.icon] : null;
+
                   return act ? (
-                    <button onClick={(e: React.MouseEvent) => { e.stopPropagation(); onExecuteAction(act, rowData); }} className="w-full h-full bg-slate-900 text-white text-[10px] font-black py-3 hover:bg-indigo-600 transition-colors">
+                    <button onClick={(e: React.MouseEvent) => { e.stopPropagation(); onExecuteAction(act, rowData); }} className="w-full h-full bg-slate-900 text-white flex flex-col items-center justify-center gap-1 text-[10px] font-black py-3 hover:bg-indigo-600 transition-colors">
+                      {ActIcon && <ActIcon size={14} />}
                       {act.name}
                     </button>
                   ) : null;
@@ -64,10 +68,12 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
 export default function AppBuilder() {
   const [appState, setAppState] = useState<AppState>({
     id: null, 
-    name: '경남외고 학사 시스템',
+    name: '새로운 앱',
+    icon: null, // [신규] 초기 앱 아이콘 상태
     views: [{ id: 'v1', name: '메인 홈 (첫 화면)', tableName: null, cardHeight: 120, columnCount: 1, layoutRows: [], onClickActionId: null }],
     actions: []
   });
+  
   const [schemaData, setSchemaData] = useState<SchemaData>({});
   const [activeItem, setActiveItem] = useState<{ type: 'view' | 'action', id: string }>({ type: 'view', id: 'v1' });
   const [previewData, setPreviewData] = useState<Record<string, any[]>>({});
@@ -76,6 +82,7 @@ export default function AppBuilder() {
 
   const [isAppListModalOpen, setIsAppListModalOpen] = useState(false);
   const [savedAppsList, setSavedAppsList] = useState<any[]>([]);
+  const [isAppIconPickerOpen, setIsAppIconPickerOpen] = useState(false); // [신규] 앱 아이콘 픽커 상태
 
   useEffect(() => {
     async function fetchSchema() {
@@ -127,7 +134,7 @@ export default function AppBuilder() {
           payload[mapping.targetColumn] = rowData[mapping.sourceValue];
         } else if (mapping.mappingType === 'prompt') {
           const userInput = window.prompt(mapping.sourceValue || `${mapping.targetColumn}에 저장할 값을 입력하세요:`);
-          if (userInput === null) { alert('입력이 취소되어 작업이 중단되었습니다.'); return; }
+          if (userInput === null) return;
           payload[mapping.targetColumn] = userInput;
         } else {
           payload[mapping.targetColumn] = mapping.sourceValue;
@@ -152,14 +159,14 @@ export default function AppBuilder() {
     try {
       const payload = {
         name: appState.name,
-        app_config: { views: appState.views, actions: appState.actions }
+        app_config: { views: appState.views, actions: appState.actions, icon: appState.icon }
       };
 
       if (!appState.id) {
         const { data, error } = await supabase.from('apps').insert([payload]).select('id');
         if (error) throw error;
         if (data && data.length > 0) { setAppState(prev => ({ ...prev, id: data[0].id })); }
-        alert('성공적으로 저장 및 배포되었습니다! 이제 라이브 앱을 확인할 수 있습니다.');
+        alert('성공적으로 저장 및 배포되었습니다!');
       } else {
         const { error } = await supabase.from('apps').update(payload).eq('id', appState.id);
         if (error) throw error;
@@ -174,11 +181,11 @@ export default function AppBuilder() {
 
   const handleDeleteApp = async () => {
     if (!appState.id) return;
-    if (!window.confirm('정말로 이 앱을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며, 라이브 링크도 즉시 비활성화됩니다.')) return;
+    if (!window.confirm('정말로 이 앱을 삭제하시겠습니까?')) return;
     try {
       const { error } = await supabase.from('apps').delete().eq('id', appState.id);
       if (error) throw error;
-      alert('앱이 성공적으로 삭제되었습니다. 초기 상태로 돌아갑니다.');
+      alert('앱이 성공적으로 삭제되었습니다.');
       handleCreateNewApp();
     } catch (error: any) {
       alert(`앱 삭제 실패: ${error.message}`);
@@ -187,11 +194,7 @@ export default function AppBuilder() {
 
   const openAppListModal = async () => {
     setIsAppListModalOpen(true);
-    const { data, error } = await supabase
-      .from('apps')
-      .select('id, name, created_at')
-      .order('id', { ascending: false });
-      
+    const { data } = await supabase.from('apps').select('id, name, created_at').order('id', { ascending: false });
     if (data) setSavedAppsList(data);
   };
 
@@ -203,6 +206,7 @@ export default function AppBuilder() {
       setAppState({
         id: data.id,
         name: data.name || '이름 없는 앱',
+        icon: data.app_config?.icon || null,
         views: data.app_config?.views || [],
         actions: data.app_config?.actions || []
       });
@@ -216,16 +220,13 @@ export default function AppBuilder() {
     }
   };
 
-  // [수정] 새 앱 만들기 함수 로직 안정화
   const handleCreateNewApp = () => {
     const newViewId = `v_${Date.now()}`;
     setAppState({
-      id: null, 
-      name: '새로운 앱',
+      id: null, name: '새로운 앱', icon: null,
       views: [{ id: newViewId, name: '메인 홈 (첫 화면)', tableName: null, cardHeight: 120, columnCount: 1, layoutRows: [], onClickActionId: null }],
       actions: []
     });
-    // 상태가 업데이트 되기 전의 배열 대신, 방금 만든 새로운 ID를 직접 대입하여 화면 꼬임 방지
     setCurrentPreviewViewId(newViewId);
     setActiveItem({ type: 'view', id: newViewId });
     setIsAppListModalOpen(false);
@@ -234,11 +235,12 @@ export default function AppBuilder() {
   const activeView = appState.views.find(v => v.id === activeItem.id);
   const activeAction = appState.actions.find(a => a.id === activeItem.id);
   const previewView = appState.views.find(v => v.id === currentPreviewViewId) || appState.views[0];
+  const PreviewViewIcon = previewView?.icon && IconMap[previewView.icon] ? IconMap[previewView.icon] : null;
 
   return (
     <div className="flex h-screen w-full bg-slate-100 font-sans overflow-hidden">
       
-      {/* 모달 */}
+      {/* 팝업 모달 */}
       {isAppListModalOpen && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -253,34 +255,21 @@ export default function AppBuilder() {
             
             <div className="p-4 max-h-[400px] overflow-y-auto bg-slate-50 space-y-2">
               {savedAppsList.length === 0 ? (
-                <div className="py-10 text-center text-slate-400 font-bold text-sm">
-                  아직 저장된 앱이 없습니다.
-                </div>
+                <div className="py-10 text-center text-slate-400 font-bold text-sm">저장된 앱이 없습니다.</div>
               ) : (
                 savedAppsList.map(app => (
-                  <button 
-                    key={app.id} 
-                    onClick={() => loadAppToBuilder(app.id)}
-                    className="w-full flex items-center justify-between p-4 bg-white border border-slate-200 rounded-2xl hover:border-indigo-400 hover:shadow-md transition-all text-left group"
-                  >
+                  <button key={app.id} onClick={() => loadAppToBuilder(app.id)} className="w-full flex items-center justify-between p-4 bg-white border border-slate-200 rounded-2xl hover:border-indigo-400 hover:shadow-md transition-all text-left group">
                     <div>
                       <h3 className="font-black text-slate-800 text-base group-hover:text-indigo-700">{app.name || '이름 없는 앱'}</h3>
                       <p className="text-xs text-slate-400 font-bold mt-1">ID: {app.id} • {new Date(app.created_at).toLocaleDateString()}</p>
                     </div>
-                    <span className="text-sm font-black text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                      열기 &rarr;
-                    </span>
+                    <span className="text-sm font-black text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity">열기 &rarr;</span>
                   </button>
                 ))
               )}
             </div>
-
-            {/* 모달 안에도 새 앱 만들기 버튼 유지 (직관성을 위해) */}
             <div className="p-6 bg-white border-t border-slate-100">
-              <button 
-                onClick={handleCreateNewApp} 
-                className="w-full py-4 border-2 border-dashed border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2"
-              >
+              <button onClick={handleCreateNewApp} className="w-full py-4 border-2 border-dashed border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2">
                 <Plus size={18} /> 아예 새로운 앱 만들기
               </button>
             </div>
@@ -291,34 +280,32 @@ export default function AppBuilder() {
       {/* 사이드바 */}
       <aside className="w-[320px] border-r bg-white flex flex-col shrink-0 shadow-2xl z-50 relative">
         <div className="p-6 bg-indigo-700 text-white border-b border-indigo-800 shrink-0 flex flex-col gap-4">
-          
-          {/* [수정] 상단 앱 전환/생성 버튼들을 가로로 나란히 배치 */}
           <div className="flex justify-between items-center">
             <span className="text-[10px] font-black text-indigo-300 tracking-widest uppercase">My Workspace</span>
             <div className="flex items-center gap-1.5">
-              <button 
-                onClick={handleCreateNewApp} 
-                className="flex items-center gap-1 text-[11px] font-bold bg-indigo-800 hover:bg-indigo-900 text-white px-2.5 py-1.5 rounded-full transition-all shadow-sm"
-                title="초기화하고 새 앱 만들기"
-              >
-                <Plus size={12} /> 새 앱
-              </button>
-              <button 
-                onClick={openAppListModal} 
-                className="flex items-center gap-1 text-[11px] font-bold bg-indigo-800 hover:bg-indigo-900 text-white px-2.5 py-1.5 rounded-full transition-all shadow-sm"
-                title="저장된 앱 불러오기"
-              >
-                <FolderOpen size={12} /> 열기
-              </button>
+              <button onClick={handleCreateNewApp} className="flex items-center gap-1 text-[11px] font-bold bg-indigo-800 hover:bg-indigo-900 px-2.5 py-1.5 rounded-full" title="새 앱"><Plus size={12} /> 새 앱</button>
+              <button onClick={openAppListModal} className="flex items-center gap-1 text-[11px] font-bold bg-indigo-800 hover:bg-indigo-900 px-2.5 py-1.5 rounded-full" title="열기"><FolderOpen size={12} /> 열기</button>
             </div>
           </div>
           
-          <input 
-            type="text" 
-            value={appState.name} 
-            onChange={(e) => setAppState({...appState, name: e.target.value})}
-            className="bg-transparent text-white text-2xl font-black outline-none w-full border-b-2 border-indigo-400 focus:border-white transition-all placeholder:text-indigo-300 pb-1"
-          />
+          {/* [신규] 사이드바 앱 이름과 아이콘 결합 */}
+          <div className="flex items-center gap-3 mt-2">
+            <button 
+              onClick={() => setIsAppIconPickerOpen(true)}
+              className="w-10 h-10 shrink-0 flex items-center justify-center bg-indigo-800 border border-indigo-500 rounded-xl hover:bg-indigo-900 hover:border-white transition-all"
+            >
+              {appState.icon && IconMap[appState.icon] ? 
+                React.createElement(IconMap[appState.icon], { className: "text-white", size: 20 }) : 
+                <Star className="text-indigo-300" size={20} />
+              }
+            </button>
+            <input 
+              type="text" 
+              value={appState.name} 
+              onChange={(e) => setAppState({...appState, name: e.target.value})}
+              className="bg-transparent text-white text-xl font-black outline-none w-full border-b-2 border-indigo-400 focus:border-white transition-all placeholder:text-indigo-300 pb-1"
+            />
+          </div>
         </div>
         
         <div className="p-6 flex-1 overflow-y-auto space-y-10">
@@ -332,15 +319,19 @@ export default function AppBuilder() {
               }} className="p-1 hover:bg-slate-100 rounded-lg text-indigo-600"><Plus size={18}/></button>
             </div>
             <div className="space-y-2">
-              {appState.views.map(v => (
-                <button 
-                  key={v.id} 
-                  onClick={() => setActiveItem({type:'view', id:v.id})}
-                  className={`w-full text-left px-5 py-3 rounded-2xl text-sm font-black transition-all ${activeItem.id===v.id ? 'bg-indigo-600 text-white shadow-xl scale-105' : 'hover:bg-slate-100 text-slate-600'}`}
-                >
-                  {v.name}
-                </button>
-              ))}
+              {appState.views.map(v => {
+                const ViewIcon = v.icon && IconMap[v.icon] ? IconMap[v.icon] : null;
+                return (
+                  <button 
+                    key={v.id} 
+                    onClick={() => setActiveItem({type:'view', id:v.id})}
+                    className={`w-full flex items-center gap-2 text-left px-5 py-3 rounded-2xl text-sm font-black transition-all ${activeItem.id===v.id ? 'bg-indigo-600 text-white shadow-xl scale-105' : 'hover:bg-slate-100 text-slate-600'}`}
+                  >
+                    {ViewIcon && <ViewIcon size={16} className={activeItem.id === v.id ? "text-indigo-200" : "text-slate-400"} />}
+                    <span className="truncate">{v.name}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div>
@@ -353,46 +344,32 @@ export default function AppBuilder() {
               }} className="p-1 hover:bg-slate-100 rounded-lg text-rose-500"><Plus size={18}/></button>
             </div>
             <div className="space-y-2">
-              {appState.actions.map(a => (
-                <button 
-                  key={a.id} 
-                  onClick={() => setActiveItem({type:'action', id:a.id})}
-                  className={`w-full text-left px-5 py-3 border-l-8 rounded-r-2xl text-sm font-black transition-all ${activeItem.id===a.id ? 'bg-rose-50 border-rose-500 text-rose-800 shadow-sm' : 'border-transparent hover:bg-slate-100 text-slate-600'}`}
-                >
-                  ⚡ {a.name}
-                </button>
-              ))}
+              {appState.actions.map(a => {
+                const ActIcon = a.icon && IconMap[a.icon] ? IconMap[a.icon] : null;
+                return (
+                  <button 
+                    key={a.id} 
+                    onClick={() => setActiveItem({type:'action', id:a.id})}
+                    className={`w-full flex items-center gap-2 text-left px-5 py-3 border-l-8 rounded-r-2xl text-sm font-black transition-all ${activeItem.id===a.id ? 'bg-rose-50 border-rose-500 text-rose-800 shadow-sm' : 'border-transparent hover:bg-slate-100 text-slate-600'}`}
+                  >
+                    {ActIcon ? <ActIcon size={16} className={activeItem.id === a.id ? "text-rose-500" : "text-slate-400"} /> : <span>⚡</span>}
+                    <span className="truncate">{a.name}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
 
         <div className="p-6 bg-slate-50 border-t border-slate-200 shrink-0">
-          <button
-            onClick={handleSaveAndDeploy}
-            disabled={isSaving}
-            className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-black shadow-xl hover:shadow-indigo-500/30 transition-all active:scale-95 disabled:opacity-70 disabled:pointer-events-none"
-          >
+          <button onClick={handleSaveAndDeploy} disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-black shadow-xl hover:shadow-indigo-500/30 transition-all active:scale-95 disabled:opacity-70 disabled:pointer-events-none">
             {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
             {isSaving ? '배포 진행 중...' : '🚀 저장 및 배포하기'}
           </button>
-
           {appState.id && (
             <div className="mt-3 flex items-center gap-2">
-              <a
-                href={`/preview/${appState.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-2xl text-sm font-bold transition-all shadow-sm"
-              >
-                <ExternalLink size={16} /> 라이브 앱 열기
-              </a>
-              <button
-                onClick={handleDeleteApp}
-                title="이 앱을 서버에서 삭제합니다"
-                className="p-3 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 hover:border-rose-300 rounded-2xl transition-all shadow-sm"
-              >
-                <Trash2 size={18} />
-              </button>
+              <a href={`/preview/${appState.id}`} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-2xl text-sm font-bold transition-all shadow-sm"><ExternalLink size={16} /> 라이브 앱 열기</a>
+              <button onClick={handleDeleteApp} title="이 앱을 서버에서 삭제합니다" className="p-3 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 hover:border-rose-300 rounded-2xl transition-all shadow-sm"><Trash2 size={18} /></button>
             </div>
           )}
         </div>
@@ -417,8 +394,13 @@ export default function AppBuilder() {
 
       <aside className="w-[450px] bg-slate-900 flex flex-col items-center py-10 shrink-0 shadow-2xl z-30">
         <div className="w-[340px] h-[720px] bg-white rounded-[4rem] border-[10px] border-slate-800 shadow-2xl overflow-hidden flex flex-col relative">
+          
+          {/* [수정] 라이브 프리뷰 헤더에도 뷰 아이콘 노출 */}
           <div className="pt-14 pb-4 px-12 text-center border-b bg-white sticky top-0 z-10 flex items-center justify-center shadow-sm relative">
-            <div className="font-black text-slate-900 text-xl tracking-tight truncate">{previewView?.name}</div>
+            <div className="font-black text-slate-900 text-xl tracking-tight truncate flex items-center justify-center gap-2">
+              {PreviewViewIcon && <PreviewViewIcon size={20} className="text-indigo-500" />}
+              {previewView?.name}
+            </div>
             {previewView?.tableName && (
               <button onClick={(e) => { e.stopPropagation(); fetchTableData(previewView.tableName!); }} className="absolute right-4 bottom-3.5 p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all active:scale-95" title="데이터 동기화">
                 <RefreshCw size={18} />
@@ -431,13 +413,8 @@ export default function AppBuilder() {
               {previewData[previewView?.tableName || '']?.map((row, idx) => {
                 const clickAction = appState.actions.find(a => a.id === previewView?.onClickActionId);
                 return (
-                  <div 
-                    key={idx} 
-                    className={`bg-white border-b border-r border-slate-100 overflow-hidden transition-all ${clickAction ? 'cursor-pointer hover:bg-indigo-50/50 active:scale-[0.98]' : ''}`} 
-                    style={{ minHeight: `${previewView.cardHeight}px` }}
-                    onClick={() => { if (clickAction) handleAction(clickAction, row); }}
-                  >
-                    <RenderPreviewLayout rows={previewView.layoutRows} rowData={row} actions={appState.actions} onExecuteAction={handleAction} />
+                  <div key={idx} className={`bg-white border-b border-r border-slate-100 overflow-hidden transition-all ${clickAction ? 'cursor-pointer hover:bg-indigo-50/50 active:scale-[0.98]' : ''}`} style={{ minHeight: `${previewView?.cardHeight}px` }} onClick={() => { if (clickAction) handleAction(clickAction, row); }}>
+                    <RenderPreviewLayout rows={previewView?.layoutRows || []} rowData={row} actions={appState.actions} onExecuteAction={handleAction} />
                   </div>
                 );
               })}
@@ -452,6 +429,14 @@ export default function AppBuilder() {
           )}
         </div>
       </aside>
+
+      {/* 앱 설정 아이콘 피커 */}
+      <IconPicker 
+        isOpen={isAppIconPickerOpen} 
+        onClose={() => setIsAppIconPickerOpen(false)}
+        selectedIcon={appState.icon}
+        onSelect={(iconName) => setAppState({ ...appState, icon: iconName })}
+      />
     </div>
   );
 }

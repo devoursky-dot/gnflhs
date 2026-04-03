@@ -1,7 +1,8 @@
 // action.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import { Action, View, SchemaData, InsertMapping } from './types';
-import { Settings2, Trash2, Plus, DatabaseZap } from 'lucide-react';
+import { Settings2, Trash2, Plus, DatabaseZap, Star } from 'lucide-react';
+import IconPicker, { IconMap } from './picker'; // [신규] 피커 임포트
 
 interface ActionEditorProps {
   action: Action;
@@ -12,13 +13,20 @@ interface ActionEditorProps {
 }
 
 export default function ActionEditor({ action, views, schemaData, onUpdate, onDelete }: ActionEditorProps) {
+  const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
+
   return (
-    <div className="flex-1 overflow-y-auto p-8 lg:p-12 bg-white rounded-tl-3xl shadow-sm border-l border-t border-slate-200">
+    <div className="flex-1 overflow-y-auto p-8 lg:p-12 bg-white rounded-tl-3xl shadow-sm border-l border-t border-slate-200 relative">
       <div className="max-w-2xl mx-auto space-y-8">
+        
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div>
             <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-              <Settings2 className="text-rose-500" /> 액션 설정: {action.name}
+              {action.icon && IconMap[action.icon] ? 
+                React.createElement(IconMap[action.icon], { className: "text-rose-500", size: 28 }) : 
+                <Settings2 className="text-rose-500" size={28} />
+              }
+              액션 설정: {action.name}
             </h2>
             <p className="text-sm text-slate-500 mt-1">카드 내 버튼 클릭 시 실행될 이벤트를 정의하세요.</p>
           </div>
@@ -31,15 +39,30 @@ export default function ActionEditor({ action, views, schemaData, onUpdate, onDe
         </div>
 
         <div className="space-y-6 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+          
+          {/* [신규] 아이콘 + 텍스트 인풋 결합 */}
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">액션 이름</label>
-            {/* [수정] 입력 필드에 text-slate-900 bg-white 명시적 추가 */}
-            <input
-              type="text"
-              value={action.name}
-              onChange={(e) => onUpdate({ ...action, name: e.target.value })}
-              className="w-full p-3 rounded-xl border border-slate-200 text-slate-900 bg-white focus:border-rose-500 focus:ring-2 focus:ring-rose-200 outline-none transition-all"
-            />
+            <label className="block text-sm font-bold text-slate-700 mb-2">액션 아이콘 및 이름</label>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setIsIconPickerOpen(true)}
+                title="아이콘 변경하기"
+                className="w-12 h-12 shrink-0 flex items-center justify-center bg-white border border-slate-200 rounded-xl hover:border-rose-400 hover:shadow-md transition-all group"
+              >
+                {action.icon && IconMap[action.icon] ? 
+                  React.createElement(IconMap[action.icon], { className: "text-rose-500 group-hover:scale-110 transition-transform", size: 24 }) : 
+                  <Star className="text-slate-400 group-hover:text-rose-500 transition-colors" size={24} />
+                }
+              </button>
+              
+              <input
+                type="text"
+                value={action.name}
+                onChange={(e) => onUpdate({ ...action, name: e.target.value })}
+                placeholder="액션 이름을 입력하세요"
+                className="flex-1 p-3 rounded-xl border border-slate-200 text-slate-900 bg-white focus:border-rose-500 focus:ring-2 focus:ring-rose-200 outline-none transition-all"
+              />
+            </div>
           </div>
 
           <div>
@@ -74,7 +97,6 @@ export default function ActionEditor({ action, views, schemaData, onUpdate, onDe
           {action.type === 'alert' && (
             <div className="animate-in fade-in slide-in-from-top-2">
               <label className="block text-sm font-bold text-slate-700 mb-2">알림 메시지 내용</label>
-              {/* [수정] text-slate-900 추가 */}
               <input
                 type="text"
                 value={action.message || ''}
@@ -117,7 +139,6 @@ export default function ActionEditor({ action, views, schemaData, onUpdate, onDe
                     </label>
                     {action.requireConfirmation && (
                       <div className="ml-6">
-                        {/* [수정] text-slate-900 추가 */}
                         <input
                           type="text"
                           value={action.confirmationMessage || ''}
@@ -201,7 +222,6 @@ export default function ActionEditor({ action, views, schemaData, onUpdate, onDe
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 block">
                               3. {mapping.mappingType === 'card_data' ? '가져올 원본 컬럼명' : mapping.mappingType === 'prompt' ? '팝업 창에 띄울 질문 내용' : '입력할 고정값'}
                             </span>
-                            {/* [수정] text-slate-900 추가 */}
                             <input
                               type="text"
                               value={mapping.sourceValue}
@@ -230,9 +250,16 @@ export default function ActionEditor({ action, views, schemaData, onUpdate, onDe
               )}
             </div>
           )}
-
         </div>
       </div>
+
+      {/* 피커 모달 렌더링 */}
+      <IconPicker 
+        isOpen={isIconPickerOpen} 
+        onClose={() => setIsIconPickerOpen(false)}
+        selectedIcon={action.icon}
+        onSelect={(iconName) => onUpdate({ ...action, icon: iconName })}
+      />
     </div>
   );
 }

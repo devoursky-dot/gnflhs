@@ -1,16 +1,17 @@
 // picker.tsx
 import React, { useState, useMemo } from 'react';
 import * as LucideIcons from 'lucide-react';
-import { Search, X, Hash } from 'lucide-react';
+import { Search, X, Hash, Star } from 'lucide-react';
 
-// 1. Lucide의 모든 아이콘을 동적으로 추출하여 IconMap 생성 (수천 개 자동 맵핑)
+// 1. Lucide의 모든 아이콘을 동적으로 추출하여 IconMap 생성 (에러 완벽 수정)
 export const IconMap = Object.entries(LucideIcons).reduce((acc, [name, component]) => {
-  // 컴포넌트(함수/객체)이면서 유틸리티 함수가 아닌 것만 필터링
+  // 🔥 핵심 수정: 이름이 '대문자'로 시작하는지 검사하여 실제 React 컴포넌트만 안전하게 추출
+  // (소문자로 시작하는 icons, aliases, defaultAttributes 등의 일반 객체 데이터 배제)
   if (
-    (typeof component === 'object' || typeof component === 'function') && 
-    name !== 'createLucideIcon' && 
-    name !== 'default' &&
-    name !== 'Icon'
+    /^[A-Z]/.test(name) && 
+    name !== 'Icon' && 
+    name !== 'LucideIcon' &&
+    (typeof component === 'object' || typeof component === 'function')
   ) {
     acc[name] = component as React.ElementType;
   }
@@ -159,7 +160,6 @@ export default function IconPicker({ isOpen, onClose, onSelect, selectedIcon }: 
                 <p className="font-bold">검색어에 일치하는 아이콘이 없습니다.</p>
               </div>
             ) : (
-              // [최적화 포인트] auto-fill을 사용하여 브라우저 너비에 맞게 유동적 배치
               <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-4">
                 {displayedIcons.map(iconName => {
                   const IconComponent = IconMap[iconName];
