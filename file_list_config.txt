@@ -1,0 +1,6 @@
+C:/react-projects/gnflhs/app/preview/[appId]/page.tsx
+C:/react-projects/gnflhs/app/design/page.tsx
+C:/react-projects/gnflhs/app/design/action.tsx
+C:/react-projects/gnflhs/app/design/view.tsx
+C:/react-projects/gnflhs/app/design/picker.tsx
+C:/react-projects/gnflhs/app/design/types.ts

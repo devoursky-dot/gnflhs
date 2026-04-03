@@ -1,16 +1,16 @@
+// 파일 경로: C:/react-projects/gnflhs/app/preview/[appId]/page.tsx
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 
-// Supabase 클라이언트 초기화
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
 
-// --- 프리뷰 렌더러 (빌더와 동일한 엔진) ---
 const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) => {
   const isImageUrl = (url: any) => {
     if (typeof url !== 'string') return false;
@@ -27,20 +27,12 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
 
             return (
               <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col justify-center min-w-0 overflow-hidden relative">
-                
-                {/* 이미지 */}
                 {cell.contentType === 'field' && shouldShowImage && (
                   <div className="w-full h-full overflow-hidden bg-slate-50">
-                    <img 
-                      src={String(cellValue)} 
-                      alt="img" 
-                      className="w-full h-full object-cover" 
-                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                    />
+                    <img src={String(cellValue)} alt="img" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                   </div>
                 )}
                 
-                {/* 텍스트 */}
                 {cell.contentType === 'field' && !shouldShowImage && (
                   <div className="p-2 w-full h-full flex items-center">
                     <span className="text-[14px] font-black text-slate-900 break-words leading-tight">
@@ -49,15 +41,11 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
                   </div>
                 )}
 
-                {/* 버튼 (액션) */}
                 {cell.contentType === 'action' && (() => {
                   const act = actions?.find((a: any) => a.id === cell.contentValue);
                   return act ? (
                     <button 
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation(); 
-                        onExecuteAction(act, rowData); 
-                      }}
+                      onClick={(e: React.MouseEvent) => { e.stopPropagation(); onExecuteAction(act, rowData); }}
                       className="w-full h-full bg-slate-900 text-white text-[10px] font-black py-3 hover:bg-indigo-600 transition-colors"
                     >
                       {act.name}
@@ -65,7 +53,6 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
                   ) : null;
                 })()}
 
-                {/* 중첩 레이아웃 */}
                 {cell.contentType === 'nested' && cell.nestedRows && (
                   <RenderPreviewLayout rows={cell.nestedRows} rowData={rowData} actions={actions} onExecuteAction={onExecuteAction} />
                 )}
@@ -78,9 +65,8 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
   );
 };
 
-// [중요] 반드시 export default function 컴포넌트명() 형태로 내보내야 합니다.
 export default function LiveAppPreview() {
-  const params = useParams(); // URL에서 [appId]를 안전하게 가져오기 위함
+  const params = useParams();
   const appId = params?.appId;
 
   const [loading, setLoading] = useState(true);
@@ -88,7 +74,6 @@ export default function LiveAppPreview() {
   const [currentViewId, setCurrentViewId] = useState<string>('');
   const [tableData, setTableData] = useState<Record<string, any[]>>({});
 
-  // 1. 앱 설정 정보 불러오기
   useEffect(() => {
     if (!appId) return;
 
@@ -102,11 +87,26 @@ export default function LiveAppPreview() {
 
         if (error) throw error;
 
-        setAppData(data);
+        const urlParams = new URLSearchParams(window.location.search);
+        const mode = urlParams.get('mode');
         
-        // 첫 번째 뷰를 기본 화면으로 설정
-        if (data?.app_config?.views?.length > 0) {
-          setCurrentViewId(data.app_config.views[0].id);
+        let activeConfig = data.app_config; 
+        
+        // --- [수정] UI 배너 대신 브라우저 탭 제목으로 모드 구분 ---
+        if (mode === 'draft') {
+          activeConfig = data.draft_config || data.app_config; 
+          document.title = `[Draft] ${data.name || '미리보기'}`;
+        } else {
+          document.title = data.name || '앱 실행';
+        }
+
+        const normalizedData = { ...data, app_config: activeConfig || { views: [], actions: [] } };
+        setAppData(normalizedData);
+        
+        if (normalizedData.app_config?.views?.length > 0) {
+          const initialViewId = urlParams.get('viewId');
+          const targetView = initialViewId ? normalizedData.app_config.views.find((v: any) => v.id === initialViewId) : null;
+          setCurrentViewId(targetView ? targetView.id : normalizedData.app_config.views[0].id);
         }
       } catch (error) {
         console.error("Failed to load app config:", error);
@@ -118,12 +118,10 @@ export default function LiveAppPreview() {
     fetchAppConfig();
   }, [appId]);
 
-  // 2. 현재 화면(View)에 필요한 DB 테이블 데이터 불러오기
   const fetchTableData = async (tableName: string) => {
     try {
       const { data, error } = await supabase.from(tableName).select("*").limit(1000);
       if (error) throw error;
-      
       if (data) {
         setTableData(prev => ({ ...prev, [tableName]: data }));
       }
@@ -141,7 +139,6 @@ export default function LiveAppPreview() {
     }
   }, [currentViewId, currentView?.tableName, tableData]);
 
-  // 3. 사용자가 앱에서 버튼이나 카드를 클릭했을 때 실행할 액션 로직
   const handleAction = async (action: any, rowData: any) => {
     if (action.type === 'alert') {
       alert(action.message || '알림');
@@ -160,18 +157,15 @@ export default function LiveAppPreview() {
       }
 
       const payload: Record<string, any> = {};
-      
+
       for (const mapping of action.insertMappings) {
         if (!mapping.targetColumn) continue;
-        
+
         if (mapping.mappingType === 'card_data') {
           payload[mapping.targetColumn] = rowData[mapping.sourceValue];
         } else if (mapping.mappingType === 'prompt') {
           const userInput = window.prompt(mapping.sourceValue || `${mapping.targetColumn}에 저장할 값을 입력하세요:`);
-          if (userInput === null) {
-            alert('입력이 취소되었습니다.');
-            return; 
-          }
+          if (userInput === null) return;
           payload[mapping.targetColumn] = userInput;
         } else {
           payload[mapping.targetColumn] = mapping.sourceValue;
@@ -182,14 +176,11 @@ export default function LiveAppPreview() {
         const { error } = await supabase.from(action.insertTableName).insert([payload]);
         if (error) throw error;
         
-        // 추가 성공 시, 현재 보고 있는 화면의 테이블이라면 새로고침
         if (currentView?.tableName === action.insertTableName) {
           await fetchTableData(action.insertTableName);
         }
-        
         alert(`성공: [${action.insertTableName}] 테이블에 데이터가 추가되었습니다.`);
       } catch (error: any) {
-        console.error("Insert Error: ", error);
         alert(`데이터 추가 실패: ${error.message}`);
       }
     }
@@ -199,18 +190,16 @@ export default function LiveAppPreview() {
     return <div className="flex h-screen w-full items-center justify-center bg-slate-50 text-slate-500 font-bold">앱을 불러오는 중입니다...</div>;
   }
 
-  if (!appData) {
-    return <div className="flex h-screen w-full items-center justify-center bg-slate-50 text-rose-500 font-bold">앱을 찾을 수 없거나 삭제되었습니다.</div>;
+  if (!appData || !appData.app_config?.views?.length) {
+    return <div className="flex h-screen w-full items-center justify-center bg-slate-50 text-rose-500 font-bold">표시할 화면이 없거나 설정이 비어있습니다.</div>;
   }
 
-  // --- 실제 앱 UI 렌더링 ---
   return (
     <div className="min-h-screen bg-slate-100 flex justify-center font-sans">
       <div className="w-full max-w-md bg-white shadow-2xl flex flex-col relative">
         
-        {/* 상단 네비게이션 헤더 */}
-        <div className="pt-12 pb-4 px-6 text-center border-b bg-white sticky top-0 z-10 flex items-center justify-center shadow-sm relative">
-          {/* 뒤로가기 버튼 (첫 화면이 아닐 때만 노출) */}
+        {/* 상단 네비게이션 헤더 (배너 제거 후 top-0 고정) */}
+        <div className="pt-8 pb-4 px-6 text-center border-b bg-white sticky top-0 z-10 flex items-center justify-center shadow-sm relative">
           {currentViewId !== appData.app_config.views[0]?.id && (
             <button 
               onClick={() => setCurrentViewId(appData.app_config.views[0].id)}
@@ -224,7 +213,6 @@ export default function LiveAppPreview() {
             {currentView?.name || appData.name}
           </div>
           
-          {/* 동기화 버튼 */}
           {currentView?.tableName && (
             <button
               onClick={() => fetchTableData(currentView.tableName)}

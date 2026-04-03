@@ -1,8 +1,9 @@
-// types.ts
+// 파일 경로: C:/react-projects/gnflhs/app/design/types.ts
+
 export type AppState = {
   id: number | null;
   name: string;
-  icon?: string | null; // [신규] 앱 아이콘
+  icon?: string | null;
   views: View[];
   actions: Action[];
 };
@@ -10,7 +11,7 @@ export type AppState = {
 export type View = {
   id: string;
   name: string;
-  icon?: string | null; // [신규] 뷰 아이콘
+  icon?: string | null;
   tableName: string | null;
   cardHeight: number;
   columnCount: number;
@@ -38,12 +39,14 @@ export type InsertMapping = {
   targetColumn: string;
   mappingType: 'card_data' | 'static' | 'prompt';
   sourceValue: string;
+  // [신규] 데이터 타입 구분 (숫자 또는 문자)
+  valueType?: 'string' | 'number'; 
 };
 
 export type Action = {
   id: string;
   name: string;
-  icon?: string | null; // [신규] 액션 아이콘
+  icon?: string | null;
   type: 'navigate' | 'alert' | 'link' | 'insert_row';
   targetViewId: string | null;
   message: string | null;
