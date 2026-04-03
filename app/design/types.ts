@@ -13,11 +13,12 @@ export type View = {
   cardHeight: number;
   columnCount: number;
   layoutRows: LayoutRow[];
-  onClickActionId?: string | null; // [신규] 카드 전체 클릭 시 실행될 액션 ID
+  onClickActionId?: string | null;
 };
 
 export type LayoutRow = {
   id: string;
+  type?: 'row';
   cells: LayoutCell[];
 };
 
@@ -30,12 +31,27 @@ export type LayoutCell = {
   nestedRows?: LayoutRow[];
 };
 
+export type InsertMapping = {
+  id: string;
+  targetColumn: string;
+  mappingType: 'card_data' | 'static' | 'prompt'; // [추가] prompt: 팝업으로 입력받기
+  sourceValue: string;
+};
+
 export type Action = {
   id: string;
   name: string;
-  type: 'navigate' | 'alert' | 'link';
+  type: 'navigate' | 'alert' | 'link' | 'insert_row';
   targetViewId: string | null;
   message: string | null;
+  
+  // 데이터 추가 액션을 위한 속성
+  insertTableName?: string | null;
+  insertMappings?: InsertMapping[];
+  
+  // [신규 추가] 액션 실행 전 확인 여부
+  requireConfirmation?: boolean;
+  confirmationMessage?: string | null;
 };
 
 export type SchemaData = Record<string, string[]>;

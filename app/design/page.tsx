@@ -5,23 +5,22 @@ import { createClient } from '@supabase/supabase-js';
 import { AppState, View, Action, SchemaData, LayoutRow, LayoutCell } from './types';
 import ViewEditor from './view';
 import ActionEditor from './action';
-import { Plus } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 
-// Supabase 클라이언트 설정
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
 
 // --- 프리뷰 렌더러 ---
-const RenderPreviewLayout = ({ rows, rowData, actions, onNavigate }: any) => {
+const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) => {
   const isImageUrl = (url: any) => {
     if (typeof url !== 'string') return false;
     return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url) || (url.startsWith('http') && url.includes('/storage/v1/object/public/'));
   };
 
   return (
-    <div className="flex flex-col gap-0 w-full h-full">
+    <div className="flex flex-col gap-0 w-full h-full text-slate-900">
       {rows.map((row: LayoutRow) => (
         <div key={row.id} className="flex gap-0 w-full items-stretch">
           {row.cells.map((cell: LayoutCell) => {
@@ -30,6 +29,7 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onNavigate }: any) => {
 
             return (
               <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col justify-center min-w-0 overflow-hidden relative">
+                
                 {/* 이미지 렌더링 */}
                 {cell.contentType === 'field' && shouldShowImage && (
                   <div className="w-full h-full overflow-hidden bg-slate-50">
@@ -46,7 +46,7 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onNavigate }: any) => {
                 {cell.contentType === 'field' && !shouldShowImage && (
                   <div className="p-2 w-full h-full flex items-center">
                     <span className="text-[14px] font-black text-slate-900 break-words leading-tight">
-                      {String(cellValue || '-')}
+                      {cellValue !== null && cellValue !== undefined && cellValue !== '' ? String(cellValue) : '-'}
                     </span>
                   </div>
                 )}
@@ -58,7 +58,7 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onNavigate }: any) => {
                     <button 
                       onClick={(e: React.MouseEvent) => {
                         e.stopPropagation(); 
-                        act.type === 'alert' ? alert(act.message) : onNavigate(act.targetViewId);
+                        onExecuteAction(act, rowData); 
                       }}
                       className="w-full h-full bg-slate-900 text-white text-[10px] font-black py-3 hover:bg-indigo-600 transition-colors"
                     >
@@ -69,7 +69,7 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onNavigate }: any) => {
 
                 {/* 중첩 레이아웃 */}
                 {cell.contentType === 'nested' && cell.nestedRows && (
-                  <RenderPreviewLayout rows={cell.nestedRows} rowData={rowData} actions={actions} onNavigate={onNavigate} />
+                  <RenderPreviewLayout rows={cell.nestedRows} rowData={rowData} actions={actions} onExecuteAction={onExecuteAction} />
                 )}
               </div>
             );
@@ -115,14 +115,73 @@ export default function AppBuilder() {
     fetchSchema();
   }, []);
 
+  const fetchTableData = async (tableName: string) => {
+    const { data } = await supabase.from(tableName).select("*").limit(1000);
+    if (data) {
+      setPreviewData(prev => ({ ...prev, [tableName]: data }));
+    }
+  };
+
   useEffect(() => {
     const activeView = appState.views.find(v => v.id === currentPreviewViewId);
     if (activeView?.tableName && !previewData[activeView.tableName]) {
-      supabase.from(activeView.tableName).select("*").limit(1000).then(({ data }) => {
-        if (data) setPreviewData(prev => ({ ...prev, [activeView.tableName as string]: data }));
-      });
+      fetchTableData(activeView.tableName);
     }
   }, [currentPreviewViewId, appState.views, previewData]);
+
+  const handleAction = async (action: Action, rowData: any) => {
+    if (action.type === 'alert') {
+      alert(action.message || '알림');
+    } else if (action.type === 'navigate' && action.targetViewId) {
+      setCurrentPreviewViewId(action.targetViewId);
+    } else if (action.type === 'insert_row' && action.insertTableName) {
+      
+      if (action.requireConfirmation) {
+        const isConfirmed = window.confirm(action.confirmationMessage || '정말로 데이터를 추가하시겠습니까?');
+        if (!isConfirmed) return; 
+      }
+
+      if (!action.insertMappings || action.insertMappings.length === 0) {
+        alert('실패: 데이터 매핑이 설정되지 않았습니다.');
+        return;
+      }
+
+      const payload: Record<string, any> = {};
+      
+      for (const mapping of action.insertMappings) {
+        if (!mapping.targetColumn) continue;
+        
+        if (mapping.mappingType === 'card_data') {
+          payload[mapping.targetColumn] = rowData[mapping.sourceValue];
+        } else if (mapping.mappingType === 'prompt') {
+          const userInput = window.prompt(mapping.sourceValue || `${mapping.targetColumn}에 저장할 값을 입력하세요:`);
+          
+          if (userInput === null) {
+            alert('입력이 취소되어 작업이 중단되었습니다.');
+            return; 
+          }
+          payload[mapping.targetColumn] = userInput;
+        } else {
+          payload[mapping.targetColumn] = mapping.sourceValue;
+        }
+      }
+
+      try {
+        const { error } = await supabase.from(action.insertTableName).insert([payload]);
+        if (error) throw error;
+        
+        const currentView = appState.views.find(v => v.id === currentPreviewViewId);
+        if (currentView?.tableName === action.insertTableName) {
+          await fetchTableData(action.insertTableName);
+        }
+        
+        alert(`성공: [${action.insertTableName}] 테이블에 데이터가 추가되었습니다.`);
+      } catch (error: any) {
+        console.error("Insert Error: ", error);
+        alert(`데이터 추가 실패: ${error.message}`);
+      }
+    }
+  };
 
   const activeView = appState.views.find(v => v.id === activeItem.id);
   const activeAction = appState.actions.find(a => a.id === activeItem.id);
@@ -136,7 +195,7 @@ export default function AppBuilder() {
             type="text" 
             value={appState.name} 
             onChange={(e) => setAppState({...appState, name: e.target.value})}
-            className="bg-transparent text-xl font-black outline-none w-full border-b-2 border-indigo-400 focus:border-white transition-all"
+            className="bg-transparent text-white text-xl font-black outline-none w-full border-b-2 border-indigo-400 focus:border-white transition-all placeholder:text-indigo-300"
           />
         </div>
         <div className="p-6 flex-1 overflow-y-auto space-y-10">
@@ -187,8 +246,8 @@ export default function AppBuilder() {
 
       <main className="flex-1 flex flex-col relative z-10 bg-slate-50 h-screen overflow-y-auto">
         <header className="h-16 border-b bg-white px-10 flex items-center shadow-sm shrink-0 sticky top-0 z-20">
-          <span className="text-xs font-black text-slate-300 uppercase tracking-widest">{activeItem.type} MODE</span>
-          <span className="mx-4 text-slate-200">|</span>
+          <span className="text-xs font-black text-slate-400 uppercase tracking-widest">{activeItem.type} MODE</span>
+          <span className="mx-4 text-slate-300">|</span>
           <span className="text-lg font-black text-slate-900">{activeItem.type==='view' ? activeView?.name : activeAction?.name}</span>
         </header>
         
@@ -205,6 +264,7 @@ export default function AppBuilder() {
             <ActionEditor 
               action={activeAction} 
               views={appState.views}
+              schemaData={schemaData} 
               onUpdate={(upd) => setAppState({...appState, actions: appState.actions.map(a => a.id===upd.id ? upd : a)})} 
               onDelete={(id) => { 
                 setAppState({...appState, actions: appState.actions.filter(a => a.id !== id)}); 
@@ -217,8 +277,27 @@ export default function AppBuilder() {
 
       <aside className="w-[450px] bg-slate-900 flex flex-col items-center py-10 shrink-0 shadow-2xl z-30">
         <div className="w-[340px] h-[720px] bg-white rounded-[4rem] border-[10px] border-slate-800 shadow-2xl overflow-hidden flex flex-col relative">
-          <div className="pt-16 pb-6 text-center border-b font-black text-slate-900 text-xl tracking-tight bg-white sticky top-0 z-10">{previewView?.name}</div>
-          <div className="flex-1 overflow-y-auto bg-slate-50">
+          
+          {/* [수정] 모바일 친화적 헤더 레이아웃: 아이콘 버튼을 우측에 앱 네비게이션바처럼 배치 */}
+          <div className="pt-14 pb-4 px-12 text-center border-b bg-white sticky top-0 z-10 flex items-center justify-center shadow-sm relative">
+            <div className="font-black text-slate-900 text-xl tracking-tight truncate">
+              {previewView?.name}
+            </div>
+            {previewView?.tableName && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fetchTableData(previewView.tableName!);
+                }}
+                className="absolute right-4 bottom-3.5 p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all active:scale-95"
+                title="데이터 동기화"
+              >
+                <RefreshCw size={18} />
+              </button>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto bg-slate-50 text-slate-900">
             <div className={`grid gap-0 ${
               previewView.columnCount === 2 ? 'grid-cols-2' : 
               previewView.columnCount === 3 ? 'grid-cols-3' : 
@@ -236,9 +315,7 @@ export default function AppBuilder() {
                     style={{ minHeight: `${previewView.cardHeight}px` }}
                     onClick={() => {
                       if (clickAction) {
-                        clickAction.type === 'alert' 
-                          ? alert(clickAction.message || '') 
-                          : setCurrentPreviewViewId(clickAction.targetViewId || '');
+                        handleAction(clickAction, row); 
                       }
                     }}
                   >
@@ -246,7 +323,7 @@ export default function AppBuilder() {
                       rows={previewView.layoutRows} 
                       rowData={row} 
                       actions={appState.actions} 
-                      onNavigate={(id:string) => setCurrentPreviewViewId(id)}
+                      onExecuteAction={handleAction} 
                     />
                   </div>
                 );
