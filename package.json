@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@prisma/client": "^7.6.0",
-    "@supabase/supabase-js": "^2.100.1",
+    "@supabase/supabase-js": "^2.101.1",
     "@tanstack/react-table": "^8.21.3",
     "lucide-react": "^1.7.0",
     "next": "16.2.1",

@@ -10,21 +10,23 @@ export type View = {
   id: string;
   name: string;
   tableName: string | null;
+  cardHeight: number;
+  columnCount: number;
   layoutRows: LayoutRow[];
+  onClickActionId?: string | null; // [신규] 카드 전체 클릭 시 실행될 액션 ID
 };
 
 export type LayoutRow = {
   id: string;
-  type: 'row';
   cells: LayoutCell[];
 };
 
 export type LayoutCell = {
   id: string;
-  flex: number;
+  flex: number; 
   contentType: 'empty' | 'field' | 'action' | 'nested';
   contentValue: string | null;
-  isImage?: boolean; // [업그레이드] 이미지 여부 체크 속성 추가
+  isImage?: boolean; 
   nestedRows?: LayoutRow[];
 };
 
