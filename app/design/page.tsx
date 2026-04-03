@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { AppState, View, Action, SchemaData, LayoutRow, LayoutCell } from './types';
 import ViewEditor from './view';
 import ActionEditor from './action';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw, Send, Loader2, ExternalLink, Trash2, FolderOpen, X } from 'lucide-react';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
@@ -29,20 +29,11 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
 
             return (
               <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col justify-center min-w-0 overflow-hidden relative">
-                
-                {/* 이미지 렌더링 */}
                 {cell.contentType === 'field' && shouldShowImage && (
                   <div className="w-full h-full overflow-hidden bg-slate-50">
-                    <img 
-                      src={String(cellValue)} 
-                      alt="img" 
-                      className="w-full h-full object-cover" 
-                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                    />
+                    <img src={String(cellValue)} alt="img" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                   </div>
                 )}
-                
-                {/* 텍스트 출력 */}
                 {cell.contentType === 'field' && !shouldShowImage && (
                   <div className="p-2 w-full h-full flex items-center">
                     <span className="text-[14px] font-black text-slate-900 break-words leading-tight">
@@ -50,24 +41,14 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
                     </span>
                   </div>
                 )}
-
-                {/* 개별 액션 버튼 */}
                 {cell.contentType === 'action' && (() => {
                   const act = actions.find((a: Action) => a.id === cell.contentValue);
                   return act ? (
-                    <button 
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation(); 
-                        onExecuteAction(act, rowData); 
-                      }}
-                      className="w-full h-full bg-slate-900 text-white text-[10px] font-black py-3 hover:bg-indigo-600 transition-colors"
-                    >
+                    <button onClick={(e: React.MouseEvent) => { e.stopPropagation(); onExecuteAction(act, rowData); }} className="w-full h-full bg-slate-900 text-white text-[10px] font-black py-3 hover:bg-indigo-600 transition-colors">
                       {act.name}
                     </button>
                   ) : null;
                 })()}
-
-                {/* 중첩 레이아웃 */}
                 {cell.contentType === 'nested' && cell.nestedRows && (
                   <RenderPreviewLayout rows={cell.nestedRows} rowData={rowData} actions={actions} onExecuteAction={onExecuteAction} />
                 )}
@@ -84,21 +65,17 @@ export default function AppBuilder() {
   const [appState, setAppState] = useState<AppState>({
     id: null, 
     name: '경남외고 학사 시스템',
-    views: [{ 
-      id: 'v1', 
-      name: '메인 홈 (첫 화면)', 
-      tableName: null, 
-      cardHeight: 120, 
-      columnCount: 1, 
-      layoutRows: [], 
-      onClickActionId: null 
-    }],
+    views: [{ id: 'v1', name: '메인 홈 (첫 화면)', tableName: null, cardHeight: 120, columnCount: 1, layoutRows: [], onClickActionId: null }],
     actions: []
   });
   const [schemaData, setSchemaData] = useState<SchemaData>({});
   const [activeItem, setActiveItem] = useState<{ type: 'view' | 'action', id: string }>({ type: 'view', id: 'v1' });
   const [previewData, setPreviewData] = useState<Record<string, any[]>>({});
   const [currentPreviewViewId, setCurrentPreviewViewId] = useState<string>('v1');
+  const [isSaving, setIsSaving] = useState(false); 
+
+  const [isAppListModalOpen, setIsAppListModalOpen] = useState(false);
+  const [savedAppsList, setSavedAppsList] = useState<any[]>([]);
 
   useEffect(() => {
     async function fetchSchema() {
@@ -135,52 +112,123 @@ export default function AppBuilder() {
     } else if (action.type === 'navigate' && action.targetViewId) {
       setCurrentPreviewViewId(action.targetViewId);
     } else if (action.type === 'insert_row' && action.insertTableName) {
-      
       if (action.requireConfirmation) {
         const isConfirmed = window.confirm(action.confirmationMessage || '정말로 데이터를 추가하시겠습니까?');
         if (!isConfirmed) return; 
       }
-
       if (!action.insertMappings || action.insertMappings.length === 0) {
         alert('실패: 데이터 매핑이 설정되지 않았습니다.');
         return;
       }
-
       const payload: Record<string, any> = {};
-      
       for (const mapping of action.insertMappings) {
         if (!mapping.targetColumn) continue;
-        
         if (mapping.mappingType === 'card_data') {
           payload[mapping.targetColumn] = rowData[mapping.sourceValue];
         } else if (mapping.mappingType === 'prompt') {
           const userInput = window.prompt(mapping.sourceValue || `${mapping.targetColumn}에 저장할 값을 입력하세요:`);
-          
-          if (userInput === null) {
-            alert('입력이 취소되어 작업이 중단되었습니다.');
-            return; 
-          }
+          if (userInput === null) { alert('입력이 취소되어 작업이 중단되었습니다.'); return; }
           payload[mapping.targetColumn] = userInput;
         } else {
           payload[mapping.targetColumn] = mapping.sourceValue;
         }
       }
-
       try {
         const { error } = await supabase.from(action.insertTableName).insert([payload]);
         if (error) throw error;
-        
         const currentView = appState.views.find(v => v.id === currentPreviewViewId);
         if (currentView?.tableName === action.insertTableName) {
           await fetchTableData(action.insertTableName);
         }
-        
         alert(`성공: [${action.insertTableName}] 테이블에 데이터가 추가되었습니다.`);
       } catch (error: any) {
-        console.error("Insert Error: ", error);
         alert(`데이터 추가 실패: ${error.message}`);
       }
     }
+  };
+
+  const handleSaveAndDeploy = async () => {
+    setIsSaving(true);
+    try {
+      const payload = {
+        name: appState.name,
+        app_config: { views: appState.views, actions: appState.actions }
+      };
+
+      if (!appState.id) {
+        const { data, error } = await supabase.from('apps').insert([payload]).select('id');
+        if (error) throw error;
+        if (data && data.length > 0) { setAppState(prev => ({ ...prev, id: data[0].id })); }
+        alert('성공적으로 저장 및 배포되었습니다! 이제 라이브 앱을 확인할 수 있습니다.');
+      } else {
+        const { error } = await supabase.from('apps').update(payload).eq('id', appState.id);
+        if (error) throw error;
+        alert('성공적으로 업데이트 및 배포되었습니다!');
+      }
+    } catch (error: any) {
+      alert(`배포 중 오류가 발생했습니다.\n\n${error.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteApp = async () => {
+    if (!appState.id) return;
+    if (!window.confirm('정말로 이 앱을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며, 라이브 링크도 즉시 비활성화됩니다.')) return;
+    try {
+      const { error } = await supabase.from('apps').delete().eq('id', appState.id);
+      if (error) throw error;
+      alert('앱이 성공적으로 삭제되었습니다. 초기 상태로 돌아갑니다.');
+      handleCreateNewApp();
+    } catch (error: any) {
+      alert(`앱 삭제 실패: ${error.message}`);
+    }
+  };
+
+  const openAppListModal = async () => {
+    setIsAppListModalOpen(true);
+    const { data, error } = await supabase
+      .from('apps')
+      .select('id, name, created_at')
+      .order('id', { ascending: false });
+      
+    if (data) setSavedAppsList(data);
+  };
+
+  const loadAppToBuilder = async (appId: number) => {
+    try {
+      const { data, error } = await supabase.from('apps').select('*').eq('id', appId).single();
+      if (error) throw error;
+
+      setAppState({
+        id: data.id,
+        name: data.name || '이름 없는 앱',
+        views: data.app_config?.views || [],
+        actions: data.app_config?.actions || []
+      });
+
+      const firstViewId = data.app_config?.views?.[0]?.id || 'v1';
+      setCurrentPreviewViewId(firstViewId);
+      setActiveItem({ type: 'view', id: firstViewId });
+      setIsAppListModalOpen(false);
+    } catch (error: any) {
+      alert(`앱을 불러오는 데 실패했습니다: ${error.message}`);
+    }
+  };
+
+  // [수정] 새 앱 만들기 함수 로직 안정화
+  const handleCreateNewApp = () => {
+    const newViewId = `v_${Date.now()}`;
+    setAppState({
+      id: null, 
+      name: '새로운 앱',
+      views: [{ id: newViewId, name: '메인 홈 (첫 화면)', tableName: null, cardHeight: 120, columnCount: 1, layoutRows: [], onClickActionId: null }],
+      actions: []
+    });
+    // 상태가 업데이트 되기 전의 배열 대신, 방금 만든 새로운 ID를 직접 대입하여 화면 꼬임 방지
+    setCurrentPreviewViewId(newViewId);
+    setActiveItem({ type: 'view', id: newViewId });
+    setIsAppListModalOpen(false);
   };
 
   const activeView = appState.views.find(v => v.id === activeItem.id);
@@ -189,15 +237,90 @@ export default function AppBuilder() {
 
   return (
     <div className="flex h-screen w-full bg-slate-100 font-sans overflow-hidden">
-      <aside className="w-[320px] border-r bg-white flex flex-col shrink-0 shadow-2xl z-50">
-        <div className="p-8 bg-indigo-700 text-white border-b border-indigo-800 shrink-0">
+      
+      {/* 모달 */}
+      {isAppListModalOpen && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white">
+              <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                <FolderOpen className="text-indigo-600" /> 내 앱 목록
+              </h2>
+              <button onClick={() => setIsAppListModalOpen(false)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-4 max-h-[400px] overflow-y-auto bg-slate-50 space-y-2">
+              {savedAppsList.length === 0 ? (
+                <div className="py-10 text-center text-slate-400 font-bold text-sm">
+                  아직 저장된 앱이 없습니다.
+                </div>
+              ) : (
+                savedAppsList.map(app => (
+                  <button 
+                    key={app.id} 
+                    onClick={() => loadAppToBuilder(app.id)}
+                    className="w-full flex items-center justify-between p-4 bg-white border border-slate-200 rounded-2xl hover:border-indigo-400 hover:shadow-md transition-all text-left group"
+                  >
+                    <div>
+                      <h3 className="font-black text-slate-800 text-base group-hover:text-indigo-700">{app.name || '이름 없는 앱'}</h3>
+                      <p className="text-xs text-slate-400 font-bold mt-1">ID: {app.id} • {new Date(app.created_at).toLocaleDateString()}</p>
+                    </div>
+                    <span className="text-sm font-black text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                      열기 &rarr;
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+
+            {/* 모달 안에도 새 앱 만들기 버튼 유지 (직관성을 위해) */}
+            <div className="p-6 bg-white border-t border-slate-100">
+              <button 
+                onClick={handleCreateNewApp} 
+                className="w-full py-4 border-2 border-dashed border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2"
+              >
+                <Plus size={18} /> 아예 새로운 앱 만들기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 사이드바 */}
+      <aside className="w-[320px] border-r bg-white flex flex-col shrink-0 shadow-2xl z-50 relative">
+        <div className="p-6 bg-indigo-700 text-white border-b border-indigo-800 shrink-0 flex flex-col gap-4">
+          
+          {/* [수정] 상단 앱 전환/생성 버튼들을 가로로 나란히 배치 */}
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-black text-indigo-300 tracking-widest uppercase">My Workspace</span>
+            <div className="flex items-center gap-1.5">
+              <button 
+                onClick={handleCreateNewApp} 
+                className="flex items-center gap-1 text-[11px] font-bold bg-indigo-800 hover:bg-indigo-900 text-white px-2.5 py-1.5 rounded-full transition-all shadow-sm"
+                title="초기화하고 새 앱 만들기"
+              >
+                <Plus size={12} /> 새 앱
+              </button>
+              <button 
+                onClick={openAppListModal} 
+                className="flex items-center gap-1 text-[11px] font-bold bg-indigo-800 hover:bg-indigo-900 text-white px-2.5 py-1.5 rounded-full transition-all shadow-sm"
+                title="저장된 앱 불러오기"
+              >
+                <FolderOpen size={12} /> 열기
+              </button>
+            </div>
+          </div>
+          
           <input 
             type="text" 
             value={appState.name} 
             onChange={(e) => setAppState({...appState, name: e.target.value})}
-            className="bg-transparent text-white text-xl font-black outline-none w-full border-b-2 border-indigo-400 focus:border-white transition-all placeholder:text-indigo-300"
+            className="bg-transparent text-white text-2xl font-black outline-none w-full border-b-2 border-indigo-400 focus:border-white transition-all placeholder:text-indigo-300 pb-1"
           />
         </div>
+        
         <div className="p-6 flex-1 overflow-y-auto space-y-10">
           <div>
             <div className="flex justify-between text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
@@ -242,6 +365,37 @@ export default function AppBuilder() {
             </div>
           </div>
         </div>
+
+        <div className="p-6 bg-slate-50 border-t border-slate-200 shrink-0">
+          <button
+            onClick={handleSaveAndDeploy}
+            disabled={isSaving}
+            className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-black shadow-xl hover:shadow-indigo-500/30 transition-all active:scale-95 disabled:opacity-70 disabled:pointer-events-none"
+          >
+            {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
+            {isSaving ? '배포 진행 중...' : '🚀 저장 및 배포하기'}
+          </button>
+
+          {appState.id && (
+            <div className="mt-3 flex items-center gap-2">
+              <a
+                href={`/preview/${appState.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-2xl text-sm font-bold transition-all shadow-sm"
+              >
+                <ExternalLink size={16} /> 라이브 앱 열기
+              </a>
+              <button
+                onClick={handleDeleteApp}
+                title="이 앱을 서버에서 삭제합니다"
+                className="p-3 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 hover:border-rose-300 rounded-2xl transition-all shadow-sm"
+              >
+                <Trash2 size={18} />
+              </button>
+            </div>
+          )}
+        </div>
       </aside>
 
       <main className="flex-1 flex flex-col relative z-10 bg-slate-50 h-screen overflow-y-auto">
@@ -253,78 +407,37 @@ export default function AppBuilder() {
         
         <div className="flex-1">
           {activeItem.type==='view' && activeView && (
-            <ViewEditor 
-              view={activeView} 
-              schemaData={schemaData} 
-              actions={appState.actions} 
-              onUpdate={(upd) => setAppState({...appState, views: appState.views.map(v => v.id===upd.id ? upd : v)})}
-            />
+            <ViewEditor view={activeView} schemaData={schemaData} actions={appState.actions} onUpdate={(upd) => setAppState({...appState, views: appState.views.map(v => v.id===upd.id ? upd : v)})} />
           )}
           {activeItem.type==='action' && activeAction && (
-            <ActionEditor 
-              action={activeAction} 
-              views={appState.views}
-              schemaData={schemaData} 
-              onUpdate={(upd) => setAppState({...appState, actions: appState.actions.map(a => a.id===upd.id ? upd : a)})} 
-              onDelete={(id) => { 
-                setAppState({...appState, actions: appState.actions.filter(a => a.id !== id)}); 
-                setActiveItem({type:'view', id:'v1'}); 
-              }}
-            />
+            <ActionEditor action={activeAction} views={appState.views} schemaData={schemaData} onUpdate={(upd) => setAppState({...appState, actions: appState.actions.map(a => a.id===upd.id ? upd : a)})} onDelete={(id) => { setAppState({...appState, actions: appState.actions.filter(a => a.id !== id)}); setActiveItem({type:'view', id:'v1'}); }} />
           )}
         </div>
       </main>
 
       <aside className="w-[450px] bg-slate-900 flex flex-col items-center py-10 shrink-0 shadow-2xl z-30">
         <div className="w-[340px] h-[720px] bg-white rounded-[4rem] border-[10px] border-slate-800 shadow-2xl overflow-hidden flex flex-col relative">
-          
-          {/* [수정] 모바일 친화적 헤더 레이아웃: 아이콘 버튼을 우측에 앱 네비게이션바처럼 배치 */}
           <div className="pt-14 pb-4 px-12 text-center border-b bg-white sticky top-0 z-10 flex items-center justify-center shadow-sm relative">
-            <div className="font-black text-slate-900 text-xl tracking-tight truncate">
-              {previewView?.name}
-            </div>
+            <div className="font-black text-slate-900 text-xl tracking-tight truncate">{previewView?.name}</div>
             {previewView?.tableName && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  fetchTableData(previewView.tableName!);
-                }}
-                className="absolute right-4 bottom-3.5 p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all active:scale-95"
-                title="데이터 동기화"
-              >
+              <button onClick={(e) => { e.stopPropagation(); fetchTableData(previewView.tableName!); }} className="absolute right-4 bottom-3.5 p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all active:scale-95" title="데이터 동기화">
                 <RefreshCw size={18} />
               </button>
             )}
           </div>
 
           <div className="flex-1 overflow-y-auto bg-slate-50 text-slate-900">
-            <div className={`grid gap-0 ${
-              previewView.columnCount === 2 ? 'grid-cols-2' : 
-              previewView.columnCount === 3 ? 'grid-cols-3' : 
-              previewView.columnCount === 4 ? 'grid-cols-4' : 'grid-cols-1'
-            }`}>
+            <div className={`grid gap-0 ${previewView?.columnCount === 2 ? 'grid-cols-2' : previewView?.columnCount === 3 ? 'grid-cols-3' : previewView?.columnCount === 4 ? 'grid-cols-4' : 'grid-cols-1'}`}>
               {previewData[previewView?.tableName || '']?.map((row, idx) => {
-                const clickAction = appState.actions.find(a => a.id === previewView.onClickActionId);
-
+                const clickAction = appState.actions.find(a => a.id === previewView?.onClickActionId);
                 return (
                   <div 
                     key={idx} 
-                    className={`bg-white border-b border-r border-slate-100 overflow-hidden transition-all ${
-                      clickAction ? 'cursor-pointer hover:bg-indigo-50/50 active:scale-[0.98]' : ''
-                    }`} 
+                    className={`bg-white border-b border-r border-slate-100 overflow-hidden transition-all ${clickAction ? 'cursor-pointer hover:bg-indigo-50/50 active:scale-[0.98]' : ''}`} 
                     style={{ minHeight: `${previewView.cardHeight}px` }}
-                    onClick={() => {
-                      if (clickAction) {
-                        handleAction(clickAction, row); 
-                      }
-                    }}
+                    onClick={() => { if (clickAction) handleAction(clickAction, row); }}
                   >
-                    <RenderPreviewLayout 
-                      rows={previewView.layoutRows} 
-                      rowData={row} 
-                      actions={appState.actions} 
-                      onExecuteAction={handleAction} 
-                    />
+                    <RenderPreviewLayout rows={previewView.layoutRows} rowData={row} actions={appState.actions} onExecuteAction={handleAction} />
                   </div>
                 );
               })}
@@ -332,10 +445,7 @@ export default function AppBuilder() {
           </div>
           {currentPreviewViewId !== appState.views[0]?.id && (
             <div className="p-6 bg-white border-t border-slate-100">
-              <button 
-                onClick={() => setCurrentPreviewViewId(appState.views[0].id)} 
-                className="w-full py-4 bg-slate-900 text-white rounded-2xl text-sm font-black shadow-2xl hover:bg-indigo-700 transition-all"
-              >
+              <button onClick={() => setCurrentPreviewViewId(appState.views[0].id)} className="w-full py-4 bg-slate-900 text-white rounded-2xl text-sm font-black shadow-2xl hover:bg-indigo-700 transition-all">
                 🏠 첫 화면으로 이동
               </button>
             </div>
