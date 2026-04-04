@@ -13,11 +13,16 @@ export type View = {
   name: string;
   icon?: string | null;
   tableName: string | null;
-  // --- [신규] 1단계 서버 필터 설정을 위한 속성 ---
+  
+  // 1단계 서버 필터 속성
   filterColumn?: string | null;  
   filterOperator?: 'eq' | 'neq' | 'like' | 'gt' | 'lt'; 
   filterValue?: string | null;   
-  // ------------------------------------------
+  
+  // 🔥 [신규] 서버 정렬 속성
+  sortColumn?: string | null;    
+  sortDirection?: 'asc' | 'desc';
+  
   cardHeight: number;
   columnCount: number;
   layoutRows: LayoutRow[];
@@ -36,9 +41,10 @@ export type LayoutCell = {
   contentType: 'empty' | 'field' | 'action' | 'nested';
   contentValue: string | null;
   isImage?: boolean; 
-  nestedRows?: LayoutRow[];
+  nestedRows?: LayoutRow[]; 
 };
 
+// [복구 완료] 인서트(데이터 추가) 시 필요한 맵핑 세부 규칙
 export type InsertMapping = {
   id: string;
   targetColumn: string;
@@ -47,6 +53,7 @@ export type InsertMapping = {
   valueType?: 'string' | 'number';
 };
 
+// [복구 완료] 액션 세부 규칙
 export type Action = {
   id: string;
   name: string;

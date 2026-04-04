@@ -1,5 +1,4 @@
 // 파일 경로: app/preview/[appId]/page.tsx
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -13,6 +12,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
 
+// 재귀적으로 UI를 그려주는 레이아웃 렌더러
 const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) => {
   const isImageUrl = (url: any) => {
     if (typeof url !== 'string') return false;
@@ -69,12 +69,13 @@ export default function LiveAppPreview() {
   const [currentViewId, setCurrentViewId] = useState<string>('');
   const [tableData, setTableData] = useState<Record<string, any[]>>({});
   
+  // 데이터 입력 폼을 위한 상태
   const [isInputModalOpen, setIsInputModalOpen] = useState(false);
   const [activeInsertAction, setActiveInsertAction] = useState<any>(null);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // 2단계 클라이언트 검색 상태
+  // 검색 상태
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
@@ -100,23 +101,25 @@ export default function LiveAppPreview() {
 
   const currentView = appData?.app_config?.views?.find((v: any) => v.id === currentViewId);
 
-  // 🔥 TypeScript 주황색 경고 해결을 위한 타입 단언(Type Assertion) 적용
+  // [핵심] 서버 사이드 필터링 및 정렬 실행 (타입 경고 없음)
   const fetchTableData = async (view: any) => {
     if (!view || !view.tableName) return;
     
-    // query 변수를 'any' 타입으로 지정하여, 동적 체이닝에 대한 TS의 엄격한 검사를 유연하게 만듭니다.
     let query: any = supabase.from(view.tableName).select("*");
 
     if (view.filterColumn && view.filterValue) {
       const op = view.filterOperator || 'eq';
-      // 명시적으로 string 임을 알려줍니다.
       const col = view.filterColumn as string;
       const val = view.filterValue;
 
       if (op === 'like') query = query.ilike(col, `%${val}%`);
       else if (op === 'gt') query = query.gt(col, val);
       else if (op === 'lt') query = query.lt(col, val);
-      else query = query.eq(col, val); // 이제 주황색 에러가 발생하지 않습니다.
+      else query = query.eq(col, val); 
+    }
+
+    if (view.sortColumn) {
+      query = query.order(view.sortColumn as string, { ascending: view.sortDirection === 'asc' });
     }
 
     const { data } = await query.limit(3000); 
@@ -127,6 +130,7 @@ export default function LiveAppPreview() {
     if (currentView) fetchTableData(currentView);
   }, [currentViewId, currentView]);
 
+  // 액션 제어 핸들러 (입력 폼 모달 오픈 포함)
   const handleAction = async (action: any, rowData: any) => {
     if (action.type === 'alert') {
       alert(action.message || '알림');
@@ -146,6 +150,7 @@ export default function LiveAppPreview() {
     }
   };
 
+  // 데이터 최종 저장 핸들러
   const handleSubmitInsert = async () => {
     if (!activeInsertAction || isSubmitting) return;
     if (!window.confirm("입력하신 내용을 저장하시겠습니까?")) return;
@@ -174,6 +179,7 @@ export default function LiveAppPreview() {
     }
   };
 
+  // 실시간 검색어 기반 필터링
   const getFilteredData = () => {
     const rawData = tableData[currentView?.tableName || ''] || [];
     if (!searchTerm) return rawData; 
@@ -221,7 +227,7 @@ export default function LiveAppPreview() {
           </div>
         </div>
 
-        {/* 메인 콘텐츠 영역 */}
+        {/* 메인 콘텐츠 목록 (카드 렌더링) */}
         <div className="flex-1 overflow-y-auto bg-slate-50 pb-20">
           <div className={`grid gap-0 ${
             currentView?.columnCount === 2 ? 'grid-cols-2' : 
@@ -270,7 +276,7 @@ export default function LiveAppPreview() {
         </div>
       </div>
 
-      {/* 입력 모달 */}
+      {/* 데이터 입력용 모달 UI */}
       {isInputModalOpen && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
