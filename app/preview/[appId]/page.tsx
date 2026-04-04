@@ -1,11 +1,12 @@
-// 파일 경로: C:/react-projects/gnflhs/app/preview/[appId]/page.tsx
+// 파일 경로: app/preview/[appId]/page.tsx
 
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
-import { X, CheckCircle2, ChevronLeft, RefreshCw } from 'lucide-react';
+import { X, CheckCircle2, ChevronLeft, RefreshCw, Layout } from 'lucide-react';
+import { IconMap } from '../../design/picker'; 
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
@@ -67,7 +68,6 @@ export default function LiveAppPreview() {
   const [appData, setAppData] = useState<any>(null);
   const [currentViewId, setCurrentViewId] = useState<string>('');
   const [tableData, setTableData] = useState<Record<string, any[]>>({});
-
   const [isInputModalOpen, setIsInputModalOpen] = useState(false);
   const [activeInsertAction, setActiveInsertAction] = useState<any>(null);
   const [formData, setFormData] = useState<Record<string, any>>({});
@@ -100,6 +100,7 @@ export default function LiveAppPreview() {
   };
 
   const currentView = appData?.app_config?.views?.find((v: any) => v.id === currentViewId);
+
   useEffect(() => {
     if (currentView?.tableName && !tableData[currentView.tableName]) fetchTableData(currentView.tableName);
   }, [currentViewId, currentView]);
@@ -134,7 +135,6 @@ export default function LiveAppPreview() {
           finalPayload[m.targetColumn] = Number(finalPayload[m.targetColumn]) || 0;
         }
       });
-
       const { error } = await supabase.from(activeInsertAction.insertTableName).insert([finalPayload]);
       if (error) throw error;
       
@@ -154,7 +154,8 @@ export default function LiveAppPreview() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex justify-center font-sans">
-      <div className="w-full max-w-md bg-white shadow-2xl flex flex-col relative">
+      <div className="w-full max-w-md bg-white shadow-2xl flex flex-col relative h-screen overflow-hidden">
+        {/* 상단 헤더 */}
         <div className="pt-8 pb-4 px-6 text-center border-b bg-white sticky top-0 z-10 flex items-center justify-between">
           <div className="w-10">
             {currentViewId !== appData?.app_config?.views?.[0]?.id && (
@@ -169,8 +170,8 @@ export default function LiveAppPreview() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-slate-50">
-          {/* [수정] 그리드 컬럼 배치 로직 강화 */}
+        {/* 메인 콘텐츠 영역 (하단바 높이만큼 여백 확보) */}
+        <div className="flex-1 overflow-y-auto bg-slate-50 pb-20">
           <div className={`grid gap-0 ${
             currentView?.columnCount === 2 ? 'grid-cols-2' : 
             currentView?.columnCount === 3 ? 'grid-cols-3' : 
@@ -186,8 +187,29 @@ export default function LiveAppPreview() {
             ))}
           </div>
         </div>
+
+        {/* 고정 하단 탭 메뉴 */}
+        <div className="h-20 bg-white border-t flex items-center justify-around px-2 absolute bottom-0 w-full z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+          {appData?.app_config?.views?.slice(0, 5).map((v: any) => {
+            const IconComp = v.icon && IconMap[v.icon] ? IconMap[v.icon] : Layout;
+            const isActive = currentViewId === v.id;
+            return (
+              <button 
+                key={v.id} 
+                onClick={() => setCurrentViewId(v.id)}
+                className={`flex-1 flex flex-col items-center gap-1 transition-all ${isActive ? 'text-indigo-600' : 'text-slate-300 hover:text-slate-500'}`}
+              >
+                <IconComp size={22} strokeWidth={isActive ? 3 : 2} />
+                <span className={`text-[9px] font-black uppercase tracking-tighter truncate w-full text-center ${isActive ? 'opacity-100' : 'opacity-60'}`}>
+                  {v.name}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
+      {/* 입력 모달 */}
       {isInputModalOpen && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
@@ -202,7 +224,6 @@ export default function LiveAppPreview() {
               {activeInsertAction?.insertMappings?.filter((m: any) => m.mappingType === 'prompt').map((mapping: any) => (
                 <div key={mapping.id} className="space-y-2">
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-wider">{mapping.sourceValue}</label>
-                  {/* [수정] 글자 가시성 확보 (text-slate-900 추가) */}
                   <input
                     type={mapping.valueType === 'number' ? 'number' : 'text'}
                     value={formData[mapping.targetColumn] || ''}
@@ -212,11 +233,6 @@ export default function LiveAppPreview() {
                   />
                 </div>
               ))}
-              {activeInsertAction?.insertMappings?.filter((m: any) => m.mappingType !== 'prompt').length > 0 && (
-                <div className="pt-4 border-t border-slate-200">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase italic">* 나머지 자동 매핑 데이터는 저장 시 함께 처리됩니다.</p>
-                </div>
-              )}
             </div>
 
             <div className="p-6 bg-white border-t flex gap-3">

@@ -1,9 +1,11 @@
 // 파일 경로: C:/react-projects/gnflhs/app/design/action.tsx
 
-import React, { useState } from 'react';
+"use client";
+
+import React from 'react';
 import { Action, View, SchemaData, InsertMapping } from './types';
-import { Settings2, Trash2, Plus, DatabaseZap, Star, Database, Type, MessageSquare } from 'lucide-react';
-import IconPicker, { IconMap } from './picker';
+import { Settings2, Trash2, Plus, DatabaseZap, Star } from 'lucide-react';
+import { IconMap } from './picker';
 
 interface ActionEditorProps {
   action: Action;
@@ -11,11 +13,17 @@ interface ActionEditorProps {
   schemaData: SchemaData;
   onUpdate: (updated: Action) => void;
   onDelete: (id: string) => void;
+  onOpenIconPicker: () => void; // 부모의 피커를 열기 위한 함수
 }
 
-export default function ActionEditor({ action, views, schemaData, onUpdate, onDelete }: ActionEditorProps) {
-  const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
-
+export default function ActionEditor({ 
+  action, 
+  views, 
+  schemaData, 
+  onUpdate, 
+  onDelete,
+  onOpenIconPicker 
+}: ActionEditorProps) {
   return (
     <div className="flex-1 overflow-y-auto p-8 lg:p-12 bg-white rounded-tl-3xl shadow-sm border-l border-t border-slate-200 relative">
       <div className="max-w-3xl mx-auto space-y-8">
@@ -40,7 +48,10 @@ export default function ActionEditor({ action, views, schemaData, onUpdate, onDe
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-2">액션 아이콘 및 이름</label>
             <div className="flex items-center gap-3">
-              <button onClick={() => setIsIconPickerOpen(true)} className="w-12 h-12 shrink-0 flex items-center justify-center bg-white border border-slate-200 rounded-xl hover:border-rose-400 transition-all group">
+              <button 
+                onClick={onOpenIconPicker} 
+                className="w-12 h-12 shrink-0 flex items-center justify-center bg-white border border-slate-200 rounded-xl hover:border-rose-400 transition-all group"
+              >
                 {action.icon && IconMap[action.icon] ?
                   React.createElement(IconMap[action.icon], { className: "text-rose-500", size: 24 }) : 
                   <Star className="text-slate-400" size={24} />
@@ -70,7 +81,9 @@ export default function ActionEditor({ action, views, schemaData, onUpdate, onDe
 
           {action.type === 'insert_row' && (
             <div className="space-y-5 border-t border-slate-200 pt-5 mt-5">
-              <label className="flex items-center gap-2 text-sm font-bold text-slate-700"><DatabaseZap size={16} className="text-rose-500"/> 대상 테이블</label>
+              <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                <DatabaseZap size={16} className="text-rose-500"/> 대상 테이블
+              </label>
               <select
                 value={action.insertTableName || ''}
                 onChange={(e) => onUpdate({ ...action, insertTableName: e.target.value, insertMappings: [] })}
@@ -105,7 +118,6 @@ export default function ActionEditor({ action, views, schemaData, onUpdate, onDe
                       </button>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* 1. 대상 컬럼 */}
                         <div>
                           <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider">1. 저장할 컬럼</span>
                           <select
@@ -122,7 +134,6 @@ export default function ActionEditor({ action, views, schemaData, onUpdate, onDe
                           </select>
                         </div>
 
-                        {/* 2. 출처 선택 */}
                         <div>
                           <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider">2. 데이터 출처</span>
                           <select
@@ -140,7 +151,6 @@ export default function ActionEditor({ action, views, schemaData, onUpdate, onDe
                           </select>
                         </div>
 
-                        {/* 3. 데이터 타입 (숫자/문자) */}
                         <div>
                           <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider">3. 데이터 형식</span>
                           <select
@@ -157,7 +167,6 @@ export default function ActionEditor({ action, views, schemaData, onUpdate, onDe
                           </select>
                         </div>
 
-                        {/* 4. 값 또는 레이블 */}
                         <div>
                           <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider">
                             4. {mapping.mappingType === 'prompt' ? '입력 폼 레이블' : mapping.mappingType === 'card_data' ? '원본 컬럼명' : '고정값'}
@@ -183,7 +192,6 @@ export default function ActionEditor({ action, views, schemaData, onUpdate, onDe
           )}
         </div>
       </div>
-      <IconPicker isOpen={isIconPickerOpen} onClose={() => setIsIconPickerOpen(false)} selectedIcon={action.icon} onSelect={(name) => onUpdate({ ...action, icon: name })} />
     </div>
   );
 }

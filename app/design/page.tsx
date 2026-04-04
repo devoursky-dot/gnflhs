@@ -23,15 +23,16 @@ export default function AppBuilder() {
     views: [{ id: 'v1', name: '메인 홈 (첫 화면)', tableName: null, cardHeight: 120, columnCount: 1, layoutRows: [], onClickActionId: null }],
     actions: []
   });
-
   const [schemaData, setSchemaData] = useState<SchemaData>({});
-  const [activeItem, setActiveItem] = useState<{ type: 'view' | 'action', id: string }>({ type: 'view', id: 'v1' });
+  const [activeItem, setActiveItem] = useState<{ type: 'view' | 'action' | 'app', id: string }>({ type: 'view', id: 'v1' });
   const [isSaving, setIsSaving] = useState(false); 
   const [isPreviewSaving, setIsPreviewSaving] = useState<string | null>(null);
 
   const [isAppListModalOpen, setIsAppListModalOpen] = useState(false);
   const [savedAppsList, setSavedAppsList] = useState<any[]>([]);
-  const [isAppIconPickerOpen, setIsAppIconPickerOpen] = useState(false); 
+  
+  // [수정] 통합 아이콘 피커 상태
+  const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
 
   useEffect(() => {
     async function fetchSchema() {
@@ -48,25 +49,19 @@ export default function AppBuilder() {
     fetchSchema();
   }, []);
 
-  // --- [신규] 미리보기 팝업용 임시 저장(Draft) 함수 ---
   const handlePreviewPopup = async (viewId: string) => {
     if (!appState.id) {
       alert('최초 1회는 우측 하단의 [🚀 저장 및 배포하기]를 진행하여 앱을 생성해주세요.');
       return;
     }
-
     setIsPreviewSaving(viewId);
     try {
-      // app_config가 아닌 draft_config에만 몰래 저장합니다.
       const draftPayload = {
         name: appState.name,
         draft_config: { views: appState.views, actions: appState.actions, icon: appState.icon }
       };
-      
       const { error } = await supabase.from('apps').update(draftPayload).eq('id', appState.id);
       if (error) throw error;
-
-      // 새 탭/창이 무한정 뜨는 것을 방지하기 위해 target 속성을 고정합니다.
       window.open(
         `/preview/${appState.id}?viewId=${viewId}&mode=draft`, 
         'LivePreviewWindow', 
@@ -79,18 +74,15 @@ export default function AppBuilder() {
     }
   };
 
-  // --- [수정] 실제 운영 배포 (Publish) 함수 ---
   const handleSaveAndDeploy = async () => {
     setIsSaving(true);
     try {
       const config = { views: appState.views, actions: appState.actions, icon: appState.icon };
-      // 배포 시에는 app_config와 draft_config 둘 다 동일하게 맞춥니다.
       const payload = {
         name: appState.name,
         app_config: config,
         draft_config: config
       };
-
       if (!appState.id) {
         const { data, error } = await supabase.from('apps').insert([payload]).select('id');
         if (error) throw error;
@@ -127,15 +119,11 @@ export default function AppBuilder() {
     if (data) setSavedAppsList(data);
   };
 
-  // --- [수정] 앱 불러올 때 draft_config 우선 적용 ---
   const loadAppToBuilder = async (appId: number) => {
     try {
       const { data, error } = await supabase.from('apps').select('*').eq('id', appId).single();
       if (error) throw error;
-
-      // 작업 중이던 draft_config가 있으면 그것을 불러오고, 없으면 배포된 app_config를 씁니다.
       const configToLoad = data.draft_config || data.app_config || { views: [], actions: [] };
-
       setAppState({
         id: data.id,
         name: data.name || '이름 없는 앱',
@@ -143,7 +131,6 @@ export default function AppBuilder() {
         views: configToLoad.views || [],
         actions: configToLoad.actions || []
       });
-      
       const firstViewId = configToLoad.views?.[0]?.id || 'v1';
       setActiveItem({ type: 'view', id: firstViewId });
       setIsAppListModalOpen(false);
@@ -163,13 +150,31 @@ export default function AppBuilder() {
     setIsAppListModalOpen(false);
   };
 
+  // [수정] 아이콘 선택 시 대상에 따라 상태 업데이트
+  const handleIconSelect = (iconName: string) => {
+    if (activeItem.type === 'app') {
+      setAppState({ ...appState, icon: iconName });
+    } else if (activeItem.type === 'view') {
+      setAppState({ ...appState, views: appState.views.map(v => v.id === activeItem.id ? { ...v, icon: iconName } : v) });
+    } else if (activeItem.type === 'action') {
+      setAppState({ ...appState, actions: appState.actions.map(a => a.id === activeItem.id ? { ...a, icon: iconName } : a) });
+    }
+  };
+
+  // [수정] 현재 피커에 표시될 아이콘 값 계산
+  const getCurrentIcon = () => {
+    if (activeItem.type === 'app') return appState.icon;
+    if (activeItem.type === 'view') return appState.views.find(v => v.id === activeItem.id)?.icon;
+    if (activeItem.type === 'action') return appState.actions.find(a => a.id === activeItem.id)?.icon;
+    return null;
+  };
+
   const activeView = appState.views.find(v => v.id === activeItem.id);
   const activeAction = appState.actions.find(a => a.id === activeItem.id);
 
   return (
     <div className="flex h-screen w-full bg-slate-100 font-sans overflow-hidden">
       
-      {/* 팝업 모달 */}
       {isAppListModalOpen && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -179,20 +184,19 @@ export default function AppBuilder() {
               </h2>
               <button onClick={() => setIsAppListModalOpen(false)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all">
                 <X size={20} />
-               </button>
+              </button>
             </div>
-            
             <div className="p-4 max-h-[400px] overflow-y-auto bg-slate-50 space-y-2">
               {savedAppsList.length === 0 ? (
                 <div className="py-10 text-center text-slate-400 font-bold text-sm">저장된 앱이 없습니다.</div>
               ) : (
                 savedAppsList.map(app => (
                   <button key={app.id} onClick={() => loadAppToBuilder(app.id)} className="w-full flex items-center justify-between p-4 bg-white border border-slate-200 rounded-2xl hover:border-indigo-400 hover:shadow-md transition-all text-left group">
-                      <div>
+                    <div>
                       <h3 className="font-black text-slate-800 text-base group-hover:text-indigo-700">{app.name || '이름 없는 앱'}</h3>
                       <p className="text-xs text-slate-400 font-bold mt-1">ID: {app.id} • {new Date(app.created_at).toLocaleDateString()}</p>
                     </div>
-                      <span className="text-sm font-black text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity">열기 &rarr;</span>
+                    <span className="text-sm font-black text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity">열기 &rarr;</span>
                   </button>
                 ))
               )}
@@ -206,7 +210,6 @@ export default function AppBuilder() {
         </div>
       )}
 
-      {/* 사이드바 */}
       <aside className="w-[320px] border-r bg-white flex flex-col shrink-0 shadow-2xl z-50 relative">
         <div className="p-6 bg-indigo-700 text-white border-b border-indigo-800 shrink-0 flex flex-col gap-4">
           <div className="flex justify-between items-center">
@@ -219,10 +222,11 @@ export default function AppBuilder() {
           
           <div className="flex items-center gap-3 mt-2">
             <button 
-              onClick={() => setIsAppIconPickerOpen(true)}
+              onClick={() => { setActiveItem({ type: 'app', id: 'app' }); setIsIconPickerOpen(true); }}
               className="w-10 h-10 shrink-0 flex items-center justify-center bg-indigo-800 border border-indigo-500 rounded-xl hover:bg-indigo-900 hover:border-white transition-all"
             >
-              {appState.icon && IconMap[appState.icon] ? React.createElement(IconMap[appState.icon], { className: "text-white", size: 20 }) : 
+              {appState.icon && IconMap[appState.icon] ?
+                React.createElement(IconMap[appState.icon], { className: "text-white", size: 20 }) : 
                 <Star className="text-indigo-300" size={20} />
               }
             </button>
@@ -237,7 +241,7 @@ export default function AppBuilder() {
         
         <div className="p-6 flex-1 overflow-y-auto space-y-10">
           <div>
-             <div className="flex justify-between text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
+            <div className="flex justify-between text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
               <span>VIEWS</span>
               <button onClick={() => { 
                 const id=`v_${Date.now()}`;
@@ -248,24 +252,15 @@ export default function AppBuilder() {
             <div className="space-y-2">
               {appState.views.map(v => {
                 const ViewIcon = v.icon && IconMap[v.icon] ? IconMap[v.icon] : null;
-                
                 return (
-                  <div 
-                    key={v.id} 
-                    className={`w-full flex items-center justify-between px-5 py-3 rounded-2xl text-sm font-black transition-all ${activeItem.id === v.id ? 'bg-indigo-600 text-white shadow-xl scale-105' : 'hover:bg-slate-100 text-slate-600'}`}
-                  >
-                    <button 
-                      onClick={() => setActiveItem({type:'view', id:v.id})}
-                      className="flex-1 flex items-center gap-2 text-left truncate outline-none"
-                    >
+                  <div key={v.id} className={`w-full flex items-center justify-between px-5 py-3 rounded-2xl text-sm font-black transition-all ${activeItem.id === v.id ? 'bg-indigo-600 text-white shadow-xl scale-105' : 'hover:bg-slate-100 text-slate-600'}`}>
+                    <button onClick={() => setActiveItem({type:'view', id:v.id})} className="flex-1 flex items-center gap-2 text-left truncate outline-none">
                       {ViewIcon && <ViewIcon size={16} className={activeItem.id === v.id ? "text-indigo-200" : "text-slate-400"} />}
                       <span className="truncate">{v.name}</span>
                     </button>
-                    
                     <button
                       onClick={(e) => { e.stopPropagation(); handlePreviewPopup(v.id); }}
                       disabled={isPreviewSaving === v.id}
-                      title="이 화면만 새 창(팝업)으로 띄워 테스트하기"
                       className={`p-1.5 ml-2 shrink-0 rounded-lg transition-all ${activeItem.id === v.id ? 'text-indigo-200 hover:text-white hover:bg-indigo-500' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-200'} disabled:opacity-50`}
                     >
                       {isPreviewSaving === v.id ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
@@ -288,11 +283,7 @@ export default function AppBuilder() {
               {appState.actions.map(a => {
                 const ActIcon = a.icon && IconMap[a.icon] ? IconMap[a.icon] : null;
                 return (
-                  <button 
-                    key={a.id} 
-                    onClick={() => setActiveItem({type:'action', id:a.id})}
-                    className={`w-full flex items-center gap-2 text-left px-5 py-3 border-l-8 rounded-r-2xl text-sm font-black transition-all ${activeItem.id===a.id ? 'bg-rose-50 border-rose-500 text-rose-800 shadow-sm' : 'border-transparent hover:bg-slate-100 text-slate-600'}`}
-                  >
+                  <button key={a.id} onClick={() => setActiveItem({type:'action', id:a.id})} className={`w-full flex items-center gap-2 text-left px-5 py-3 border-l-8 rounded-r-2xl text-sm font-black transition-all ${activeItem.id===a.id ? 'bg-rose-50 border-rose-500 text-rose-800 shadow-sm' : 'border-transparent hover:bg-slate-100 text-slate-600'}`}>
                     {ActIcon ? <ActIcon size={16} className={activeItem.id === a.id ? "text-rose-500" : "text-slate-400"} /> : <span>⚡</span>}
                     <span className="truncate">{a.name}</span>
                   </button>
@@ -309,14 +300,13 @@ export default function AppBuilder() {
           </button>
           {appState.id && (
             <div className="mt-3 flex items-center gap-2">
-              <a href={`/preview/${appState.id}`} target="_blank" rel="noopener noreferrer" title="실제 배포된 앱 보기 (유저 시점)" className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-2xl text-sm font-bold transition-all shadow-sm"><ExternalLink size={16} /> 라이브 앱 확인</a>
-              <button onClick={handleDeleteApp} title="이 앱을 서버에서 삭제합니다" className="p-3 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 hover:border-rose-300 rounded-2xl transition-all shadow-sm"><Trash2 size={18} /></button>
+              <a href={`/preview/${appState.id}`} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-2xl text-sm font-bold transition-all shadow-sm"><ExternalLink size={16} /> 라이브 앱 확인</a>
+              <button onClick={handleDeleteApp} className="p-3 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 hover:border-rose-300 rounded-2xl transition-all shadow-sm"><Trash2 size={18} /></button>
             </div>
           )}
         </div>
       </aside>
 
-      {/* --- 우측 패널 완전히 삭제 후 중앙 편집 화면을 100% 활용 --- */}
       <main className="flex-1 flex flex-col relative z-10 bg-slate-50 h-screen overflow-y-auto">
         <header className="h-16 border-b bg-white px-10 flex items-center shadow-sm shrink-0 sticky top-0 z-20">
           <span className="text-xs font-black text-slate-400 uppercase tracking-widest">{activeItem.type} MODE</span>
@@ -325,22 +315,36 @@ export default function AppBuilder() {
         </header>
         
         <div className="flex-1 flex justify-center">
-          <div className="w-full max-w-4xl p-6"> {/* 최대 너비를 설정하여 너무 퍼지지 않게 중앙 정렬 */}
+          <div className="w-full max-w-4xl p-6">
             {activeItem.type==='view' && activeView && (
-              <ViewEditor view={activeView} schemaData={schemaData} actions={appState.actions} onUpdate={(upd) => setAppState({...appState, views: appState.views.map(v => v.id===upd.id ? upd : v)})} />
+              <ViewEditor 
+                view={activeView} 
+                schemaData={schemaData} 
+                actions={appState.actions} 
+                onUpdate={(upd) => setAppState({...appState, views: appState.views.map(v => v.id===upd.id ? upd : v)})} 
+              />
             )}
             {activeItem.type==='action' && activeAction && (
-              <ActionEditor action={activeAction} views={appState.views} schemaData={schemaData} onUpdate={(upd) => setAppState({...appState, actions: appState.actions.map(a => a.id===upd.id ? upd : a)})} onDelete={(id) => { setAppState({...appState, actions: appState.actions.filter(a => a.id !== id)}); setActiveItem({type:'view', id:'v1'}); }} />
+              <ActionEditor 
+                action={activeAction} 
+                views={appState.views} 
+                schemaData={schemaData} 
+                onUpdate={(upd) => setAppState({...appState, actions: appState.actions.map(a => a.id===upd.id ? upd : a)})} 
+                onDelete={(id) => { setAppState({...appState, actions: appState.actions.filter(a => a.id !== id)}); setActiveItem({type:'view', id:'v1'}); }}
+                // [수정] 액션에서 피커를 열도록 전달
+                onOpenIconPicker={() => setIsIconPickerOpen(true)}
+              />
             )}
           </div>
         </div>
       </main>
 
+      {/* [수정] 통합 아이콘 피커 - main과 aside 밖 최상위에 위치하여 가려짐 방지 */}
       <IconPicker 
-        isOpen={isAppIconPickerOpen} 
-        onClose={() => setIsAppIconPickerOpen(false)}
-        selectedIcon={appState.icon}
-        onSelect={(iconName) => setAppState({ ...appState, icon: iconName })}
+        isOpen={isIconPickerOpen} 
+        onClose={() => setIsIconPickerOpen(false)}
+        selectedIcon={getCurrentIcon()}
+        onSelect={handleIconSelect}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-// 파일 경로: C:/react-projects/gnflhs/app/design/types.ts
+// 파일 경로: app/design/types.ts
 
 export type AppState = {
   id: number | null;
@@ -39,8 +39,7 @@ export type InsertMapping = {
   targetColumn: string;
   mappingType: 'card_data' | 'static' | 'prompt';
   sourceValue: string;
-  // [신규] 데이터 타입 구분 (숫자 또는 문자)
-  valueType?: 'string' | 'number'; 
+  valueType?: 'string' | 'number';
 };
 
 export type Action = {
