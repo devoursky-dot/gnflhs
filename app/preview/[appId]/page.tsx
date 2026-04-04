@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
-import { X, CheckCircle2, ChevronLeft, RefreshCw, Layout } from 'lucide-react';
+import { X, CheckCircle2, ChevronLeft, RefreshCw, Layout, Search } from 'lucide-react';
 import { IconMap } from '../../design/picker'; 
 
 const supabase = createClient(
@@ -68,10 +68,14 @@ export default function LiveAppPreview() {
   const [appData, setAppData] = useState<any>(null);
   const [currentViewId, setCurrentViewId] = useState<string>('');
   const [tableData, setTableData] = useState<Record<string, any[]>>({});
+  
   const [isInputModalOpen, setIsInputModalOpen] = useState(false);
   const [activeInsertAction, setActiveInsertAction] = useState<any>(null);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // 2단계 클라이언트 검색 상태
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     if (!appId) return;
@@ -94,15 +98,33 @@ export default function LiveAppPreview() {
     fetchAppConfig();
   }, [appId]);
 
-  const fetchTableData = async (tableName: string) => {
-    const { data } = await supabase.from(tableName).select("*").limit(1000);
-    if (data) setTableData(prev => ({ ...prev, [tableName]: data }));
-  };
-
   const currentView = appData?.app_config?.views?.find((v: any) => v.id === currentViewId);
 
+  // 🔥 TypeScript 주황색 경고 해결을 위한 타입 단언(Type Assertion) 적용
+  const fetchTableData = async (view: any) => {
+    if (!view || !view.tableName) return;
+    
+    // query 변수를 'any' 타입으로 지정하여, 동적 체이닝에 대한 TS의 엄격한 검사를 유연하게 만듭니다.
+    let query: any = supabase.from(view.tableName).select("*");
+
+    if (view.filterColumn && view.filterValue) {
+      const op = view.filterOperator || 'eq';
+      // 명시적으로 string 임을 알려줍니다.
+      const col = view.filterColumn as string;
+      const val = view.filterValue;
+
+      if (op === 'like') query = query.ilike(col, `%${val}%`);
+      else if (op === 'gt') query = query.gt(col, val);
+      else if (op === 'lt') query = query.lt(col, val);
+      else query = query.eq(col, val); // 이제 주황색 에러가 발생하지 않습니다.
+    }
+
+    const { data } = await query.limit(3000); 
+    if (data) setTableData(prev => ({ ...prev, [view.tableName]: data }));
+  };
+
   useEffect(() => {
-    if (currentView?.tableName && !tableData[currentView.tableName]) fetchTableData(currentView.tableName);
+    if (currentView) fetchTableData(currentView);
   }, [currentViewId, currentView]);
 
   const handleAction = async (action: any, rowData: any) => {
@@ -110,6 +132,7 @@ export default function LiveAppPreview() {
       alert(action.message || '알림');
     } else if (action.type === 'navigate') {
       setCurrentViewId(action.targetViewId);
+      setSearchTerm(''); 
     } else if (action.type === 'insert_row') {
       setActiveInsertAction(action);
       const initialData: Record<string, any> = {};
@@ -140,8 +163,9 @@ export default function LiveAppPreview() {
       
       alert("성공적으로 저장되었습니다.");
       setIsInputModalOpen(false);
+      
       if (currentView?.tableName === activeInsertAction.insertTableName) {
-        fetchTableData(currentView.tableName);
+        fetchTableData(currentView);
       }
     } catch (err: any) {
       alert(`저장 실패: ${err.message}`);
@@ -150,35 +174,62 @@ export default function LiveAppPreview() {
     }
   };
 
+  const getFilteredData = () => {
+    const rawData = tableData[currentView?.tableName || ''] || [];
+    if (!searchTerm) return rawData; 
+
+    return rawData.filter((row: any) => 
+      Object.values(row).some(val => 
+        String(val).toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    );
+  };
+
+  const displayData = getFilteredData();
+
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-slate-50 font-black text-slate-400">LOADING...</div>;
 
   return (
     <div className="min-h-screen bg-slate-100 flex justify-center font-sans">
       <div className="w-full max-w-md bg-white shadow-2xl flex flex-col relative h-screen overflow-hidden">
-        {/* 상단 헤더 */}
-        <div className="pt-8 pb-4 px-6 text-center border-b bg-white sticky top-0 z-10 flex items-center justify-between">
-          <div className="w-10">
-            {currentViewId !== appData?.app_config?.views?.[0]?.id && (
-              <button onClick={() => setCurrentViewId(appData.app_config.views[0].id)} className="p-2 text-slate-400"><ChevronLeft /></button>
-            )}
+        
+        {/* 상단 헤더 및 검색 바 */}
+        <div className="pt-8 pb-3 px-6 border-b bg-white sticky top-0 z-10 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-10">
+              {currentViewId !== appData?.app_config?.views?.[0]?.id && (
+                <button onClick={() => setCurrentViewId(appData.app_config.views[0].id)} className="p-2 text-slate-400 hover:text-slate-600 transition-colors"><ChevronLeft /></button>
+              )}
+            </div>
+            <div className="font-black text-slate-900 text-xl truncate">{currentView?.name || appData.name}</div>
+            <div className="w-10 text-right">
+              {currentView?.tableName && (
+                <button onClick={() => fetchTableData(currentView)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"><RefreshCw size={18} /></button>
+              )}
+            </div>
           </div>
-          <div className="font-black text-slate-900 text-xl truncate">{currentView?.name || appData.name}</div>
-          <div className="w-10">
-            {currentView?.tableName && (
-              <button onClick={() => fetchTableData(currentView.tableName)} className="p-2 text-slate-400"><RefreshCw size={18} /></button>
-            )}
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input 
+              type="text"
+              placeholder="데이터 검색..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-100 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-700"
+            />
           </div>
         </div>
 
-        {/* 메인 콘텐츠 영역 (하단바 높이만큼 여백 확보) */}
+        {/* 메인 콘텐츠 영역 */}
         <div className="flex-1 overflow-y-auto bg-slate-50 pb-20">
           <div className={`grid gap-0 ${
             currentView?.columnCount === 2 ? 'grid-cols-2' : 
             currentView?.columnCount === 3 ? 'grid-cols-3' : 
             currentView?.columnCount === 4 ? 'grid-cols-4' : 'grid-cols-1'
           }`}>
-            {tableData[currentView?.tableName || '']?.map((row, idx) => (
-              <div key={idx} className="bg-white border-b border-r border-slate-100 overflow-hidden" style={{ minHeight: `${currentView?.cardHeight || 120}px` }} onClick={() => {
+            {displayData.map((row, idx) => (
+              <div key={idx} className="bg-white border-b border-r border-slate-100 overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors" style={{ minHeight: `${currentView?.cardHeight || 120}px` }} onClick={() => {
                 const act = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId);
                 if (act) handleAction(act, row);
               }}>
@@ -186,9 +237,16 @@ export default function LiveAppPreview() {
               </div>
             ))}
           </div>
+
+          {displayData.length === 0 && (
+            <div className="p-20 text-center flex flex-col items-center gap-3 text-slate-400 mt-10">
+              <Search size={40} className="opacity-20" />
+              <p className="font-bold">조건에 맞는 데이터가 없습니다.</p>
+            </div>
+          )}
         </div>
 
-        {/* 고정 하단 탭 메뉴 */}
+        {/* 하단 탭 메뉴 */}
         <div className="h-20 bg-white border-t flex items-center justify-around px-2 absolute bottom-0 w-full z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
           {appData?.app_config?.views?.slice(0, 5).map((v: any) => {
             const IconComp = v.icon && IconMap[v.icon] ? IconMap[v.icon] : Layout;
@@ -196,11 +254,14 @@ export default function LiveAppPreview() {
             return (
               <button 
                 key={v.id} 
-                onClick={() => setCurrentViewId(v.id)}
-                className={`flex-1 flex flex-col items-center gap-1 transition-all ${isActive ? 'text-indigo-600' : 'text-slate-300 hover:text-slate-500'}`}
+                onClick={() => {
+                  setCurrentViewId(v.id);
+                  setSearchTerm(''); 
+                }}
+                className={`flex-1 flex flex-col items-center gap-1.5 transition-all ${isActive ? 'text-indigo-600 scale-105' : 'text-slate-300 hover:text-slate-500'}`}
               >
                 <IconComp size={22} strokeWidth={isActive ? 3 : 2} />
-                <span className={`text-[9px] font-black uppercase tracking-tighter truncate w-full text-center ${isActive ? 'opacity-100' : 'opacity-60'}`}>
+                <span className={`text-[10px] font-black uppercase tracking-tighter truncate w-16 text-center ${isActive ? 'opacity-100' : 'opacity-60'}`}>
                   {v.name}
                 </span>
               </button>
@@ -217,13 +278,13 @@ export default function LiveAppPreview() {
               <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
                 <CheckCircle2 className="text-indigo-600" /> 데이터 입력
               </h3>
-              <button onClick={() => setIsInputModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full"><X /></button>
+              <button onClick={() => setIsInputModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"><X /></button>
             </div>
             
             <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto bg-slate-50">
               {activeInsertAction?.insertMappings?.filter((m: any) => m.mappingType === 'prompt').map((mapping: any) => (
                 <div key={mapping.id} className="space-y-2">
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-wider">{mapping.sourceValue}</label>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-wider pl-1">{mapping.sourceValue}</label>
                   <input
                     type={mapping.valueType === 'number' ? 'number' : 'text'}
                     value={formData[mapping.targetColumn] || ''}
@@ -233,6 +294,11 @@ export default function LiveAppPreview() {
                   />
                 </div>
               ))}
+              {activeInsertAction?.insertMappings?.filter((m: any) => m.mappingType !== 'prompt').length > 0 && (
+                <div className="pt-4 border-t border-slate-200">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase italic">* 나머지 데이터는 자동 매핑되어 저장됩니다.</p>
+                </div>
+              )}
             </div>
 
             <div className="p-6 bg-white border-t flex gap-3">
@@ -240,7 +306,7 @@ export default function LiveAppPreview() {
               <button 
                 onClick={handleSubmitInsert} 
                 disabled={isSubmitting}
-                className="flex-1 py-4 bg-slate-900 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
+                className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
               >
                 {isSubmitting ? "저장 중..." : "최종 저장"}
               </button>

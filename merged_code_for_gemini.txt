@@ -3,14 +3,15 @@ FILE PATH: C:/react-projects/gnflhs/app/preview/[appId]/page.tsx
 FILE NAME: page.tsx
 ==================================================
 
-// 파일 경로: C:/react-projects/gnflhs/app/preview/[appId]/page.tsx
+// 파일 경로: app/preview/[appId]/page.tsx
 
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
-import { X, CheckCircle2, ChevronLeft, RefreshCw } from 'lucide-react';
+import { X, CheckCircle2, ChevronLeft, RefreshCw, Layout, Search } from 'lucide-react';
+import { IconMap } from '../../design/picker'; 
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
@@ -72,11 +73,14 @@ export default function LiveAppPreview() {
   const [appData, setAppData] = useState<any>(null);
   const [currentViewId, setCurrentViewId] = useState<string>('');
   const [tableData, setTableData] = useState<Record<string, any[]>>({});
-
+  
   const [isInputModalOpen, setIsInputModalOpen] = useState(false);
   const [activeInsertAction, setActiveInsertAction] = useState<any>(null);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // 2단계 클라이언트 검색 상태
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     if (!appId) return;
@@ -99,14 +103,33 @@ export default function LiveAppPreview() {
     fetchAppConfig();
   }, [appId]);
 
-  const fetchTableData = async (tableName: string) => {
-    const { data } = await supabase.from(tableName).select("*").limit(1000);
-    if (data) setTableData(prev => ({ ...prev, [tableName]: data }));
+  const currentView = appData?.app_config?.views?.find((v: any) => v.id === currentViewId);
+
+  // 🔥 TypeScript 주황색 경고 해결을 위한 타입 단언(Type Assertion) 적용
+  const fetchTableData = async (view: any) => {
+    if (!view || !view.tableName) return;
+    
+    // query 변수를 'any' 타입으로 지정하여, 동적 체이닝에 대한 TS의 엄격한 검사를 유연하게 만듭니다.
+    let query: any = supabase.from(view.tableName).select("*");
+
+    if (view.filterColumn && view.filterValue) {
+      const op = view.filterOperator || 'eq';
+      // 명시적으로 string 임을 알려줍니다.
+      const col = view.filterColumn as string;
+      const val = view.filterValue;
+
+      if (op === 'like') query = query.ilike(col, `%${val}%`);
+      else if (op === 'gt') query = query.gt(col, val);
+      else if (op === 'lt') query = query.lt(col, val);
+      else query = query.eq(col, val); // 이제 주황색 에러가 발생하지 않습니다.
+    }
+
+    const { data } = await query.limit(3000); 
+    if (data) setTableData(prev => ({ ...prev, [view.tableName]: data }));
   };
 
-  const currentView = appData?.app_config?.views?.find((v: any) => v.id === currentViewId);
   useEffect(() => {
-    if (currentView?.tableName && !tableData[currentView.tableName]) fetchTableData(currentView.tableName);
+    if (currentView) fetchTableData(currentView);
   }, [currentViewId, currentView]);
 
   const handleAction = async (action: any, rowData: any) => {
@@ -114,6 +137,7 @@ export default function LiveAppPreview() {
       alert(action.message || '알림');
     } else if (action.type === 'navigate') {
       setCurrentViewId(action.targetViewId);
+      setSearchTerm(''); 
     } else if (action.type === 'insert_row') {
       setActiveInsertAction(action);
       const initialData: Record<string, any> = {};
@@ -139,14 +163,14 @@ export default function LiveAppPreview() {
           finalPayload[m.targetColumn] = Number(finalPayload[m.targetColumn]) || 0;
         }
       });
-
       const { error } = await supabase.from(activeInsertAction.insertTableName).insert([finalPayload]);
       if (error) throw error;
       
       alert("성공적으로 저장되었습니다.");
       setIsInputModalOpen(false);
+      
       if (currentView?.tableName === activeInsertAction.insertTableName) {
-        fetchTableData(currentView.tableName);
+        fetchTableData(currentView);
       }
     } catch (err: any) {
       alert(`저장 실패: ${err.message}`);
@@ -155,34 +179,62 @@ export default function LiveAppPreview() {
     }
   };
 
+  const getFilteredData = () => {
+    const rawData = tableData[currentView?.tableName || ''] || [];
+    if (!searchTerm) return rawData; 
+
+    return rawData.filter((row: any) => 
+      Object.values(row).some(val => 
+        String(val).toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    );
+  };
+
+  const displayData = getFilteredData();
+
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-slate-50 font-black text-slate-400">LOADING...</div>;
 
   return (
     <div className="min-h-screen bg-slate-100 flex justify-center font-sans">
-      <div className="w-full max-w-md bg-white shadow-2xl flex flex-col relative">
-        <div className="pt-8 pb-4 px-6 text-center border-b bg-white sticky top-0 z-10 flex items-center justify-between">
-          <div className="w-10">
-            {currentViewId !== appData?.app_config?.views?.[0]?.id && (
-              <button onClick={() => setCurrentViewId(appData.app_config.views[0].id)} className="p-2 text-slate-400"><ChevronLeft /></button>
-            )}
+      <div className="w-full max-w-md bg-white shadow-2xl flex flex-col relative h-screen overflow-hidden">
+        
+        {/* 상단 헤더 및 검색 바 */}
+        <div className="pt-8 pb-3 px-6 border-b bg-white sticky top-0 z-10 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-10">
+              {currentViewId !== appData?.app_config?.views?.[0]?.id && (
+                <button onClick={() => setCurrentViewId(appData.app_config.views[0].id)} className="p-2 text-slate-400 hover:text-slate-600 transition-colors"><ChevronLeft /></button>
+              )}
+            </div>
+            <div className="font-black text-slate-900 text-xl truncate">{currentView?.name || appData.name}</div>
+            <div className="w-10 text-right">
+              {currentView?.tableName && (
+                <button onClick={() => fetchTableData(currentView)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"><RefreshCw size={18} /></button>
+              )}
+            </div>
           </div>
-          <div className="font-black text-slate-900 text-xl truncate">{currentView?.name || appData.name}</div>
-          <div className="w-10">
-            {currentView?.tableName && (
-              <button onClick={() => fetchTableData(currentView.tableName)} className="p-2 text-slate-400"><RefreshCw size={18} /></button>
-            )}
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input 
+              type="text"
+              placeholder="데이터 검색..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-100 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-700"
+            />
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-slate-50">
-          {/* [수정] 그리드 컬럼 배치 로직 강화 */}
+        {/* 메인 콘텐츠 영역 */}
+        <div className="flex-1 overflow-y-auto bg-slate-50 pb-20">
           <div className={`grid gap-0 ${
             currentView?.columnCount === 2 ? 'grid-cols-2' : 
             currentView?.columnCount === 3 ? 'grid-cols-3' : 
             currentView?.columnCount === 4 ? 'grid-cols-4' : 'grid-cols-1'
           }`}>
-            {tableData[currentView?.tableName || '']?.map((row, idx) => (
-              <div key={idx} className="bg-white border-b border-r border-slate-100 overflow-hidden" style={{ minHeight: `${currentView?.cardHeight || 120}px` }} onClick={() => {
+            {displayData.map((row, idx) => (
+              <div key={idx} className="bg-white border-b border-r border-slate-100 overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors" style={{ minHeight: `${currentView?.cardHeight || 120}px` }} onClick={() => {
                 const act = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId);
                 if (act) handleAction(act, row);
               }}>
@@ -190,9 +242,40 @@ export default function LiveAppPreview() {
               </div>
             ))}
           </div>
+
+          {displayData.length === 0 && (
+            <div className="p-20 text-center flex flex-col items-center gap-3 text-slate-400 mt-10">
+              <Search size={40} className="opacity-20" />
+              <p className="font-bold">조건에 맞는 데이터가 없습니다.</p>
+            </div>
+          )}
+        </div>
+
+        {/* 하단 탭 메뉴 */}
+        <div className="h-20 bg-white border-t flex items-center justify-around px-2 absolute bottom-0 w-full z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+          {appData?.app_config?.views?.slice(0, 5).map((v: any) => {
+            const IconComp = v.icon && IconMap[v.icon] ? IconMap[v.icon] : Layout;
+            const isActive = currentViewId === v.id;
+            return (
+              <button 
+                key={v.id} 
+                onClick={() => {
+                  setCurrentViewId(v.id);
+                  setSearchTerm(''); 
+                }}
+                className={`flex-1 flex flex-col items-center gap-1.5 transition-all ${isActive ? 'text-indigo-600 scale-105' : 'text-slate-300 hover:text-slate-500'}`}
+              >
+                <IconComp size={22} strokeWidth={isActive ? 3 : 2} />
+                <span className={`text-[10px] font-black uppercase tracking-tighter truncate w-16 text-center ${isActive ? 'opacity-100' : 'opacity-60'}`}>
+                  {v.name}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
+      {/* 입력 모달 */}
       {isInputModalOpen && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
@@ -200,14 +283,13 @@ export default function LiveAppPreview() {
               <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
                 <CheckCircle2 className="text-indigo-600" /> 데이터 입력
               </h3>
-              <button onClick={() => setIsInputModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full"><X /></button>
+              <button onClick={() => setIsInputModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"><X /></button>
             </div>
             
             <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto bg-slate-50">
               {activeInsertAction?.insertMappings?.filter((m: any) => m.mappingType === 'prompt').map((mapping: any) => (
                 <div key={mapping.id} className="space-y-2">
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-wider">{mapping.sourceValue}</label>
-                  {/* [수정] 글자 가시성 확보 (text-slate-900 추가) */}
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-wider pl-1">{mapping.sourceValue}</label>
                   <input
                     type={mapping.valueType === 'number' ? 'number' : 'text'}
                     value={formData[mapping.targetColumn] || ''}
@@ -219,7 +301,7 @@ export default function LiveAppPreview() {
               ))}
               {activeInsertAction?.insertMappings?.filter((m: any) => m.mappingType !== 'prompt').length > 0 && (
                 <div className="pt-4 border-t border-slate-200">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase italic">* 나머지 자동 매핑 데이터는 저장 시 함께 처리됩니다.</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase italic">* 나머지 데이터는 자동 매핑되어 저장됩니다.</p>
                 </div>
               )}
             </div>
@@ -229,7 +311,7 @@ export default function LiveAppPreview() {
               <button 
                 onClick={handleSubmitInsert} 
                 disabled={isSubmitting}
-                className="flex-1 py-4 bg-slate-900 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
+                className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
               >
                 {isSubmitting ? "저장 중..." : "최종 저장"}
               </button>
@@ -246,7 +328,7 @@ FILE PATH: C:/react-projects/gnflhs/app/design/page.tsx
 FILE NAME: page.tsx
 ==================================================
 
-// 파일 경로: C:/react-projects/gnflhs/app/design/page.tsx
+// 파일 경로: app/design/page.tsx
 
 "use client";
 
@@ -255,7 +337,7 @@ import { createClient } from '@supabase/supabase-js';
 import { AppState, View, Action, SchemaData } from './types';
 import ViewEditor from './view';
 import ActionEditor from './action';
-import { Plus, Send, Loader2, ExternalLink, Trash2, FolderOpen, X, Star } from 'lucide-react';
+import { Plus, Send, Loader2, ExternalLink, Trash2, FolderOpen, X, Star, ArrowUp, ArrowDown, Copy } from 'lucide-react';
 import IconPicker, { IconMap } from './picker'; 
 
 const supabase = createClient(
@@ -271,15 +353,15 @@ export default function AppBuilder() {
     views: [{ id: 'v1', name: '메인 홈 (첫 화면)', tableName: null, cardHeight: 120, columnCount: 1, layoutRows: [], onClickActionId: null }],
     actions: []
   });
+
   const [schemaData, setSchemaData] = useState<SchemaData>({});
   const [activeItem, setActiveItem] = useState<{ type: 'view' | 'action' | 'app', id: string }>({ type: 'view', id: 'v1' });
+  
   const [isSaving, setIsSaving] = useState(false); 
   const [isPreviewSaving, setIsPreviewSaving] = useState<string | null>(null);
 
   const [isAppListModalOpen, setIsAppListModalOpen] = useState(false);
   const [savedAppsList, setSavedAppsList] = useState<any[]>([]);
-  
-  // [수정] 통합 아이콘 피커 상태
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
 
   useEffect(() => {
@@ -297,6 +379,90 @@ export default function AppBuilder() {
     fetchSchema();
   }, []);
 
+  // ------------------------------------------------------------------
+  // 🔥 [신규 기능] View(화면) 관리: 이동, 복제, 삭제
+  // ------------------------------------------------------------------
+  const moveView = (index: number, direction: 'up' | 'down') => {
+    if ((direction === 'up' && index === 0) || (direction === 'down' && index === appState.views.length - 1)) return;
+    const newViews = [...appState.views];
+    const temp = newViews[index];
+    newViews[index] = newViews[index + (direction === 'up' ? -1 : 1)];
+    newViews[index + (direction === 'up' ? -1 : 1)] = temp;
+    setAppState({ ...appState, views: newViews });
+  };
+
+  const duplicateView = (id: string) => {
+    const viewToCopy = appState.views.find(v => v.id === id);
+    if (!viewToCopy) return;
+    
+    // React 렌더링 충돌을 막기 위한 깊은 복사 및 내부 중첩 ID 재생성 (매우 중요)
+    const duplicatedView = JSON.parse(JSON.stringify(viewToCopy));
+    const newId = `v_${Date.now()}`;
+    duplicatedView.id = newId;
+    duplicatedView.name = `${viewToCopy.name} (복사본)`;
+    
+    const resetIds = (rows: any[]) => {
+      rows.forEach(r => {
+        r.id = `r_${Math.random().toString(36).substr(2, 9)}`;
+        r.cells.forEach((c: any) => {
+          c.id = `c_${Math.random().toString(36).substr(2, 9)}`;
+          if (c.nestedRows) resetIds(c.nestedRows);
+        });
+      });
+    };
+    resetIds(duplicatedView.layoutRows);
+
+    setAppState({ ...appState, views: [...appState.views, duplicatedView] });
+    setActiveItem({ type: 'view', id: newId });
+  };
+
+  const deleteView = (id: string) => {
+    if (appState.views.length <= 1) {
+      alert('앱에는 최소 1개의 화면(View)이 필요합니다.');
+      return;
+    }
+    if (window.confirm('정말로 이 화면을 삭제하시겠습니까?\n이 작업은 복구할 수 없습니다.')) {
+      const newViews = appState.views.filter(v => v.id !== id);
+      setAppState({ ...appState, views: newViews });
+      if (activeItem.id === id) setActiveItem({ type: 'view', id: newViews[0].id });
+    }
+  };
+
+  // ------------------------------------------------------------------
+  // 🔥 [신규 기능] Action(기능) 관리: 이동, 복제, 삭제
+  // ------------------------------------------------------------------
+  const moveAction = (index: number, direction: 'up' | 'down') => {
+    if ((direction === 'up' && index === 0) || (direction === 'down' && index === appState.actions.length - 1)) return;
+    const newActions = [...appState.actions];
+    const temp = newActions[index];
+    newActions[index] = newActions[index + (direction === 'up' ? -1 : 1)];
+    newActions[index + (direction === 'up' ? -1 : 1)] = temp;
+    setAppState({ ...appState, actions: newActions });
+  };
+
+  const duplicateAction = (id: string) => {
+    const actToCopy = appState.actions.find(a => a.id === id);
+    if (!actToCopy) return;
+    const duplicatedAct = JSON.parse(JSON.stringify(actToCopy));
+    const newId = `a_${Date.now()}`;
+    duplicatedAct.id = newId;
+    duplicatedAct.name = `${actToCopy.name} (복사본)`;
+    if (duplicatedAct.insertMappings) {
+      duplicatedAct.insertMappings.forEach((m: any) => m.id = `m_${Math.random().toString(36).substr(2, 9)}`);
+    }
+    setAppState({ ...appState, actions: [...appState.actions, duplicatedAct] });
+    setActiveItem({ type: 'action', id: newId });
+  };
+
+  const deleteAction = (id: string) => {
+    if (window.confirm('정말로 이 액션을 삭제하시겠습니까?')) {
+      const newActions = appState.actions.filter(a => a.id !== id);
+      setAppState({ ...appState, actions: newActions });
+      if (activeItem.id === id) setActiveItem({ type: 'view', id: appState.views[0].id });
+    }
+  };
+
+  // 기존 유지 기능들
   const handlePreviewPopup = async (viewId: string) => {
     if (!appState.id) {
       alert('최초 1회는 우측 하단의 [🚀 저장 및 배포하기]를 진행하여 앱을 생성해주세요.');
@@ -304,17 +470,10 @@ export default function AppBuilder() {
     }
     setIsPreviewSaving(viewId);
     try {
-      const draftPayload = {
-        name: appState.name,
-        draft_config: { views: appState.views, actions: appState.actions, icon: appState.icon }
-      };
+      const draftPayload = { name: appState.name, draft_config: { views: appState.views, actions: appState.actions, icon: appState.icon } };
       const { error } = await supabase.from('apps').update(draftPayload).eq('id', appState.id);
       if (error) throw error;
-      window.open(
-        `/preview/${appState.id}?viewId=${viewId}&mode=draft`, 
-        'LivePreviewWindow', 
-        'width=420,height=850,resizable=yes,scrollbars=yes'
-      );
+      window.open(`/preview/${appState.id}?viewId=${viewId}&mode=draft`, 'LivePreviewWindow', 'width=420,height=850,resizable=yes,scrollbars=yes');
     } catch (error: any) {
       alert(`미리보기 동기화 실패: ${error.message}`);
     } finally {
@@ -326,15 +485,12 @@ export default function AppBuilder() {
     setIsSaving(true);
     try {
       const config = { views: appState.views, actions: appState.actions, icon: appState.icon };
-      const payload = {
-        name: appState.name,
-        app_config: config,
-        draft_config: config
-      };
+      const payload = { name: appState.name, app_config: config, draft_config: config };
+      
       if (!appState.id) {
         const { data, error } = await supabase.from('apps').insert([payload]).select('id');
         if (error) throw error;
-        if (data && data.length > 0) { setAppState(prev => ({ ...prev, id: data[0].id })); }
+        if (data && data.length > 0) setAppState(prev => ({ ...prev, id: data[0].id }));
         alert('성공적으로 저장 및 최초 배포되었습니다!');
       } else {
         const { error } = await supabase.from('apps').update(payload).eq('id', appState.id);
@@ -356,9 +512,7 @@ export default function AppBuilder() {
       if (error) throw error;
       alert('앱이 성공적으로 삭제되었습니다.');
       handleCreateNewApp();
-    } catch (error: any) {
-      alert(`앱 삭제 실패: ${error.message}`);
-    }
+    } catch (error: any) {}
   };
 
   const openAppListModal = async () => {
@@ -398,18 +552,12 @@ export default function AppBuilder() {
     setIsAppListModalOpen(false);
   };
 
-  // [수정] 아이콘 선택 시 대상에 따라 상태 업데이트
   const handleIconSelect = (iconName: string) => {
-    if (activeItem.type === 'app') {
-      setAppState({ ...appState, icon: iconName });
-    } else if (activeItem.type === 'view') {
-      setAppState({ ...appState, views: appState.views.map(v => v.id === activeItem.id ? { ...v, icon: iconName } : v) });
-    } else if (activeItem.type === 'action') {
-      setAppState({ ...appState, actions: appState.actions.map(a => a.id === activeItem.id ? { ...a, icon: iconName } : a) });
-    }
+    if (activeItem.type === 'app') setAppState({ ...appState, icon: iconName });
+    else if (activeItem.type === 'view') setAppState({ ...appState, views: appState.views.map(v => v.id === activeItem.id ? { ...v, icon: iconName } : v) });
+    else if (activeItem.type === 'action') setAppState({ ...appState, actions: appState.actions.map(a => a.id === activeItem.id ? { ...a, icon: iconName } : a) });
   };
 
-  // [수정] 현재 피커에 표시될 아이콘 값 계산
   const getCurrentIcon = () => {
     if (activeItem.type === 'app') return appState.icon;
     if (activeItem.type === 'view') return appState.views.find(v => v.id === activeItem.id)?.icon;
@@ -458,6 +606,7 @@ export default function AppBuilder() {
         </div>
       )}
 
+      {/* 사이드바 영역 */}
       <aside className="w-[320px] border-r bg-white flex flex-col shrink-0 shadow-2xl z-50 relative">
         <div className="p-6 bg-indigo-700 text-white border-b border-indigo-800 shrink-0 flex flex-col gap-4">
           <div className="flex justify-between items-center">
@@ -470,13 +619,10 @@ export default function AppBuilder() {
           
           <div className="flex items-center gap-3 mt-2">
             <button 
-              onClick={() => { setActiveItem({ type: 'app', id: 'app' }); setIsIconPickerOpen(true); }}
+               onClick={() => { setActiveItem({ type: 'app', id: 'app' }); setIsIconPickerOpen(true); }}
               className="w-10 h-10 shrink-0 flex items-center justify-center bg-indigo-800 border border-indigo-500 rounded-xl hover:bg-indigo-900 hover:border-white transition-all"
             >
-              {appState.icon && IconMap[appState.icon] ?
-                React.createElement(IconMap[appState.icon], { className: "text-white", size: 20 }) : 
-                <Star className="text-indigo-300" size={20} />
-              }
+              {appState.icon && IconMap[appState.icon] ? React.createElement(IconMap[appState.icon], { className: "text-white", size: 20 }) : <Star className="text-indigo-300" size={20} />}
             </button>
             <input 
               type="text" 
@@ -488,60 +634,91 @@ export default function AppBuilder() {
         </div>
         
         <div className="p-6 flex-1 overflow-y-auto space-y-10">
+          
+          {/* 뷰(View) 리스트 렌더링 영역 */}
           <div>
-            <div className="flex justify-between text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
+            <div className="flex justify-between items-center text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
               <span>VIEWS</span>
               <button onClick={() => { 
                 const id=`v_${Date.now()}`;
                 setAppState({...appState, views:[...appState.views, {id, name:'새 뷰', tableName:null, cardHeight:120, columnCount: 1, layoutRows:[], onClickActionId: null}]});
                 setActiveItem({type:'view', id});
-              }} className="p-1 hover:bg-slate-100 rounded-lg text-indigo-600"><Plus size={18}/></button>
+              }} className="p-1 hover:bg-slate-100 rounded-lg text-indigo-600 transition-colors"><Plus size={18}/></button>
             </div>
-            <div className="space-y-2">
-              {appState.views.map(v => {
+            <div className="space-y-3">
+              {appState.views.map((v, index) => {
                 const ViewIcon = v.icon && IconMap[v.icon] ? IconMap[v.icon] : null;
+                const isActive = activeItem.id === v.id;
+                
                 return (
-                  <div key={v.id} className={`w-full flex items-center justify-between px-5 py-3 rounded-2xl text-sm font-black transition-all ${activeItem.id === v.id ? 'bg-indigo-600 text-white shadow-xl scale-105' : 'hover:bg-slate-100 text-slate-600'}`}>
-                    <button onClick={() => setActiveItem({type:'view', id:v.id})} className="flex-1 flex items-center gap-2 text-left truncate outline-none">
-                      {ViewIcon && <ViewIcon size={16} className={activeItem.id === v.id ? "text-indigo-200" : "text-slate-400"} />}
-                      <span className="truncate">{v.name}</span>
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handlePreviewPopup(v.id); }}
-                      disabled={isPreviewSaving === v.id}
-                      className={`p-1.5 ml-2 shrink-0 rounded-lg transition-all ${activeItem.id === v.id ? 'text-indigo-200 hover:text-white hover:bg-indigo-500' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-200'} disabled:opacity-50`}
-                    >
-                      {isPreviewSaving === v.id ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
-                    </button>
+                  <div key={v.id} onClick={() => setActiveItem({type:'view', id:v.id})} className={`w-full flex flex-col px-4 py-3 rounded-2xl text-sm font-black transition-all group cursor-pointer border ${isActive ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl scale-[1.02]' : 'bg-white border-slate-200 hover:border-indigo-300 text-slate-600 hover:shadow-md'}`}>
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex-1 flex items-center gap-2 text-left truncate outline-none">
+                        {ViewIcon ? <ViewIcon size={16} className={isActive ? "text-indigo-200" : "text-slate-400"} /> : <Star size={16} className={isActive ? "text-indigo-200" : "text-slate-400"} />}
+                        <span className="truncate">{v.name}</span>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handlePreviewPopup(v.id); }}
+                        disabled={isPreviewSaving === v.id}
+                        className={`p-1.5 ml-2 shrink-0 rounded-lg transition-all ${isActive ? 'text-indigo-200 hover:text-white hover:bg-indigo-500' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100'} disabled:opacity-50`}
+                        title="미리보기 팝업 열기"
+                      >
+                        {isPreviewSaving === v.id ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+                      </button>
+                    </div>
+                    
+                    {/* 🔥 뷰 조작 액션 바 (트렌디한 호버 메뉴) */}
+                    <div className={`flex items-center justify-end gap-1 overflow-hidden transition-all duration-300 ${isActive ? 'max-h-10 mt-3 opacity-100' : 'max-h-0 opacity-0 group-hover:max-h-10 group-hover:mt-3 group-hover:opacity-100'}`}>
+                      <button onClick={(e) => { e.stopPropagation(); moveView(index, 'up'); }} disabled={index === 0} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-indigo-500 disabled:opacity-30' : 'hover:bg-slate-100 disabled:opacity-30'}`} title="순서 올리기"><ArrowUp size={14}/></button>
+                      <button onClick={(e) => { e.stopPropagation(); moveView(index, 'down'); }} disabled={index === appState.views.length - 1} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-indigo-500 disabled:opacity-30' : 'hover:bg-slate-100 disabled:opacity-30'}`} title="순서 내리기"><ArrowDown size={14}/></button>
+                      <div className={`w-[1px] h-3 mx-1 ${isActive ? 'bg-indigo-400' : 'bg-slate-200'}`}></div>
+                      <button onClick={(e) => { e.stopPropagation(); duplicateView(v.id); }} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-indigo-500' : 'hover:bg-slate-100'}`} title="화면 복사하기"><Copy size={14}/></button>
+                      <button onClick={(e) => { e.stopPropagation(); deleteView(v.id); }} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-500 hover:text-white text-rose-200' : 'hover:bg-rose-50 text-rose-400'}`} title="화면 삭제하기"><Trash2 size={14}/></button>
+                    </div>
                   </div>
                 );
               })}
             </div>
           </div>
+          
+          {/* 액션(Action) 리스트 렌더링 영역 */}
           <div>
-            <div className="flex justify-between text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
+            <div className="flex justify-between items-center text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
               <span>ACTIONS</span>
               <button onClick={() => { 
                 const id=`a_${Date.now()}`;
                 setAppState({...appState, actions:[...appState.actions, {id, name:'새 액션', type:'alert', targetViewId:null, message:null}]}); 
                 setActiveItem({type:'action', id});
-              }} className="p-1 hover:bg-slate-100 rounded-lg text-rose-500"><Plus size={18}/></button>
+              }} className="p-1 hover:bg-slate-100 rounded-lg text-rose-500 transition-colors"><Plus size={18}/></button>
             </div>
-            <div className="space-y-2">
-              {appState.actions.map(a => {
+            <div className="space-y-3">
+              {appState.actions.map((a, index) => {
                 const ActIcon = a.icon && IconMap[a.icon] ? IconMap[a.icon] : null;
+                const isActive = activeItem.id === a.id;
+
                 return (
-                  <button key={a.id} onClick={() => setActiveItem({type:'action', id:a.id})} className={`w-full flex items-center gap-2 text-left px-5 py-3 border-l-8 rounded-r-2xl text-sm font-black transition-all ${activeItem.id===a.id ? 'bg-rose-50 border-rose-500 text-rose-800 shadow-sm' : 'border-transparent hover:bg-slate-100 text-slate-600'}`}>
-                    {ActIcon ? <ActIcon size={16} className={activeItem.id === a.id ? "text-rose-500" : "text-slate-400"} /> : <span>⚡</span>}
-                    <span className="truncate">{a.name}</span>
-                  </button>
+                  <div key={a.id} onClick={() => setActiveItem({type:'action', id:a.id})} className={`w-full flex flex-col px-4 py-3 border-l-8 rounded-r-2xl text-sm font-black transition-all group cursor-pointer ${isActive ? 'bg-rose-50 border-rose-500 text-rose-800 shadow-md scale-[1.02]' : 'bg-white border-transparent hover:bg-slate-100 text-slate-600 hover:shadow-sm'}`}>
+                    <div className="flex items-center gap-2 text-left w-full">
+                      {ActIcon ? <ActIcon size={16} className={isActive ? "text-rose-500" : "text-slate-400"} /> : <span className="opacity-70">⚡</span>}
+                      <span className="truncate flex-1">{a.name}</span>
+                    </div>
+                    
+                    {/* 🔥 액션 조작 바 */}
+                    <div className={`flex items-center justify-end gap-1 overflow-hidden transition-all duration-300 ${isActive ? 'max-h-10 mt-3 opacity-100' : 'max-h-0 opacity-0 group-hover:max-h-10 group-hover:mt-3 group-hover:opacity-100'}`}>
+                      <button onClick={(e) => { e.stopPropagation(); moveAction(index, 'up'); }} disabled={index === 0} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-200 disabled:opacity-30' : 'hover:bg-slate-200 disabled:opacity-30'}`} title="순서 올리기"><ArrowUp size={14}/></button>
+                      <button onClick={(e) => { e.stopPropagation(); moveAction(index, 'down'); }} disabled={index === appState.actions.length - 1} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-200 disabled:opacity-30' : 'hover:bg-slate-200 disabled:opacity-30'}`} title="순서 내리기"><ArrowDown size={14}/></button>
+                      <div className={`w-[1px] h-3 mx-1 ${isActive ? 'bg-rose-200' : 'bg-slate-200'}`}></div>
+                      <button onClick={(e) => { e.stopPropagation(); duplicateAction(a.id); }} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-200' : 'hover:bg-slate-200'}`} title="액션 복사하기"><Copy size={14}/></button>
+                      <button onClick={(e) => { e.stopPropagation(); deleteAction(a.id); }} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-500 hover:text-white text-rose-500' : 'hover:bg-rose-50 text-rose-400'}`} title="액션 삭제하기"><Trash2 size={14}/></button>
+                    </div>
+                  </div>
                 );
               })}
             </div>
           </div>
         </div>
 
-        <div className="p-6 bg-slate-50 border-t border-slate-200 shrink-0">
+        <div className="p-6 bg-slate-50 border-t border-slate-200 shrink-0 z-30">
           <button onClick={handleSaveAndDeploy} disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-black shadow-xl hover:shadow-indigo-500/30 transition-all active:scale-95 disabled:opacity-70 disabled:pointer-events-none">
             {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
             {isSaving ? '배포 진행 중...' : '🚀 실제 유저에게 배포하기'}
@@ -549,7 +726,7 @@ export default function AppBuilder() {
           {appState.id && (
             <div className="mt-3 flex items-center gap-2">
               <a href={`/preview/${appState.id}`} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-2xl text-sm font-bold transition-all shadow-sm"><ExternalLink size={16} /> 라이브 앱 확인</a>
-              <button onClick={handleDeleteApp} className="p-3 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 hover:border-rose-300 rounded-2xl transition-all shadow-sm"><Trash2 size={18} /></button>
+              <button onClick={handleDeleteApp} className="p-3 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 hover:border-rose-300 rounded-2xl transition-all shadow-sm" title="현재 앱 완전 삭제"><Trash2 size={18} /></button>
             </div>
           )}
         </div>
@@ -573,13 +750,12 @@ export default function AppBuilder() {
               />
             )}
             {activeItem.type==='action' && activeAction && (
-              <ActionEditor 
+               <ActionEditor 
                 action={activeAction} 
                 views={appState.views} 
                 schemaData={schemaData} 
                 onUpdate={(upd) => setAppState({...appState, actions: appState.actions.map(a => a.id===upd.id ? upd : a)})} 
-                onDelete={(id) => { setAppState({...appState, actions: appState.actions.filter(a => a.id !== id)}); setActiveItem({type:'view', id:'v1'}); }}
-                // [수정] 액션에서 피커를 열도록 전달
+                onDelete={deleteAction}
                 onOpenIconPicker={() => setIsIconPickerOpen(true)}
               />
             )}
@@ -587,7 +763,6 @@ export default function AppBuilder() {
         </div>
       </main>
 
-      {/* [수정] 통합 아이콘 피커 - main과 aside 밖 최상위에 위치하여 가려짐 방지 */}
       <IconPicker 
         isOpen={isIconPickerOpen} 
         onClose={() => setIsIconPickerOpen(false)}
@@ -806,11 +981,24 @@ FILE PATH: C:/react-projects/gnflhs/app/design/view.tsx
 FILE NAME: view.tsx
 ==================================================
 
-// view.tsx
-import React, { useState } from 'react';
-import { View, SchemaData, LayoutRow, LayoutCell, Action } from './types';
-import { Database, LayoutTemplate, Plus, Columns, Rows, ChevronLeft, ChevronRight, X, MousePointerClick, Star } from 'lucide-react';
-import IconPicker, { IconMap } from './picker'; // [신규] 피커 임포트
+// 파일 경로: app/design/view.tsx
+"use client";
+
+import React, { useState, useMemo } from 'react';
+import { View, SchemaData, LayoutRow, Action } from './types';
+import * as LucideIcons from 'lucide-react';
+import { 
+  Database, LayoutTemplate, Plus, Columns, Rows, ChevronLeft, 
+  ChevronRight, X, MousePointerClick, Star, Filter, Search, Smartphone, Eye, Loader2, TableProperties
+} from 'lucide-react';
+import IconPicker, { IconMap } from './picker'; 
+import { createClient } from '@supabase/supabase-js'; // 🔥 Supabase 클라이언트 추가
+
+// Supabase 인스턴스 생성 (데이터 미리보기용)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+);
 
 interface ViewEditorProps {
   view: View;
@@ -820,9 +1008,42 @@ interface ViewEditorProps {
 }
 
 export default function ViewEditor({ view, schemaData, actions, onUpdate }: ViewEditorProps) {
-  // 🔥 아이콘 피커 모달 상태 관리
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
   const availableColumns = view.tableName ? schemaData[view.tableName] || [] : [];
+
+  // 🔥 데이터 미리보기 모달 상태 관리
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [previewData, setPreviewData] = useState<any[]>([]);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+
+  // 🔥 데이터 미리보기 실행 함수
+  const fetchPreviewData = async () => {
+    if (!view.tableName) return alert("먼저 테이블을 선택해주세요.");
+    
+    setIsPreviewModalOpen(true);
+    setIsLoadingPreview(true);
+    
+    try {
+      let query = supabase.from(view.tableName).select('*').limit(1000); // 상위 1000개만 확인
+      
+      // 현재 설정된 필터 조건 적용
+      if (view.filterColumn && view.filterValue) {
+        if (view.filterOperator === 'like') query = query.ilike(view.filterColumn, `%${view.filterValue}%`);
+        else if (view.filterOperator === 'gt') query = query.gt(view.filterColumn, view.filterValue);
+        else if (view.filterOperator === 'lt') query = query.lt(view.filterColumn, view.filterValue);
+        else query = query.eq(view.filterColumn, view.filterValue);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      
+      setPreviewData(data || []);
+    } catch (err: any) {
+      alert("데이터를 불러오지 못했습니다: " + err.message);
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
 
   const mutate = (callback: (rows: LayoutRow[]) => void) => {
     const next = JSON.parse(JSON.stringify(view.layoutRows));
@@ -837,78 +1058,77 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
     });
   };
 
-  const RenderRow = ({ row, depth = 0 }: { row: LayoutRow, depth: number, parentRows: LayoutRow[] }) => (
-    <div className={`group/row flex gap-2 p-3 rounded-xl border-2 border-slate-200 ${depth % 2 === 0 ? 'bg-slate-100/80' : 'bg-white'} relative mb-2`}>
-      <button 
-        onClick={() => mutate(rows => {
-          const remove = (arr: LayoutRow[]) => {
-            const idx = arr.findIndex(r => r.id === row.id);
-            if (idx > -1) arr.splice(idx, 1);
-            else arr.forEach(r => r.cells.forEach(c => { if(c.nestedRows) remove(c.nestedRows); }));
-          };
-          remove(rows);
-        })}
-        className="absolute -right-2 -top-2 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover/row:opacity-100 z-30 transition-opacity"
-      >
-        <X size={14} strokeWidth={3}/>
+  const RenderRowEditor = ({ row, depth = 0 }: { row: LayoutRow, depth: number }) => (
+    <div className={`flex gap-3 p-3 rounded-2xl border-2 border-slate-200 ${depth % 2 === 0 ? 'bg-slate-50' : 'bg-white'} relative mb-3 group/row transition-all`}>
+      <button onClick={() => mutate(rows => {
+        const remove = (arr: LayoutRow[]) => {
+          const idx = arr.findIndex(r => r.id === row.id);
+          if (idx > -1) arr.splice(idx, 1);
+          else arr.forEach(r => r.cells.forEach(c => { if(c.nestedRows) remove(c.nestedRows); }));
+        };
+        remove(rows);
+      })} className="absolute -right-3 -top-3 w-7 h-7 bg-slate-800 text-white rounded-full flex items-center justify-center opacity-0 group-hover/row:opacity-100 z-30 transition-all shadow-lg">
+        <X size={14} strokeWidth={3} />
       </button>
 
       {row.cells.map(cell => (
-        <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col gap-2 border-2 border-indigo-200 bg-white rounded-xl p-3 min-h-[100px] shadow-sm relative group/cell">
-          <div className="flex justify-between items-center bg-indigo-50 px-2 py-1 rounded-lg">
+        <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col gap-2 border-2 border-indigo-200 bg-white rounded-2xl p-4 min-h-[120px] shadow-sm relative transition-all">
+          <div className="flex justify-between items-center bg-indigo-50 px-2 py-1 rounded-xl">
             <div className="flex items-center gap-1.5">
               <button onClick={() => mutate(rows => {
                 const find = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => { if(c.id === cell.id) c.flex = Math.max(1, c.flex - 1); if(c.nestedRows) find(c.nestedRows); }));
                 find(rows);
-              })} className="p-1 hover:bg-indigo-200 rounded text-indigo-700"><ChevronLeft size={14}/></button>
+              })} className="text-indigo-700 hover:scale-125 transition-transform p-1"><ChevronLeft size={16}/></button>
               <span className="text-[11px] font-black text-indigo-700 tracking-tighter">비율:{cell.flex}</span>
               <button onClick={() => mutate(rows => {
                 const find = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => { if(c.id === cell.id) c.flex += 1; if(c.nestedRows) find(c.nestedRows); }));
                 find(rows);
-              })} className="p-1 hover:bg-indigo-200 rounded text-indigo-700"><ChevronRight size={14}/></button>
+              })} className="text-indigo-700 hover:scale-125 transition-transform p-1"><ChevronRight size={16}/></button>
             </div>
-            <div className="flex gap-2">
-              <button onClick={() => mutate(rows => {
-                const find = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => {
-                  if(c.id === cell.id) {
-                    c.contentType = 'nested';
-                    c.nestedRows = [{ id: `nr_${Date.now()}`, cells: [{ id: `nc_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }];
-                  } else if(c.nestedRows) find(c.nestedRows);
-                }));
-                find(rows);
-              })} className="text-indigo-400 hover:text-indigo-700" title="세로 분할"><Rows size={16}/></button>
-            </div>
+            <button onClick={() => mutate(rows => {
+              const find = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => {
+                if(c.id === cell.id) {
+                  c.contentType = 'nested';
+                  c.nestedRows = [{ id: `nr_${Date.now()}`, cells: [{ id: `nc_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }];
+                } else if(c.nestedRows) find(c.nestedRows);
+              }));
+              find(rows);
+            })} className="text-indigo-400 hover:text-indigo-700 p-1" title="세로 분할"><Rows size={18}/></button>
           </div>
 
           {cell.contentType === 'nested' ? (
-            <div className="space-y-3 h-full">
-              {cell.nestedRows?.map(nr => <RenderRow key={nr.id} row={nr} depth={depth + 1} parentRows={cell.nestedRows!} />)}
+            <div className="space-y-3 pt-2 h-full">
+              {cell.nestedRows?.map(nr => <RenderRowEditor key={nr.id} row={nr} depth={depth + 1} />)}
               <button onClick={() => mutate(rows => {
                 const find = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => { if(c.id === cell.id) c.nestedRows?.push({ id: `nr_${Date.now()}`, cells: [{ id: `nc_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }); if(c.nestedRows) find(c.nestedRows); }));
                 find(rows);
-              })} className="w-full py-2 border-2 border-dashed border-slate-200 text-xs font-bold text-slate-400 rounded-lg hover:bg-slate-50">+ 세로 칸 추가</button>
+              })} className="w-full py-3 border-2 border-dashed border-slate-200 text-[10px] font-black text-slate-400 rounded-xl hover:bg-slate-50 transition-colors">+ 세로 분할 추가</button>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col justify-center">
-              <select
-                value={(cell.contentType === 'action' ? 'action_' : '') + (cell.contentValue || '')}
-                onChange={(e) => {
+            <div className="flex-1 flex flex-col justify-center gap-2">
+              <select 
+                className="w-full p-2.5 text-xs font-black text-slate-900 bg-slate-50 border-2 border-slate-200 rounded-xl outline-none focus:border-indigo-500 transition-all" 
+                value={(cell.contentType === 'action' ? 'act_' : '') + (cell.contentValue || '')} 
+                onChange={e => {
                   const val = e.target.value;
                   mutate(rows => {
                     const find = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => {
                       if(c.id === cell.id) {
-                        if (val.startsWith('action_')) { c.contentType = 'action'; c.contentValue = val.replace('action_', ''); }
+                        if (val.startsWith('act_')) { c.contentType = 'action'; c.contentValue = val.replace('act_', ''); }
                         else { c.contentType = val ? 'field' : 'empty'; c.contentValue = val; }
                       } else if(c.nestedRows) find(c.nestedRows);
                     }));
                     find(rows);
                   });
                 }}
-                className="w-full p-2 text-sm font-black text-slate-900 bg-slate-50 border-2 border-slate-200 rounded-lg outline-none focus:border-indigo-500"
               >
-                <option value="">-- 표시 데이터 선택 --</option>
-                <optgroup label="DB 컬럼명">{availableColumns.map(col => <option key={col} value={col}>{col}</option>)}</optgroup>
-                <optgroup label="연결된 액션">{actions.map(act => <option key={act.id} value={`action_${act.id}`}>⚡ {act.name}</option>)}</optgroup>
+                <option value="">-- 데이터 선택 --</option>
+                <optgroup label="테이블 컬럼">
+                  {availableColumns.map(col => <option key={col} value={col}>{col}</option>)}
+                </optgroup>
+                <optgroup label="액션(기능)">
+                  {actions.map(a => <option key={a.id} value={`act_${a.id}`}>⚡ {a.name}</option>)}
+                </optgroup>
               </select>
             </div>
           )}
@@ -920,107 +1140,225 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           r.cells.forEach((c: any) => { if(c.nestedRows) find(c.nestedRows); });
         });
         find(rows);
-      })} className="w-10 flex items-center justify-center bg-indigo-600 text-white rounded-xl shadow-md hover:bg-indigo-700" title="옆으로 분할"><Columns size={20}/></button>
+      })} className="w-12 flex items-center justify-center bg-indigo-600 text-white rounded-2xl shadow-md hover:bg-indigo-700 transition-colors hover:scale-105" title="옆으로 분할"><Columns size={20}/></button>
     </div>
   );
 
   return (
-    <div className="min-h-full p-10 bg-[#F1F5F9] pb-32 text-slate-900 relative"> 
-      <div className="max-w-5xl mx-auto space-y-10">
-        
-        {/* 🔥 핵심 해결: 뷰 이름 및 아이콘 설정 영역 추가 */}
-        <section className="bg-white p-8 rounded-3xl shadow-xl border border-slate-200">
-          <label className="block text-xs font-black text-slate-400 mb-3 uppercase">현재 뷰(View)의 아이콘과 이름</label>
+    <div className="max-w-5xl mx-auto space-y-10 pb-32">
+      {/* 1. 뷰 기본 정보 섹션 */}
+      <section className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <label className="text-[11px] font-black text-slate-400 block mb-4 uppercase tracking-widest px-2">현재 화면(View) 기본 정보</label>
+        <div className="flex items-center gap-6">
+          <button 
+            onClick={() => setIsIconPickerOpen(true)} 
+            className="w-16 h-16 shrink-0 bg-indigo-50 border-2 border-indigo-100 rounded-[1.5rem] flex items-center justify-center text-indigo-600 hover:border-indigo-400 hover:shadow-md transition-all group"
+          >
+            {view.icon && IconMap[view.icon] ? 
+              React.createElement(IconMap[view.icon], { size: 32, className: "group-hover:scale-110 transition-transform" }) : 
+              <Star size={32} className="text-indigo-200 group-hover:text-indigo-400"/>
+            }
+          </button>
+          <input 
+            className="flex-1 p-5 rounded-[1.5rem] border-2 border-slate-100 text-3xl font-black outline-none focus:border-indigo-500 transition-all text-slate-900" 
+            value={view.name} 
+            onChange={e => onUpdate({...view, name: e.target.value})} 
+            placeholder="화면 이름을 입력하세요" 
+          />
+        </div>
+      </section>
+
+      {/* 2. 데이터 연결 및 서버 필터링 설정 섹션 */}
+      <section className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 animate-in fade-in slide-in-from-bottom-8 duration-600 relative overflow-hidden">
+        <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            
-            {/* 아이콘 피커 트리거 버튼 */}
-            <button 
-              onClick={() => setIsIconPickerOpen(true)}
-              className="w-16 h-16 shrink-0 flex items-center justify-center bg-indigo-50 border-2 border-indigo-100 rounded-2xl hover:border-indigo-400 hover:shadow-md transition-all group"
-            >
-              {view.icon && IconMap[view.icon] ? 
-                React.createElement(IconMap[view.icon], { className: "text-indigo-600 group-hover:scale-110 transition-transform", size: 32 }) : 
-                <Star className="text-indigo-300 group-hover:text-indigo-600 transition-colors" size={32} />
-              }
-            </button>
-
-            {/* 뷰 이름 수정 텍스트 입력창 */}
-            <input
-              type="text"
-              value={view.name}
-              onChange={(e) => onUpdate({ ...view, name: e.target.value })}
-              placeholder="화면 이름을 입력하세요"
-              className="flex-1 p-4 rounded-2xl border-2 border-slate-200 text-2xl font-black text-slate-900 focus:border-indigo-600 outline-none transition-all"
-            />
-          </div>
-        </section>
-
-        <section className="bg-white p-8 rounded-3xl shadow-xl border border-slate-200">
-          <div className="flex items-center gap-4 mb-6 text-slate-900">
-            <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg"><Database size={28}/></div>
+            <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg"><Database size={24}/></div>
             <div>
-              <h2 className="text-xl font-black">1. 화면 설정 및 데이터 연결</h2>
-              <p className="text-sm text-slate-500 font-bold">테이블과 카드 배치 방식을 결정하세요.</p>
+              <h2 className="text-xl font-black text-slate-900">1. 데이터 연결 및 서버 필터링</h2>
+              <p className="text-sm text-slate-500 font-bold">테이블을 선택하고 필터링 조건을 설정하세요.</p>
             </div>
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
+          {/* 🔥 데이터 확인 버튼 추가 */}
+          {view.tableName && (
+            <button 
+              onClick={fetchPreviewData} 
+              className="px-6 py-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl font-black text-sm flex items-center gap-2 transition-colors border border-indigo-200"
+            >
+              <Eye size={18} /> 설정된 데이터 미리보기
+            </button>
+          )}
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-4">
             <div>
-              <label className="block text-xs font-black text-slate-400 mb-2 uppercase">연결 테이블</label>
-              <select value={view.tableName || ''} onChange={(e) => onUpdate({ ...view, tableName: e.target.value, layoutRows: [] })} className="w-full p-4 rounded-2xl border-2 border-slate-200 font-black text-slate-800 focus:border-indigo-600 outline-none bg-white">
+              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1">연결 테이블</label>
+              <select 
+                className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-black text-slate-800 outline-none focus:border-indigo-500 transition-all cursor-pointer" 
+                value={view.tableName || ''} 
+                onChange={e => onUpdate({...view, tableName: e.target.value, filterColumn: null, layoutRows: []})}
+              >
                 <option value="">테이블 선택</option>
-                {Object.keys(schemaData).map(table => <option key={table} value={table}>{table}</option>)}
+                {Object.keys(schemaData).map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-black text-slate-400 mb-2 uppercase">카드 가로 배치 (열)</label>
+              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5"><Filter size={14}/> 필터 기준 칼럼 (학년/반/상태 등)</label>
               <select 
-                value={view.columnCount || 1} 
-                onChange={(e) => onUpdate({ ...view, columnCount: Number(e.target.value) })}
-                className="w-full p-4 rounded-2xl border-2 border-slate-200 font-black text-indigo-600 focus:border-indigo-600 outline-none bg-white"
+                className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-black text-indigo-600 outline-none focus:border-indigo-500 transition-all cursor-pointer" 
+                value={view.filterColumn || ''} 
+                onChange={e => onUpdate({...view, filterColumn: e.target.value || null})}
               >
-                <option value={1}>1열 (기본 목록형)</option>
-                <option value={2}>2열 (갤러리형)</option>
-                <option value={3}>3열 (그리드형)</option>
-                <option value={4}>4열 (요약형)</option>
-              </select>
-            </div>
-            <div className="col-span-2 mt-2">
-              <label className="flex items-center gap-2 text-xs font-black text-slate-400 mb-2 uppercase">
-                <MousePointerClick size={14} className="text-indigo-500"/> 카드 클릭 시 실행될 액션
-              </label>
-              <select 
-                value={view.onClickActionId || ''} 
-                onChange={(e) => onUpdate({ ...view, onClickActionId: e.target.value || null })}
-                className="w-full p-4 rounded-2xl border-2 border-indigo-100 font-black text-slate-800 focus:border-indigo-600 outline-none bg-indigo-50/30"
-              >
-                <option value="">(없음) 클릭 시 아무 동작 안 함</option>
-                {actions.map(act => (
-                  <option key={act.id} value={act.id}>⚡ {act.name}</option>
-                ))}
+                <option value="">필터 없음 (전체 데이터 가져오기)</option>
+                {availableColumns.map(col => <option key={col} value={col}>{col}</option>)}
               </select>
             </div>
           </div>
-        </section>
 
-        <section className={`${!view.tableName ? 'opacity-30 pointer-events-none' : ''}`}>
-          <div className="mb-6 flex justify-between items-center">
-            <h2 className="text-xl font-black text-slate-900 flex items-center gap-3"><LayoutTemplate size={28} className="text-indigo-600"/> 2. 카드 칸 나누기 설계</h2>
+          <div className="bg-slate-50/50 rounded-3xl p-6 border-2 border-dashed border-slate-200 flex flex-col justify-center">
+            {view.filterColumn ? (
+              <div className="space-y-4 animate-in zoom-in-95 duration-300">
+                <div className="flex gap-2 items-center text-indigo-600 font-black mb-2 text-sm"><Filter size={16}/> 상세 조건 설정</div>
+                <div className="flex gap-3">
+                  <select 
+                    className="flex-1 p-3 rounded-xl border-2 border-indigo-100 font-bold text-sm outline-none bg-white cursor-pointer" 
+                    value={view.filterOperator || 'eq'} 
+                    onChange={e => onUpdate({...view, filterOperator: e.target.value as any})}
+                  >
+                    <option value="eq">일치 (=)</option>
+                    <option value="like">포함 (Contains)</option>
+                    <option value="gt">큼 (&gt;)</option>
+                    <option value="lt">작음 (&lt;)</option>
+                  </select>
+                  <input 
+                    className="flex-[2] p-3 rounded-xl border-2 border-indigo-100 font-bold text-sm outline-none bg-white focus:border-indigo-500" 
+                    value={view.filterValue || ''} 
+                    onChange={e => onUpdate({...view, filterValue: e.target.value})} 
+                    placeholder="예: 1, 완료" 
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="text-center space-y-3">
+                <Smartphone className="mx-auto text-slate-300" size={40}/>
+                <p className="text-xs text-slate-400 font-bold leading-relaxed">좌측에서 칼럼을 선택하면<br/>서버 필터를 설정할 수 있습니다.</p>
+              </div>
+            )}
           </div>
-          <div className="bg-white p-8 rounded-3xl shadow-2xl border-2 border-slate-200 space-y-6">
-            {view.layoutRows.map(row => <RenderRow key={row.id} row={row} depth={0} parentRows={view.layoutRows} />)}
-            <button onClick={addRootRow} className="w-full py-6 border-4 border-dashed border-indigo-100 text-indigo-500 rounded-3xl font-black text-lg flex items-center justify-center gap-3 hover:bg-indigo-50 transition-all"><Plus size={24} /> 새로운 큰 칸(Row) 추가하기</button>
-          </div>
-        </section>
-      </div>
+        </div>
 
-      {/* 🔥 모달 렌더링 영역 */}
+        <div className="grid grid-cols-2 gap-8 mt-8 pt-8 border-t border-slate-50">
+          <div>
+            <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1">카드 가로 배치 (열 개수)</label>
+            <select 
+              className="w-full p-4 rounded-2xl bg-white border-2 border-slate-100 font-black text-slate-800 cursor-pointer outline-none focus:border-indigo-500" 
+              value={view.columnCount || 1} 
+              onChange={e => onUpdate({...view, columnCount: Number(e.target.value)})}
+            >
+              {[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}열 {n === 1 ? '(리스트 형태)' : `(${n}단 격자 형태)`}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5"><MousePointerClick size={14} className="text-indigo-500"/> 카드 클릭 액션</label>
+            <select 
+              className="w-full p-4 rounded-2xl bg-indigo-50/30 border-2 border-indigo-100 font-black text-slate-800 focus:border-indigo-600 outline-none cursor-pointer" 
+              value={view.onClickActionId || ''} 
+              onChange={e => onUpdate({...view, onClickActionId: e.target.value || null})}
+            >
+              <option value="">(클릭 동작 없음)</option>
+              {actions.map(act => <option key={act.id} value={act.id}>⚡ {act.name}</option>)}
+            </select>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. 카드 레이아웃 설계 섹션 */}
+      <section className={`bg-white p-10 rounded-[3.5rem] shadow-2xl border-2 border-indigo-50 relative overflow-hidden transition-all duration-500 ${!view.tableName ? 'opacity-40 pointer-events-none grayscale' : 'opacity-100'}`}>
+        <div className="absolute top-0 left-0 w-3 h-full bg-indigo-600"></div>
+        <div className="flex justify-between items-center mb-10">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-indigo-100 text-indigo-700 rounded-2xl"><LayoutTemplate size={28}/></div>
+            <h3 className="text-2xl font-black text-indigo-900">2. 카드 레이아웃 커스텀 설계</h3>
+          </div>
+          <button onClick={addRootRow} className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2"><Plus size={18}/> 행(Row) 추가하기</button>
+        </div>
+        
+        <div className="space-y-4">
+          {view.layoutRows.map(row => <RenderRowEditor key={row.id} row={row} depth={0} />)}
+          {view.layoutRows.length === 0 && (
+            <div className="py-24 border-4 border-dashed border-slate-100 rounded-[2.5rem] flex flex-col items-center justify-center text-slate-300 gap-4 bg-slate-50/50">
+              <Plus size={48} className="opacity-20"/>
+              <p className="font-black text-slate-400">우측 상단의 버튼을 눌러 카드 디자인을 시작하세요</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 아이콘 피커 모달 */}
       <IconPicker 
         isOpen={isIconPickerOpen} 
-        onClose={() => setIsIconPickerOpen(false)}
-        selectedIcon={view.icon}
-        onSelect={(iconName) => onUpdate({ ...view, icon: iconName })}
+        onClose={() => setIsIconPickerOpen(false)} 
+        selectedIcon={view.icon} 
+        onSelect={(n: string) => onUpdate({...view, icon: n})} 
       />
+
+      {/* 🔥 데이터 미리보기 모달 (추가됨) */}
+      {isPreviewModalOpen && (
+        <div className="fixed inset-0 z-[700] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-5xl h-[85vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden">
+            <div className="p-6 border-b flex justify-between items-center bg-slate-50">
+              <div className="flex items-center gap-3">
+                <TableProperties className="text-indigo-600" size={24} />
+                <h3 className="text-xl font-black text-slate-800">
+                  [{view.tableName}] 테이블 미리보기 
+                  <span className="text-sm text-indigo-600 ml-3 bg-indigo-100 px-3 py-1 rounded-full">
+                    {previewData.length}건 검색됨
+                  </span>
+                </h3>
+              </div>
+              <button onClick={() => setIsPreviewModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-full text-slate-500"><X /></button>
+            </div>
+            
+            <div className="flex-1 overflow-auto p-0 relative bg-slate-100">
+              {isLoadingPreview ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-indigo-600 bg-white/50">
+                  <Loader2 className="animate-spin" size={40} />
+                  <p className="font-bold">데이터를 불러오는 중...</p>
+                </div>
+              ) : previewData.length === 0 ? (
+                <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-bold text-lg">
+                  조건에 맞는 데이터가 없습니다. 필터 설정을 확인해주세요.
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse bg-white">
+                  <thead className="bg-slate-900 text-white sticky top-0 z-10">
+                    <tr>
+                      {availableColumns.map(col => (
+                        <th key={col} className="p-4 text-xs font-black uppercase tracking-wider border-b border-slate-700 whitespace-nowrap">
+                          {col}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewData.map((row, idx) => (
+                      <tr key={idx} className="border-b border-slate-100 hover:bg-indigo-50/50 transition-colors">
+                        {availableColumns.map(col => (
+                          <td key={col} className="p-4 text-sm font-medium text-slate-700 whitespace-nowrap max-w-[200px] truncate">
+                            {row[col] !== null ? String(row[col]) : <span className="text-slate-300 italic">null</span>}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -1235,7 +1573,7 @@ FILE PATH: C:/react-projects/gnflhs/app/design/types.ts
 FILE NAME: types.ts
 ==================================================
 
-// 파일 경로: C:/react-projects/gnflhs/app/design/types.ts
+// 파일 경로: app/design/types.ts
 
 export type AppState = {
   id: number | null;
@@ -1250,6 +1588,11 @@ export type View = {
   name: string;
   icon?: string | null;
   tableName: string | null;
+  // --- [신규] 1단계 서버 필터 설정을 위한 속성 ---
+  filterColumn?: string | null;  
+  filterOperator?: 'eq' | 'neq' | 'like' | 'gt' | 'lt'; 
+  filterValue?: string | null;   
+  // ------------------------------------------
   cardHeight: number;
   columnCount: number;
   layoutRows: LayoutRow[];
@@ -1293,5 +1636,4 @@ export type Action = {
 };
 
 export type SchemaData = Record<string, string[]>;
-// 파일 끝에 있던 불필요한 '}'를 반드시 삭제하세요.
 

@@ -13,6 +13,11 @@ export type View = {
   name: string;
   icon?: string | null;
   tableName: string | null;
+  // --- [신규] 1단계 서버 필터 설정을 위한 속성 ---
+  filterColumn?: string | null;  
+  filterOperator?: 'eq' | 'neq' | 'like' | 'gt' | 'lt'; 
+  filterValue?: string | null;   
+  // ------------------------------------------
   cardHeight: number;
   columnCount: number;
   layoutRows: LayoutRow[];

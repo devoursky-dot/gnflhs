@@ -1,4 +1,4 @@
-// 파일 경로: C:/react-projects/gnflhs/app/design/page.tsx
+// 파일 경로: app/design/page.tsx
 
 "use client";
 
@@ -7,7 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 import { AppState, View, Action, SchemaData } from './types';
 import ViewEditor from './view';
 import ActionEditor from './action';
-import { Plus, Send, Loader2, ExternalLink, Trash2, FolderOpen, X, Star } from 'lucide-react';
+import { Plus, Send, Loader2, ExternalLink, Trash2, FolderOpen, X, Star, ArrowUp, ArrowDown, Copy } from 'lucide-react';
 import IconPicker, { IconMap } from './picker'; 
 
 const supabase = createClient(
@@ -23,15 +23,15 @@ export default function AppBuilder() {
     views: [{ id: 'v1', name: '메인 홈 (첫 화면)', tableName: null, cardHeight: 120, columnCount: 1, layoutRows: [], onClickActionId: null }],
     actions: []
   });
+
   const [schemaData, setSchemaData] = useState<SchemaData>({});
   const [activeItem, setActiveItem] = useState<{ type: 'view' | 'action' | 'app', id: string }>({ type: 'view', id: 'v1' });
+  
   const [isSaving, setIsSaving] = useState(false); 
   const [isPreviewSaving, setIsPreviewSaving] = useState<string | null>(null);
 
   const [isAppListModalOpen, setIsAppListModalOpen] = useState(false);
   const [savedAppsList, setSavedAppsList] = useState<any[]>([]);
-  
-  // [수정] 통합 아이콘 피커 상태
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
 
   useEffect(() => {
@@ -49,6 +49,90 @@ export default function AppBuilder() {
     fetchSchema();
   }, []);
 
+  // ------------------------------------------------------------------
+  // 🔥 [신규 기능] View(화면) 관리: 이동, 복제, 삭제
+  // ------------------------------------------------------------------
+  const moveView = (index: number, direction: 'up' | 'down') => {
+    if ((direction === 'up' && index === 0) || (direction === 'down' && index === appState.views.length - 1)) return;
+    const newViews = [...appState.views];
+    const temp = newViews[index];
+    newViews[index] = newViews[index + (direction === 'up' ? -1 : 1)];
+    newViews[index + (direction === 'up' ? -1 : 1)] = temp;
+    setAppState({ ...appState, views: newViews });
+  };
+
+  const duplicateView = (id: string) => {
+    const viewToCopy = appState.views.find(v => v.id === id);
+    if (!viewToCopy) return;
+    
+    // React 렌더링 충돌을 막기 위한 깊은 복사 및 내부 중첩 ID 재생성 (매우 중요)
+    const duplicatedView = JSON.parse(JSON.stringify(viewToCopy));
+    const newId = `v_${Date.now()}`;
+    duplicatedView.id = newId;
+    duplicatedView.name = `${viewToCopy.name} (복사본)`;
+    
+    const resetIds = (rows: any[]) => {
+      rows.forEach(r => {
+        r.id = `r_${Math.random().toString(36).substr(2, 9)}`;
+        r.cells.forEach((c: any) => {
+          c.id = `c_${Math.random().toString(36).substr(2, 9)}`;
+          if (c.nestedRows) resetIds(c.nestedRows);
+        });
+      });
+    };
+    resetIds(duplicatedView.layoutRows);
+
+    setAppState({ ...appState, views: [...appState.views, duplicatedView] });
+    setActiveItem({ type: 'view', id: newId });
+  };
+
+  const deleteView = (id: string) => {
+    if (appState.views.length <= 1) {
+      alert('앱에는 최소 1개의 화면(View)이 필요합니다.');
+      return;
+    }
+    if (window.confirm('정말로 이 화면을 삭제하시겠습니까?\n이 작업은 복구할 수 없습니다.')) {
+      const newViews = appState.views.filter(v => v.id !== id);
+      setAppState({ ...appState, views: newViews });
+      if (activeItem.id === id) setActiveItem({ type: 'view', id: newViews[0].id });
+    }
+  };
+
+  // ------------------------------------------------------------------
+  // 🔥 [신규 기능] Action(기능) 관리: 이동, 복제, 삭제
+  // ------------------------------------------------------------------
+  const moveAction = (index: number, direction: 'up' | 'down') => {
+    if ((direction === 'up' && index === 0) || (direction === 'down' && index === appState.actions.length - 1)) return;
+    const newActions = [...appState.actions];
+    const temp = newActions[index];
+    newActions[index] = newActions[index + (direction === 'up' ? -1 : 1)];
+    newActions[index + (direction === 'up' ? -1 : 1)] = temp;
+    setAppState({ ...appState, actions: newActions });
+  };
+
+  const duplicateAction = (id: string) => {
+    const actToCopy = appState.actions.find(a => a.id === id);
+    if (!actToCopy) return;
+    const duplicatedAct = JSON.parse(JSON.stringify(actToCopy));
+    const newId = `a_${Date.now()}`;
+    duplicatedAct.id = newId;
+    duplicatedAct.name = `${actToCopy.name} (복사본)`;
+    if (duplicatedAct.insertMappings) {
+      duplicatedAct.insertMappings.forEach((m: any) => m.id = `m_${Math.random().toString(36).substr(2, 9)}`);
+    }
+    setAppState({ ...appState, actions: [...appState.actions, duplicatedAct] });
+    setActiveItem({ type: 'action', id: newId });
+  };
+
+  const deleteAction = (id: string) => {
+    if (window.confirm('정말로 이 액션을 삭제하시겠습니까?')) {
+      const newActions = appState.actions.filter(a => a.id !== id);
+      setAppState({ ...appState, actions: newActions });
+      if (activeItem.id === id) setActiveItem({ type: 'view', id: appState.views[0].id });
+    }
+  };
+
+  // 기존 유지 기능들
   const handlePreviewPopup = async (viewId: string) => {
     if (!appState.id) {
       alert('최초 1회는 우측 하단의 [🚀 저장 및 배포하기]를 진행하여 앱을 생성해주세요.');
@@ -56,17 +140,10 @@ export default function AppBuilder() {
     }
     setIsPreviewSaving(viewId);
     try {
-      const draftPayload = {
-        name: appState.name,
-        draft_config: { views: appState.views, actions: appState.actions, icon: appState.icon }
-      };
+      const draftPayload = { name: appState.name, draft_config: { views: appState.views, actions: appState.actions, icon: appState.icon } };
       const { error } = await supabase.from('apps').update(draftPayload).eq('id', appState.id);
       if (error) throw error;
-      window.open(
-        `/preview/${appState.id}?viewId=${viewId}&mode=draft`, 
-        'LivePreviewWindow', 
-        'width=420,height=850,resizable=yes,scrollbars=yes'
-      );
+      window.open(`/preview/${appState.id}?viewId=${viewId}&mode=draft`, 'LivePreviewWindow', 'width=420,height=850,resizable=yes,scrollbars=yes');
     } catch (error: any) {
       alert(`미리보기 동기화 실패: ${error.message}`);
     } finally {
@@ -78,15 +155,12 @@ export default function AppBuilder() {
     setIsSaving(true);
     try {
       const config = { views: appState.views, actions: appState.actions, icon: appState.icon };
-      const payload = {
-        name: appState.name,
-        app_config: config,
-        draft_config: config
-      };
+      const payload = { name: appState.name, app_config: config, draft_config: config };
+      
       if (!appState.id) {
         const { data, error } = await supabase.from('apps').insert([payload]).select('id');
         if (error) throw error;
-        if (data && data.length > 0) { setAppState(prev => ({ ...prev, id: data[0].id })); }
+        if (data && data.length > 0) setAppState(prev => ({ ...prev, id: data[0].id }));
         alert('성공적으로 저장 및 최초 배포되었습니다!');
       } else {
         const { error } = await supabase.from('apps').update(payload).eq('id', appState.id);
@@ -108,9 +182,7 @@ export default function AppBuilder() {
       if (error) throw error;
       alert('앱이 성공적으로 삭제되었습니다.');
       handleCreateNewApp();
-    } catch (error: any) {
-      alert(`앱 삭제 실패: ${error.message}`);
-    }
+    } catch (error: any) {}
   };
 
   const openAppListModal = async () => {
@@ -150,18 +222,12 @@ export default function AppBuilder() {
     setIsAppListModalOpen(false);
   };
 
-  // [수정] 아이콘 선택 시 대상에 따라 상태 업데이트
   const handleIconSelect = (iconName: string) => {
-    if (activeItem.type === 'app') {
-      setAppState({ ...appState, icon: iconName });
-    } else if (activeItem.type === 'view') {
-      setAppState({ ...appState, views: appState.views.map(v => v.id === activeItem.id ? { ...v, icon: iconName } : v) });
-    } else if (activeItem.type === 'action') {
-      setAppState({ ...appState, actions: appState.actions.map(a => a.id === activeItem.id ? { ...a, icon: iconName } : a) });
-    }
+    if (activeItem.type === 'app') setAppState({ ...appState, icon: iconName });
+    else if (activeItem.type === 'view') setAppState({ ...appState, views: appState.views.map(v => v.id === activeItem.id ? { ...v, icon: iconName } : v) });
+    else if (activeItem.type === 'action') setAppState({ ...appState, actions: appState.actions.map(a => a.id === activeItem.id ? { ...a, icon: iconName } : a) });
   };
 
-  // [수정] 현재 피커에 표시될 아이콘 값 계산
   const getCurrentIcon = () => {
     if (activeItem.type === 'app') return appState.icon;
     if (activeItem.type === 'view') return appState.views.find(v => v.id === activeItem.id)?.icon;
@@ -210,6 +276,7 @@ export default function AppBuilder() {
         </div>
       )}
 
+      {/* 사이드바 영역 */}
       <aside className="w-[320px] border-r bg-white flex flex-col shrink-0 shadow-2xl z-50 relative">
         <div className="p-6 bg-indigo-700 text-white border-b border-indigo-800 shrink-0 flex flex-col gap-4">
           <div className="flex justify-between items-center">
@@ -222,13 +289,10 @@ export default function AppBuilder() {
           
           <div className="flex items-center gap-3 mt-2">
             <button 
-              onClick={() => { setActiveItem({ type: 'app', id: 'app' }); setIsIconPickerOpen(true); }}
+               onClick={() => { setActiveItem({ type: 'app', id: 'app' }); setIsIconPickerOpen(true); }}
               className="w-10 h-10 shrink-0 flex items-center justify-center bg-indigo-800 border border-indigo-500 rounded-xl hover:bg-indigo-900 hover:border-white transition-all"
             >
-              {appState.icon && IconMap[appState.icon] ?
-                React.createElement(IconMap[appState.icon], { className: "text-white", size: 20 }) : 
-                <Star className="text-indigo-300" size={20} />
-              }
+              {appState.icon && IconMap[appState.icon] ? React.createElement(IconMap[appState.icon], { className: "text-white", size: 20 }) : <Star className="text-indigo-300" size={20} />}
             </button>
             <input 
               type="text" 
@@ -240,60 +304,91 @@ export default function AppBuilder() {
         </div>
         
         <div className="p-6 flex-1 overflow-y-auto space-y-10">
+          
+          {/* 뷰(View) 리스트 렌더링 영역 */}
           <div>
-            <div className="flex justify-between text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
+            <div className="flex justify-between items-center text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
               <span>VIEWS</span>
               <button onClick={() => { 
                 const id=`v_${Date.now()}`;
                 setAppState({...appState, views:[...appState.views, {id, name:'새 뷰', tableName:null, cardHeight:120, columnCount: 1, layoutRows:[], onClickActionId: null}]});
                 setActiveItem({type:'view', id});
-              }} className="p-1 hover:bg-slate-100 rounded-lg text-indigo-600"><Plus size={18}/></button>
+              }} className="p-1 hover:bg-slate-100 rounded-lg text-indigo-600 transition-colors"><Plus size={18}/></button>
             </div>
-            <div className="space-y-2">
-              {appState.views.map(v => {
+            <div className="space-y-3">
+              {appState.views.map((v, index) => {
                 const ViewIcon = v.icon && IconMap[v.icon] ? IconMap[v.icon] : null;
+                const isActive = activeItem.id === v.id;
+                
                 return (
-                  <div key={v.id} className={`w-full flex items-center justify-between px-5 py-3 rounded-2xl text-sm font-black transition-all ${activeItem.id === v.id ? 'bg-indigo-600 text-white shadow-xl scale-105' : 'hover:bg-slate-100 text-slate-600'}`}>
-                    <button onClick={() => setActiveItem({type:'view', id:v.id})} className="flex-1 flex items-center gap-2 text-left truncate outline-none">
-                      {ViewIcon && <ViewIcon size={16} className={activeItem.id === v.id ? "text-indigo-200" : "text-slate-400"} />}
-                      <span className="truncate">{v.name}</span>
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handlePreviewPopup(v.id); }}
-                      disabled={isPreviewSaving === v.id}
-                      className={`p-1.5 ml-2 shrink-0 rounded-lg transition-all ${activeItem.id === v.id ? 'text-indigo-200 hover:text-white hover:bg-indigo-500' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-200'} disabled:opacity-50`}
-                    >
-                      {isPreviewSaving === v.id ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
-                    </button>
+                  <div key={v.id} onClick={() => setActiveItem({type:'view', id:v.id})} className={`w-full flex flex-col px-4 py-3 rounded-2xl text-sm font-black transition-all group cursor-pointer border ${isActive ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl scale-[1.02]' : 'bg-white border-slate-200 hover:border-indigo-300 text-slate-600 hover:shadow-md'}`}>
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex-1 flex items-center gap-2 text-left truncate outline-none">
+                        {ViewIcon ? <ViewIcon size={16} className={isActive ? "text-indigo-200" : "text-slate-400"} /> : <Star size={16} className={isActive ? "text-indigo-200" : "text-slate-400"} />}
+                        <span className="truncate">{v.name}</span>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handlePreviewPopup(v.id); }}
+                        disabled={isPreviewSaving === v.id}
+                        className={`p-1.5 ml-2 shrink-0 rounded-lg transition-all ${isActive ? 'text-indigo-200 hover:text-white hover:bg-indigo-500' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100'} disabled:opacity-50`}
+                        title="미리보기 팝업 열기"
+                      >
+                        {isPreviewSaving === v.id ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+                      </button>
+                    </div>
+                    
+                    {/* 🔥 뷰 조작 액션 바 (트렌디한 호버 메뉴) */}
+                    <div className={`flex items-center justify-end gap-1 overflow-hidden transition-all duration-300 ${isActive ? 'max-h-10 mt-3 opacity-100' : 'max-h-0 opacity-0 group-hover:max-h-10 group-hover:mt-3 group-hover:opacity-100'}`}>
+                      <button onClick={(e) => { e.stopPropagation(); moveView(index, 'up'); }} disabled={index === 0} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-indigo-500 disabled:opacity-30' : 'hover:bg-slate-100 disabled:opacity-30'}`} title="순서 올리기"><ArrowUp size={14}/></button>
+                      <button onClick={(e) => { e.stopPropagation(); moveView(index, 'down'); }} disabled={index === appState.views.length - 1} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-indigo-500 disabled:opacity-30' : 'hover:bg-slate-100 disabled:opacity-30'}`} title="순서 내리기"><ArrowDown size={14}/></button>
+                      <div className={`w-[1px] h-3 mx-1 ${isActive ? 'bg-indigo-400' : 'bg-slate-200'}`}></div>
+                      <button onClick={(e) => { e.stopPropagation(); duplicateView(v.id); }} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-indigo-500' : 'hover:bg-slate-100'}`} title="화면 복사하기"><Copy size={14}/></button>
+                      <button onClick={(e) => { e.stopPropagation(); deleteView(v.id); }} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-500 hover:text-white text-rose-200' : 'hover:bg-rose-50 text-rose-400'}`} title="화면 삭제하기"><Trash2 size={14}/></button>
+                    </div>
                   </div>
                 );
               })}
             </div>
           </div>
+          
+          {/* 액션(Action) 리스트 렌더링 영역 */}
           <div>
-            <div className="flex justify-between text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
+            <div className="flex justify-between items-center text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
               <span>ACTIONS</span>
               <button onClick={() => { 
                 const id=`a_${Date.now()}`;
                 setAppState({...appState, actions:[...appState.actions, {id, name:'새 액션', type:'alert', targetViewId:null, message:null}]}); 
                 setActiveItem({type:'action', id});
-              }} className="p-1 hover:bg-slate-100 rounded-lg text-rose-500"><Plus size={18}/></button>
+              }} className="p-1 hover:bg-slate-100 rounded-lg text-rose-500 transition-colors"><Plus size={18}/></button>
             </div>
-            <div className="space-y-2">
-              {appState.actions.map(a => {
+            <div className="space-y-3">
+              {appState.actions.map((a, index) => {
                 const ActIcon = a.icon && IconMap[a.icon] ? IconMap[a.icon] : null;
+                const isActive = activeItem.id === a.id;
+
                 return (
-                  <button key={a.id} onClick={() => setActiveItem({type:'action', id:a.id})} className={`w-full flex items-center gap-2 text-left px-5 py-3 border-l-8 rounded-r-2xl text-sm font-black transition-all ${activeItem.id===a.id ? 'bg-rose-50 border-rose-500 text-rose-800 shadow-sm' : 'border-transparent hover:bg-slate-100 text-slate-600'}`}>
-                    {ActIcon ? <ActIcon size={16} className={activeItem.id === a.id ? "text-rose-500" : "text-slate-400"} /> : <span>⚡</span>}
-                    <span className="truncate">{a.name}</span>
-                  </button>
+                  <div key={a.id} onClick={() => setActiveItem({type:'action', id:a.id})} className={`w-full flex flex-col px-4 py-3 border-l-8 rounded-r-2xl text-sm font-black transition-all group cursor-pointer ${isActive ? 'bg-rose-50 border-rose-500 text-rose-800 shadow-md scale-[1.02]' : 'bg-white border-transparent hover:bg-slate-100 text-slate-600 hover:shadow-sm'}`}>
+                    <div className="flex items-center gap-2 text-left w-full">
+                      {ActIcon ? <ActIcon size={16} className={isActive ? "text-rose-500" : "text-slate-400"} /> : <span className="opacity-70">⚡</span>}
+                      <span className="truncate flex-1">{a.name}</span>
+                    </div>
+                    
+                    {/* 🔥 액션 조작 바 */}
+                    <div className={`flex items-center justify-end gap-1 overflow-hidden transition-all duration-300 ${isActive ? 'max-h-10 mt-3 opacity-100' : 'max-h-0 opacity-0 group-hover:max-h-10 group-hover:mt-3 group-hover:opacity-100'}`}>
+                      <button onClick={(e) => { e.stopPropagation(); moveAction(index, 'up'); }} disabled={index === 0} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-200 disabled:opacity-30' : 'hover:bg-slate-200 disabled:opacity-30'}`} title="순서 올리기"><ArrowUp size={14}/></button>
+                      <button onClick={(e) => { e.stopPropagation(); moveAction(index, 'down'); }} disabled={index === appState.actions.length - 1} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-200 disabled:opacity-30' : 'hover:bg-slate-200 disabled:opacity-30'}`} title="순서 내리기"><ArrowDown size={14}/></button>
+                      <div className={`w-[1px] h-3 mx-1 ${isActive ? 'bg-rose-200' : 'bg-slate-200'}`}></div>
+                      <button onClick={(e) => { e.stopPropagation(); duplicateAction(a.id); }} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-200' : 'hover:bg-slate-200'}`} title="액션 복사하기"><Copy size={14}/></button>
+                      <button onClick={(e) => { e.stopPropagation(); deleteAction(a.id); }} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-500 hover:text-white text-rose-500' : 'hover:bg-rose-50 text-rose-400'}`} title="액션 삭제하기"><Trash2 size={14}/></button>
+                    </div>
+                  </div>
                 );
               })}
             </div>
           </div>
         </div>
 
-        <div className="p-6 bg-slate-50 border-t border-slate-200 shrink-0">
+        <div className="p-6 bg-slate-50 border-t border-slate-200 shrink-0 z-30">
           <button onClick={handleSaveAndDeploy} disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-black shadow-xl hover:shadow-indigo-500/30 transition-all active:scale-95 disabled:opacity-70 disabled:pointer-events-none">
             {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
             {isSaving ? '배포 진행 중...' : '🚀 실제 유저에게 배포하기'}
@@ -301,7 +396,7 @@ export default function AppBuilder() {
           {appState.id && (
             <div className="mt-3 flex items-center gap-2">
               <a href={`/preview/${appState.id}`} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-2xl text-sm font-bold transition-all shadow-sm"><ExternalLink size={16} /> 라이브 앱 확인</a>
-              <button onClick={handleDeleteApp} className="p-3 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 hover:border-rose-300 rounded-2xl transition-all shadow-sm"><Trash2 size={18} /></button>
+              <button onClick={handleDeleteApp} className="p-3 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 hover:border-rose-300 rounded-2xl transition-all shadow-sm" title="현재 앱 완전 삭제"><Trash2 size={18} /></button>
             </div>
           )}
         </div>
@@ -325,13 +420,12 @@ export default function AppBuilder() {
               />
             )}
             {activeItem.type==='action' && activeAction && (
-              <ActionEditor 
+               <ActionEditor 
                 action={activeAction} 
                 views={appState.views} 
                 schemaData={schemaData} 
                 onUpdate={(upd) => setAppState({...appState, actions: appState.actions.map(a => a.id===upd.id ? upd : a)})} 
-                onDelete={(id) => { setAppState({...appState, actions: appState.actions.filter(a => a.id !== id)}); setActiveItem({type:'view', id:'v1'}); }}
-                // [수정] 액션에서 피커를 열도록 전달
+                onDelete={deleteAction}
                 onOpenIconPicker={() => setIsIconPickerOpen(true)}
               />
             )}
@@ -339,7 +433,6 @@ export default function AppBuilder() {
         </div>
       </main>
 
-      {/* [수정] 통합 아이콘 피커 - main과 aside 밖 최상위에 위치하여 가려짐 방지 */}
       <IconPicker 
         isOpen={isIconPickerOpen} 
         onClose={() => setIsIconPickerOpen(false)}
