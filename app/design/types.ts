@@ -19,9 +19,12 @@ export type View = {
   filterOperator?: 'eq' | 'neq' | 'like' | 'gt' | 'lt'; 
   filterValue?: string | null;   
   
-  // 🔥 [신규] 서버 정렬 속성
+  // 서버 정렬 속성
   sortColumn?: string | null;    
   sortDirection?: 'asc' | 'desc';
+  
+  // 🔥 [신규] 데이터를 묶어서 보여줄 그룹핑 기준 칼럼
+  groupByColumn?: string | null; 
   
   cardHeight: number;
   columnCount: number;
@@ -44,7 +47,7 @@ export type LayoutCell = {
   nestedRows?: LayoutRow[]; 
 };
 
-// [복구 완료] 인서트(데이터 추가) 시 필요한 맵핑 세부 규칙
+// [누락 방지] 인서트(데이터 추가) 시 필요한 맵핑 세부 규칙 전체 유지
 export type InsertMapping = {
   id: string;
   targetColumn: string;
@@ -53,7 +56,7 @@ export type InsertMapping = {
   valueType?: 'string' | 'number';
 };
 
-// [복구 완료] 액션 세부 규칙
+// [누락 방지] 액션(기능) 세부 규칙 전체 유지
 export type Action = {
   id: string;
   name: string;

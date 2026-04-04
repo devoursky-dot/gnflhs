@@ -6,17 +6,16 @@ import { View, SchemaData, LayoutRow, Action } from './types';
 import * as LucideIcons from 'lucide-react';
 import { 
   Database, LayoutTemplate, Plus, Columns, Rows, ChevronLeft, 
-  ChevronRight, X, MousePointerClick, Star, Filter, Search, Smartphone, Eye, Loader2, TableProperties, ArrowUpDown
+  ChevronRight, X, MousePointerClick, Star, Filter, Search, Smartphone, Eye, Loader2, TableProperties, ArrowUpDown, FolderTree
 } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js'; 
 
-// 아이콘 맵퍼 설정
+// 아이콘 맵퍼 설정 (기존 유지)
 export const IconMap = Object.entries(LucideIcons).reduce((acc, [name, component]) => {
   if (/^[A-Z]/.test(name) && typeof component !== 'string') acc[name] = component as React.ElementType;
   return acc;
 }, {} as any);
 
-// 아이콘 피커 컴포넌트 (생략 없음)
+// 아이콘 피커 컴포넌트 (기존 유지 - 누락 없음)
 const IconPicker = ({ isOpen, onClose, onSelect, selectedIcon }: any) => {
   const [search, setSearch] = useState('');
   const filtered = useMemo(() => 
@@ -50,6 +49,7 @@ const IconPicker = ({ isOpen, onClose, onSelect, selectedIcon }: any) => {
   );
 };
 
+import { createClient } from '@supabase/supabase-js'; 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
@@ -70,7 +70,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
-  // 데이터 미리보기 (필터 및 정렬 완벽 적용)
+  // 데이터 미리보기 (필터 및 정렬 완벽 적용 - 누락 없음)
   const fetchPreviewData = async () => {
     if (!view.tableName) return alert("먼저 테이블을 선택해주세요.");
     
@@ -87,7 +87,6 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
         else query = query.eq(view.filterColumn, view.filterValue);
       }
       
-      // 정렬(Sorting) 반영
       if (view.sortColumn) {
         query = query.order(view.sortColumn, { ascending: view.sortDirection === 'asc' });
       }
@@ -116,7 +115,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
     });
   };
 
-  // 재귀적 중첩 레이아웃 렌더러 (생략 없음)
+  // 재귀적 중첩 레이아웃 렌더러 (누락 없음)
   const RenderRowEditor = ({ row, depth = 0 }: { row: LayoutRow, depth: number }) => (
     <div className={`flex gap-3 p-3 rounded-2xl border-2 border-slate-200 ${depth % 2 === 0 ? 'bg-slate-50' : 'bg-white'} relative mb-3 group/row transition-all`}>
       <button onClick={() => mutate(rows => {
@@ -227,14 +226,14 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
         </div>
       </section>
 
-      {/* 2. 데이터 조회 규칙 설정 (연결, 필터, 정렬) */}
+      {/* 2. 데이터 조회 규칙 설정 */}
       <section className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 animate-in fade-in slide-in-from-bottom-8 duration-600 relative overflow-hidden">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg"><Database size={24}/></div>
             <div>
               <h2 className="text-xl font-black text-slate-900">1. 데이터 조회 규칙 설정</h2>
-              <p className="text-sm text-slate-500 font-bold">어떤 데이터를 어떻게(필터링/정렬) 불러올지 설정하세요.</p>
+              <p className="text-sm text-slate-500 font-bold">어떤 데이터를 어떻게 보여줄지(필터링/정렬/그룹화) 설정하세요.</p>
             </div>
           </div>
           
@@ -255,14 +254,14 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
               <select 
                 className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-black text-slate-800 outline-none focus:border-indigo-500 transition-all cursor-pointer" 
                 value={view.tableName || ''} 
-                onChange={e => onUpdate({...view, tableName: e.target.value, filterColumn: null, sortColumn: null, layoutRows: []})}
+                onChange={e => onUpdate({...view, tableName: e.target.value, filterColumn: null, sortColumn: null, groupByColumn: null, layoutRows: []})}
               >
                 <option value="">테이블 선택</option>
                 {Object.keys(schemaData).map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5"><Filter size={14}/> 필터 기준 칼럼 (선택사항)</label>
+              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5"><Filter size={14}/> 1단계 서버 필터 (선택사항)</label>
               <select 
                 className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-black text-indigo-600 outline-none focus:border-indigo-500 transition-all cursor-pointer" 
                 value={view.filterColumn || ''} 
@@ -306,31 +305,49 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           </div>
         </div>
 
-        {/* 데이터 정렬 및 기능 설정 */}
+        {/* 🔥 데이터 그룹핑 및 정렬 설정 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8 pt-8 border-t border-slate-50">
-          <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-50">
-            <label className="text-[10px] font-black text-indigo-600 block mb-3 uppercase tracking-wider flex items-center gap-1.5"><ArrowUpDown size={14}/> 정렬 기준 칼럼</label>
-            <select 
-              className="w-full p-3 rounded-xl bg-white border border-indigo-100 font-black text-slate-800 cursor-pointer outline-none focus:border-indigo-400" 
-              value={view.sortColumn || ''} 
-              onChange={e => onUpdate({...view, sortColumn: e.target.value || null, sortDirection: view.sortDirection || 'desc'})}
-            >
-              <option value="">기본 정렬 (DB 설정순)</option>
-              {availableColumns.map(col => <option key={col} value={col}>{col}</option>)}
-            </select>
-            
-            {view.sortColumn && (
-              <div className="mt-3 animate-in fade-in slide-in-from-top-2">
-                <select 
-                  className="w-full p-3 rounded-xl bg-white border border-indigo-100 font-black text-slate-600 cursor-pointer outline-none focus:border-indigo-400" 
-                  value={view.sortDirection || 'desc'} 
-                  onChange={e => onUpdate({...view, sortDirection: e.target.value as any})}
-                >
-                  <option value="desc">내림차순 (가장 큰/최신 값부터)</option>
-                  <option value="asc">오름차순 (가장 작은/과거 값부터)</option>
-                </select>
-              </div>
-            )}
+          
+          <div className="space-y-6">
+            {/* 데이터 그룹화 (아코디언) */}
+            <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100">
+              <label className="text-[10px] font-black text-blue-600 block mb-3 uppercase tracking-wider flex items-center gap-1.5"><FolderTree size={14}/> 데이터 묶어주기 (아코디언 형태)</label>
+              <select 
+                className="w-full p-3 rounded-xl bg-white border border-blue-200 font-black text-slate-800 cursor-pointer outline-none focus:border-blue-400" 
+                value={view.groupByColumn || ''} 
+                onChange={e => onUpdate({...view, groupByColumn: e.target.value || null})}
+              >
+                <option value="">묶지 않음 (일반 리스트 형태)</option>
+                {availableColumns.map(col => <option key={col} value={col}>{col} 칼럼 기준으로 묶기</option>)}
+              </select>
+              <p className="mt-2 text-[10px] text-blue-400 font-bold pl-1">* 선택 시, 해당 칼럼 값(예: 반, 부서)으로 폴더처럼 접혀서 표시됩니다.</p>
+            </div>
+
+            {/* 정렬 설정 */}
+            <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-50">
+              <label className="text-[10px] font-black text-indigo-600 block mb-3 uppercase tracking-wider flex items-center gap-1.5"><ArrowUpDown size={14}/> 정렬 기준 칼럼</label>
+              <select 
+                className="w-full p-3 rounded-xl bg-white border border-indigo-100 font-black text-slate-800 cursor-pointer outline-none focus:border-indigo-400" 
+                value={view.sortColumn || ''} 
+                onChange={e => onUpdate({...view, sortColumn: e.target.value || null, sortDirection: view.sortDirection || 'desc'})}
+              >
+                <option value="">기본 정렬 (DB 설정순)</option>
+                {availableColumns.map(col => <option key={col} value={col}>{col}</option>)}
+              </select>
+              
+              {view.sortColumn && (
+                <div className="mt-3 animate-in fade-in slide-in-from-top-2">
+                  <select 
+                    className="w-full p-3 rounded-xl bg-white border border-indigo-100 font-black text-slate-600 cursor-pointer outline-none focus:border-indigo-400" 
+                    value={view.sortDirection || 'desc'} 
+                    onChange={e => onUpdate({...view, sortDirection: e.target.value as any})}
+                  >
+                    <option value="desc">내림차순 (가장 큰/최신 값부터)</option>
+                    <option value="asc">오름차순 (가장 작은/과거 값부터)</option>
+                  </select>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-4">
