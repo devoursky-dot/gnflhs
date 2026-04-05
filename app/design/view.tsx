@@ -113,7 +113,8 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
   };
 
   const RenderRowEditor = ({ row, depth = 0 }: { row: LayoutRow, depth: number }) => (
-    <div className={`flex gap-3 p-3 rounded-2xl border-2 border-slate-200 ${depth % 2 === 0 ? 'bg-slate-50' : 'bg-white'} relative mb-3 group/row transition-all`}>
+    // 🔥 [레이아웃 잠금] 최소 너비를 지정해 셀들이 무한히 쪼개지며 찌그러지는 현상 방지
+    <div className={`flex gap-3 p-3 rounded-2xl border-2 border-slate-200 ${depth % 2 === 0 ? 'bg-slate-50' : 'bg-white'} relative mb-3 group/row transition-all min-w-max w-full`}>
       <button onClick={() => mutate(rows => {
         const remove = (arr: LayoutRow[]) => {
           const idx = arr.findIndex(r => r.id === row.id);
@@ -126,7 +127,8 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
       </button>
 
       {row.cells.map(cell => (
-        <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col gap-2 border-2 border-indigo-200 bg-white rounded-2xl p-4 min-h-[120px] shadow-sm relative transition-all w-full">
+        // 🔥 각 내부 셀도 최소 크기(min-w-[200px])를 확보하여 내용을 보장합니다.
+        <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col gap-2 border-2 border-indigo-200 bg-white rounded-2xl p-4 min-h-[120px] shadow-sm relative transition-all min-w-[200px]">
           <div className="flex justify-between items-center bg-indigo-50 px-2 py-1 rounded-xl">
             <div className="flex items-center gap-1.5">
               <button onClick={() => mutate(rows => {
@@ -199,10 +201,11 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
   );
 
   return (
-    // 🔥 [신규] max-w-5xl을 제거하고 w-full로 넓고 쾌적하게 구성했습니다.
-    <div className="w-full mx-auto space-y-10 pb-32">
+    // 🔥 [핵심 래퍼] min-w-fit을 통해 하위 개체들의 크기를 받아들여 무한히 확장되는 캔버스를 구현합니다.
+    <div className="w-full min-w-fit mx-auto space-y-10 pb-32">
+      
       {/* 1. 뷰 기본 정보 섹션 */}
-      <section className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <section className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-500 min-w-max">
         <label className="text-[11px] font-black text-slate-400 block mb-4 uppercase tracking-widest px-2">현재 화면(View) 기본 정보</label>
         <div className="flex items-center gap-6">
           <button 
@@ -215,7 +218,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
             }
           </button>
           <input 
-            className="flex-1 p-5 rounded-[1.5rem] border-2 border-slate-100 text-3xl font-black outline-none focus:border-indigo-500 transition-all text-slate-900" 
+            className="flex-1 p-5 rounded-[1.5rem] border-2 border-slate-100 text-3xl font-black outline-none focus:border-indigo-500 transition-all text-slate-900 min-w-[300px]" 
             value={view.name} 
             onChange={e => onUpdate({...view, name: e.target.value})} 
             placeholder="화면 이름을 입력하세요" 
@@ -229,22 +232,23 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           <div className="flex items-center gap-4">
             <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg"><Database size={24}/></div>
             <div>
-              <h2 className="text-xl font-black text-slate-900">1. 데이터 조회 규칙 설정</h2>
-              <p className="text-sm text-slate-500 font-bold">어떤 데이터를 어떻게 보여줄지(필터링/정렬/그룹화) 설정하세요.</p>
+              <h2 className="text-xl font-black text-slate-900 whitespace-nowrap">1. 데이터 조회 규칙 설정</h2>
+              <p className="text-sm text-slate-500 font-bold whitespace-nowrap">어떤 데이터를 어떻게 보여줄지(필터링/정렬/그룹화) 설정하세요.</p>
             </div>
           </div>
           
           {view.tableName && (
             <button 
               onClick={fetchPreviewData} 
-              className="px-6 py-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl font-black text-sm flex items-center gap-2 transition-colors border border-indigo-200"
+              className="px-6 py-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl font-black text-sm flex items-center gap-2 transition-colors border border-indigo-200 whitespace-nowrap"
             >
               <Eye size={18} /> 데이터 미리보기
             </button>
           )}
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* 🔥 그리드들이 강제로 아래로 떨어지거나 찌그러지지 않고 본연의 공간(min-w-max)을 계산하게 합니다. */}
+        <div className="grid grid-cols-2 gap-8 min-w-max w-full">
           <div className="space-y-4">
             <div>
               <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1">연결 테이블</label>
@@ -273,10 +277,10 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           <div className="bg-slate-50/50 rounded-3xl p-6 border-2 border-dashed border-slate-200 flex flex-col justify-center">
             {view.filterColumn ? (
               <div className="space-y-4 animate-in zoom-in-95 duration-300">
-                <div className="flex gap-2 items-center text-indigo-600 font-black mb-2 text-sm"><Filter size={16}/> 상세 필터 조건</div>
+                <div className="flex gap-2 items-center text-indigo-600 font-black mb-2 text-sm whitespace-nowrap"><Filter size={16}/> 상세 필터 조건</div>
                 <div className="flex gap-3">
                   <select 
-                    className="flex-1 p-3 rounded-xl border-2 border-indigo-100 font-bold text-sm outline-none bg-white cursor-pointer" 
+                    className="flex-1 p-3 rounded-xl border-2 border-indigo-100 font-bold text-sm outline-none bg-white cursor-pointer min-w-[150px]" 
                     value={view.filterOperator || 'eq'} 
                     onChange={e => onUpdate({...view, filterOperator: e.target.value as any})}
                   >
@@ -286,7 +290,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
                     <option value="lt">작음 (&lt;)</option>
                   </select>
                   <input 
-                    className="flex-[2] p-3 rounded-xl border-2 border-indigo-100 font-bold text-sm outline-none bg-white focus:border-indigo-500" 
+                    className="flex-[2] p-3 rounded-xl border-2 border-indigo-100 font-bold text-sm outline-none bg-white focus:border-indigo-500 min-w-[200px]" 
                     value={view.filterValue || ''} 
                     onChange={e => onUpdate({...view, filterValue: e.target.value})} 
                     placeholder="예: 1, 완료" 
@@ -296,16 +300,16 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
             ) : (
               <div className="text-center space-y-3">
                 <Smartphone className="mx-auto text-slate-300" size={40}/>
-                <p className="text-xs text-slate-400 font-bold leading-relaxed">필요한 경우 좌측에서 칼럼을<br/>선택해 데이터를 필터링하세요.</p>
+                <p className="text-xs text-slate-400 font-bold leading-relaxed whitespace-nowrap">필요한 경우 좌측에서 칼럼을<br/>선택해 데이터를 필터링하세요.</p>
               </div>
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8 pt-8 border-t border-slate-50">
+        <div className="grid grid-cols-2 gap-8 mt-8 pt-8 border-t border-slate-50 min-w-max w-full">
           <div className="space-y-6">
             <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100">
-              <label className="text-[10px] font-black text-blue-600 block mb-3 uppercase tracking-wider flex items-center gap-1.5"><FolderTree size={14}/> 데이터 묶어주기 (아코디언 형태)</label>
+              <label className="text-[10px] font-black text-blue-600 block mb-3 uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap"><FolderTree size={14}/> 데이터 묶어주기 (아코디언 형태)</label>
               <select 
                 className="w-full p-3 rounded-xl bg-white border border-blue-200 font-black text-slate-800 cursor-pointer outline-none focus:border-blue-400" 
                 value={view.groupByColumn || ''} 
@@ -314,11 +318,11 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
                 <option value="">묶지 않음 (일반 리스트 형태)</option>
                 {availableColumns.map(col => <option key={col} value={col}>{col} 칼럼 기준으로 묶기</option>)}
               </select>
-              <p className="mt-2 text-[10px] text-blue-400 font-bold pl-1">* 선택 시, 해당 칼럼 값(예: 반, 부서)으로 폴더처럼 접혀서 표시됩니다.</p>
+              <p className="mt-2 text-[10px] text-blue-400 font-bold pl-1 whitespace-nowrap">* 선택 시, 해당 칼럼 값(예: 반, 부서)으로 폴더처럼 접혀서 표시됩니다.</p>
             </div>
 
             <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-50">
-              <label className="text-[10px] font-black text-indigo-600 block mb-3 uppercase tracking-wider flex items-center gap-1.5"><ArrowUpDown size={14}/> 정렬 기준 칼럼</label>
+              <label className="text-[10px] font-black text-indigo-600 block mb-3 uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap"><ArrowUpDown size={14}/> 정렬 기준 칼럼</label>
               <select 
                 className="w-full p-3 rounded-xl bg-white border border-indigo-100 font-black text-slate-800 cursor-pointer outline-none focus:border-indigo-400" 
                 value={view.sortColumn || ''} 
@@ -345,7 +349,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
 
           <div className="space-y-4">
             <div>
-              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1">카드 가로 배치 (열 개수)</label>
+              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 whitespace-nowrap">카드 가로 배치 (열 개수)</label>
               <select 
                 className="w-full p-3 rounded-xl bg-white border-2 border-slate-100 font-black text-slate-800 cursor-pointer outline-none" 
                 value={view.columnCount || 1} 
@@ -355,7 +359,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
               </select>
             </div>
             <div>
-              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5"><MousePointerClick size={14} className="text-indigo-500"/> 카드 클릭 액션</label>
+              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5 whitespace-nowrap"><MousePointerClick size={14} className="text-indigo-500"/> 카드 클릭 액션</label>
               <select 
                 className="w-full p-3 rounded-xl bg-white border-2 border-slate-100 font-black text-slate-800 cursor-pointer outline-none" 
                 value={view.onClickActionId || ''} 
@@ -370,17 +374,18 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
       </section>
 
       {/* 3. 카드 레이아웃 커스텀 섹션 */}
-      <section className={`bg-white p-10 rounded-[3.5rem] shadow-2xl border-2 border-indigo-50 relative overflow-hidden transition-all duration-500 ${!view.tableName ? 'opacity-40 pointer-events-none grayscale' : 'opacity-100'}`}>
-        <div className="absolute top-0 left-0 w-3 h-full bg-indigo-600"></div>
-        <div className="flex justify-between items-center mb-10">
+      <section className={`bg-white p-10 rounded-[3.5rem] shadow-2xl border-2 border-indigo-50 relative transition-all duration-500 ${!view.tableName ? 'opacity-40 pointer-events-none grayscale' : 'opacity-100'}`}>
+        <div className="absolute top-0 left-0 w-3 h-full bg-indigo-600 rounded-l-[3.5rem]"></div>
+        <div className="flex justify-between items-center mb-10 min-w-max">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-indigo-100 text-indigo-700 rounded-2xl"><LayoutTemplate size={28}/></div>
-            <h3 className="text-2xl font-black text-indigo-900">2. 카드 레이아웃 커스텀 설계</h3>
+            <h3 className="text-2xl font-black text-indigo-900 whitespace-nowrap">2. 카드 레이아웃 커스텀 설계</h3>
           </div>
-          <button onClick={addRootRow} className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2"><Plus size={18}/> 행(Row) 추가하기</button>
+          <button onClick={addRootRow} className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 whitespace-nowrap"><Plus size={18}/> 행(Row) 추가하기</button>
         </div>
         
-        <div className="space-y-4">
+        {/* 가로로 넓게 뻗어나가는 캔버스 영역 */}
+        <div className="space-y-4 overflow-visible w-full min-w-fit">
           {view.layoutRows.map(row => <RenderRowEditor key={row.id} row={row} depth={0} />)}
           {view.layoutRows.length === 0 && (
             <div className="py-24 border-4 border-dashed border-slate-100 rounded-[2.5rem] flex flex-col items-center justify-center text-slate-300 gap-4 bg-slate-50/50">

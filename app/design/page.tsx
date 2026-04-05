@@ -34,8 +34,13 @@ export default function AppBuilder() {
   const [savedAppsList, setSavedAppsList] = useState<any[]>([]);
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
 
-  // 🔥 [신규] 사이드바 접기/펴기 상태 관리
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsSidebarOpen(false);
+    }
+  }, []);
 
   useEffect(() => {
     async function fetchSchema() {
@@ -274,8 +279,17 @@ export default function AppBuilder() {
         </div>
       )}
 
-      {/* 🔥 [신규] 부드러운 접기/펴기 애니메이션이 적용된 사이드바 */}
-      <aside className={`bg-white shrink-0 shadow-2xl z-50 h-screen transition-all duration-300 ease-in-out border-r border-slate-200 ${isSidebarOpen ? 'w-[320px]' : 'w-0 overflow-hidden border-none'}`}>
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      <aside className={`
+        fixed lg:static top-0 left-0 z-50 h-screen bg-white shrink-0 shadow-2xl transition-all duration-300 ease-in-out border-r border-slate-200
+        ${isSidebarOpen ? 'translate-x-0 w-[320px]' : '-translate-x-full lg:translate-x-0 lg:w-0 overflow-hidden lg:border-none'}
+      `}>
         <div className="w-[320px] flex flex-col h-full">
           <div className="p-6 bg-indigo-700 text-white border-b border-indigo-800 shrink-0 flex flex-col gap-4">
             <div className="flex justify-between items-center">
@@ -397,24 +411,27 @@ export default function AppBuilder() {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col relative z-10 bg-slate-50 h-screen overflow-y-auto">
-        <header className="h-16 border-b bg-white px-6 flex items-center shadow-sm shrink-0 sticky top-0 z-20">
-          {/* 🔥 [신규] 사이드바 접기/펴기 컨트롤 버튼 */}
+      <main className="flex-1 flex flex-col relative z-10 bg-slate-50 h-screen overflow-hidden">
+        <header className="h-16 border-b bg-white px-6 flex items-center shadow-sm shrink-0 z-20">
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
-            className="mr-5 p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+            className="mr-5 p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all shrink-0"
             title="사이드바 토글"
           >
             {isSidebarOpen ? <PanelLeftClose size={22} /> : <PanelLeft size={22} />}
           </button>
-          <span className="text-xs font-black text-slate-400 uppercase tracking-widest">{activeItem.type} MODE</span>
-          <span className="mx-4 text-slate-300">|</span>
-          <span className="text-lg font-black text-slate-900">{activeItem.type==='view' ? activeView?.name : activeAction?.name}</span>
+          <span className="text-xs font-black text-slate-400 uppercase tracking-widest hidden sm:inline">
+            {activeItem.type} MODE
+          </span>
+          <span className="mx-4 text-slate-300 hidden sm:inline">|</span>
+          <span className="text-lg font-black text-slate-900 truncate">
+            {activeItem.type==='view' ? activeView?.name : activeAction?.name}
+          </span>
         </header>
         
-        {/* 🔥 [신규] max-w-4xl 등의 너비 제한을 없애고 w-full 로 가득 채우도록 변경 */}
-        <div className="flex-1 flex justify-center w-full">
-          <div className="w-full p-6 lg:p-10">
+        {/* 🔥 [핵심 수정] 하위 개체들의 크기를 계산(min-w-max)하여 필요 시 가로 스크롤을 무조건 생성합니다. 절대 찌그러지지 않습니다. */}
+        <div className="flex-1 overflow-auto bg-slate-50">
+          <div className="min-w-max w-full p-6 lg:p-10">
             {activeItem.type==='view' && activeView && (
               <ViewEditor 
                 view={activeView} 

@@ -532,7 +532,7 @@ import { createClient } from '@supabase/supabase-js';
 import { AppState, View, Action, SchemaData } from './types';
 import ViewEditor from './view';
 import ActionEditor from './action';
-import { Plus, Send, Loader2, ExternalLink, Trash2, FolderOpen, X, Star, ArrowUp, ArrowDown, Copy } from 'lucide-react';
+import { Plus, Send, Loader2, ExternalLink, Trash2, FolderOpen, X, Star, ArrowUp, ArrowDown, Copy, PanelLeftClose, PanelLeft } from 'lucide-react';
 import IconPicker, { IconMap } from './picker'; 
 
 const supabase = createClient(
@@ -559,6 +559,14 @@ export default function AppBuilder() {
   const [savedAppsList, setSavedAppsList] = useState<any[]>([]);
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsSidebarOpen(false);
+    }
+  }, []);
+
   useEffect(() => {
     async function fetchSchema() {
       const { data } = await supabase.rpc("get_schema_info");
@@ -574,9 +582,6 @@ export default function AppBuilder() {
     fetchSchema();
   }, []);
 
-  // ------------------------------------------------------------------
-  // 🔥 [신규 기능] View(화면) 관리: 이동, 복제, 삭제
-  // ------------------------------------------------------------------
   const moveView = (index: number, direction: 'up' | 'down') => {
     if ((direction === 'up' && index === 0) || (direction === 'down' && index === appState.views.length - 1)) return;
     const newViews = [...appState.views];
@@ -590,7 +595,6 @@ export default function AppBuilder() {
     const viewToCopy = appState.views.find(v => v.id === id);
     if (!viewToCopy) return;
     
-    // React 렌더링 충돌을 막기 위한 깊은 복사 및 내부 중첩 ID 재생성 (매우 중요)
     const duplicatedView = JSON.parse(JSON.stringify(viewToCopy));
     const newId = `v_${Date.now()}`;
     duplicatedView.id = newId;
@@ -623,9 +627,6 @@ export default function AppBuilder() {
     }
   };
 
-  // ------------------------------------------------------------------
-  // 🔥 [신규 기능] Action(기능) 관리: 이동, 복제, 삭제
-  // ------------------------------------------------------------------
   const moveAction = (index: number, direction: 'up' | 'down') => {
     if ((direction === 'up' && index === 0) || (direction === 'down' && index === appState.actions.length - 1)) return;
     const newActions = [...appState.actions];
@@ -645,6 +646,9 @@ export default function AppBuilder() {
     if (duplicatedAct.insertMappings) {
       duplicatedAct.insertMappings.forEach((m: any) => m.id = `m_${Math.random().toString(36).substr(2, 9)}`);
     }
+    if (duplicatedAct.updateMappings) {
+      duplicatedAct.updateMappings.forEach((m: any) => m.id = `m_${Math.random().toString(36).substr(2, 9)}`);
+    }
     setAppState({ ...appState, actions: [...appState.actions, duplicatedAct] });
     setActiveItem({ type: 'action', id: newId });
   };
@@ -657,7 +661,6 @@ export default function AppBuilder() {
     }
   };
 
-  // 기존 유지 기능들
   const handlePreviewPopup = async (viewId: string) => {
     if (!appState.id) {
       alert('최초 1회는 우측 하단의 [🚀 저장 및 배포하기]를 진행하여 앱을 생성해주세요.');
@@ -801,141 +804,159 @@ export default function AppBuilder() {
         </div>
       )}
 
-      {/* 사이드바 영역 */}
-      <aside className="w-[320px] border-r bg-white flex flex-col shrink-0 shadow-2xl z-50 relative">
-        <div className="p-6 bg-indigo-700 text-white border-b border-indigo-800 shrink-0 flex flex-col gap-4">
-          <div className="flex justify-between items-center">
-            <span className="text-[10px] font-black text-indigo-300 tracking-widest uppercase">My Workspace</span>
-            <div className="flex items-center gap-1.5">
-              <button onClick={handleCreateNewApp} className="flex items-center gap-1 text-[11px] font-bold bg-indigo-800 hover:bg-indigo-900 px-2.5 py-1.5 rounded-full" title="새 앱"><Plus size={12} /> 새 앱</button>
-              <button onClick={openAppListModal} className="flex items-center gap-1 text-[11px] font-bold bg-indigo-800 hover:bg-indigo-900 px-2.5 py-1.5 rounded-full" title="열기"><FolderOpen size={12} /> 열기</button>
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      <aside className={`
+        fixed lg:static top-0 left-0 z-50 h-screen bg-white shrink-0 shadow-2xl transition-all duration-300 ease-in-out border-r border-slate-200
+        ${isSidebarOpen ? 'translate-x-0 w-[320px]' : '-translate-x-full lg:translate-x-0 lg:w-0 overflow-hidden lg:border-none'}
+      `}>
+        <div className="w-[320px] flex flex-col h-full">
+          <div className="p-6 bg-indigo-700 text-white border-b border-indigo-800 shrink-0 flex flex-col gap-4">
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] font-black text-indigo-300 tracking-widest uppercase">My Workspace</span>
+              <div className="flex items-center gap-1.5">
+                <button onClick={handleCreateNewApp} className="flex items-center gap-1 text-[11px] font-bold bg-indigo-800 hover:bg-indigo-900 px-2.5 py-1.5 rounded-full" title="새 앱"><Plus size={12} /> 새 앱</button>
+                <button onClick={openAppListModal} className="flex items-center gap-1 text-[11px] font-bold bg-indigo-800 hover:bg-indigo-900 px-2.5 py-1.5 rounded-full" title="열기"><FolderOpen size={12} /> 열기</button>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3 mt-2">
+              <button 
+                onClick={() => { setActiveItem({ type: 'app', id: 'app' }); setIsIconPickerOpen(true); }}
+                className="w-10 h-10 shrink-0 flex items-center justify-center bg-indigo-800 border border-indigo-500 rounded-xl hover:bg-indigo-900 hover:border-white transition-all"
+              >
+                {appState.icon && IconMap[appState.icon] ? React.createElement(IconMap[appState.icon], { className: "text-white", size: 20 }) : <Star className="text-indigo-300" size={20} />}
+              </button>
+              <input 
+                type="text" 
+                value={appState.name} 
+                onChange={(e) => setAppState({...appState, name: e.target.value})}
+                className="bg-transparent text-white text-xl font-black outline-none w-full border-b-2 border-indigo-400 focus:border-white transition-all placeholder:text-indigo-300 pb-1"
+              />
             </div>
           </div>
           
-          <div className="flex items-center gap-3 mt-2">
-            <button 
-               onClick={() => { setActiveItem({ type: 'app', id: 'app' }); setIsIconPickerOpen(true); }}
-              className="w-10 h-10 shrink-0 flex items-center justify-center bg-indigo-800 border border-indigo-500 rounded-xl hover:bg-indigo-900 hover:border-white transition-all"
-            >
-              {appState.icon && IconMap[appState.icon] ? React.createElement(IconMap[appState.icon], { className: "text-white", size: 20 }) : <Star className="text-indigo-300" size={20} />}
-            </button>
-            <input 
-              type="text" 
-              value={appState.name} 
-              onChange={(e) => setAppState({...appState, name: e.target.value})}
-              className="bg-transparent text-white text-xl font-black outline-none w-full border-b-2 border-indigo-400 focus:border-white transition-all placeholder:text-indigo-300 pb-1"
-            />
-          </div>
-        </div>
-        
-        <div className="p-6 flex-1 overflow-y-auto space-y-10">
-          
-          {/* 뷰(View) 리스트 렌더링 영역 */}
-          <div>
-            <div className="flex justify-between items-center text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
-              <span>VIEWS</span>
-              <button onClick={() => { 
-                const id=`v_${Date.now()}`;
-                setAppState({...appState, views:[...appState.views, {id, name:'새 뷰', tableName:null, cardHeight:120, columnCount: 1, layoutRows:[], onClickActionId: null}]});
-                setActiveItem({type:'view', id});
-              }} className="p-1 hover:bg-slate-100 rounded-lg text-indigo-600 transition-colors"><Plus size={18}/></button>
-            </div>
-            <div className="space-y-3">
-              {appState.views.map((v, index) => {
-                const ViewIcon = v.icon && IconMap[v.icon] ? IconMap[v.icon] : null;
-                const isActive = activeItem.id === v.id;
-                
-                return (
-                  <div key={v.id} onClick={() => setActiveItem({type:'view', id:v.id})} className={`w-full flex flex-col px-4 py-3 rounded-2xl text-sm font-black transition-all group cursor-pointer border ${isActive ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl scale-[1.02]' : 'bg-white border-slate-200 hover:border-indigo-300 text-slate-600 hover:shadow-md'}`}>
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex-1 flex items-center gap-2 text-left truncate outline-none">
-                        {ViewIcon ? <ViewIcon size={16} className={isActive ? "text-indigo-200" : "text-slate-400"} /> : <Star size={16} className={isActive ? "text-indigo-200" : "text-slate-400"} />}
-                        <span className="truncate">{v.name}</span>
+          <div className="p-6 flex-1 overflow-y-auto space-y-10">
+            <div>
+              <div className="flex justify-between items-center text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
+                <span>VIEWS</span>
+                <button onClick={() => { 
+                  const id=`v_${Date.now()}`;
+                  setAppState({...appState, views:[...appState.views, {id, name:'새 뷰', tableName:null, cardHeight:120, columnCount: 1, layoutRows:[], onClickActionId: null}]});
+                  setActiveItem({type:'view', id});
+                }} className="p-1 hover:bg-slate-100 rounded-lg text-indigo-600 transition-colors"><Plus size={18}/></button>
+              </div>
+              <div className="space-y-3">
+                {appState.views.map((v, index) => {
+                  const ViewIcon = v.icon && IconMap[v.icon] ? IconMap[v.icon] : null;
+                  const isActive = activeItem.id === v.id;
+                  
+                  return (
+                    <div key={v.id} onClick={() => setActiveItem({type:'view', id:v.id})} className={`w-full flex flex-col px-4 py-3 rounded-2xl text-sm font-black transition-all group cursor-pointer border ${isActive ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl scale-[1.02]' : 'bg-white border-slate-200 hover:border-indigo-300 text-slate-600 hover:shadow-md'}`}>
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex-1 flex items-center gap-2 text-left truncate outline-none">
+                          {ViewIcon ? <ViewIcon size={16} className={isActive ? "text-indigo-200" : "text-slate-400"} /> : <Star size={16} className={isActive ? "text-indigo-200" : "text-slate-400"} />}
+                          <span className="truncate">{v.name}</span>
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handlePreviewPopup(v.id); }}
+                          disabled={isPreviewSaving === v.id}
+                          className={`p-1.5 ml-2 shrink-0 rounded-lg transition-all ${isActive ? 'text-indigo-200 hover:text-white hover:bg-indigo-500' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100'} disabled:opacity-50`}
+                          title="미리보기 팝업 열기"
+                        >
+                          {isPreviewSaving === v.id ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+                        </button>
                       </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handlePreviewPopup(v.id); }}
-                        disabled={isPreviewSaving === v.id}
-                        className={`p-1.5 ml-2 shrink-0 rounded-lg transition-all ${isActive ? 'text-indigo-200 hover:text-white hover:bg-indigo-500' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100'} disabled:opacity-50`}
-                        title="미리보기 팝업 열기"
-                      >
-                        {isPreviewSaving === v.id ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
-                      </button>
+                      
+                      <div className={`flex items-center justify-end gap-1 overflow-hidden transition-all duration-300 ${isActive ? 'max-h-10 mt-3 opacity-100' : 'max-h-0 opacity-0 group-hover:max-h-10 group-hover:mt-3 group-hover:opacity-100'}`}>
+                        <button onClick={(e) => { e.stopPropagation(); moveView(index, 'up'); }} disabled={index === 0} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-indigo-500 disabled:opacity-30' : 'hover:bg-slate-100 disabled:opacity-30'}`} title="순서 올리기"><ArrowUp size={14}/></button>
+                        <button onClick={(e) => { e.stopPropagation(); moveView(index, 'down'); }} disabled={index === appState.views.length - 1} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-indigo-500 disabled:opacity-30' : 'hover:bg-slate-100 disabled:opacity-30'}`} title="순서 내리기"><ArrowDown size={14}/></button>
+                        <div className={`w-[1px] h-3 mx-1 ${isActive ? 'bg-indigo-400' : 'bg-slate-200'}`}></div>
+                        <button onClick={(e) => { e.stopPropagation(); duplicateView(v.id); }} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-indigo-500' : 'hover:bg-slate-100'}`} title="화면 복사하기"><Copy size={14}/></button>
+                        <button onClick={(e) => { e.stopPropagation(); deleteView(v.id); }} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-500 hover:text-white text-rose-200' : 'hover:bg-rose-50 text-rose-400'}`} title="화면 삭제하기"><Trash2 size={14}/></button>
+                      </div>
                     </div>
-                    
-                    {/* 🔥 뷰 조작 액션 바 (트렌디한 호버 메뉴) */}
-                    <div className={`flex items-center justify-end gap-1 overflow-hidden transition-all duration-300 ${isActive ? 'max-h-10 mt-3 opacity-100' : 'max-h-0 opacity-0 group-hover:max-h-10 group-hover:mt-3 group-hover:opacity-100'}`}>
-                      <button onClick={(e) => { e.stopPropagation(); moveView(index, 'up'); }} disabled={index === 0} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-indigo-500 disabled:opacity-30' : 'hover:bg-slate-100 disabled:opacity-30'}`} title="순서 올리기"><ArrowUp size={14}/></button>
-                      <button onClick={(e) => { e.stopPropagation(); moveView(index, 'down'); }} disabled={index === appState.views.length - 1} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-indigo-500 disabled:opacity-30' : 'hover:bg-slate-100 disabled:opacity-30'}`} title="순서 내리기"><ArrowDown size={14}/></button>
-                      <div className={`w-[1px] h-3 mx-1 ${isActive ? 'bg-indigo-400' : 'bg-slate-200'}`}></div>
-                      <button onClick={(e) => { e.stopPropagation(); duplicateView(v.id); }} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-indigo-500' : 'hover:bg-slate-100'}`} title="화면 복사하기"><Copy size={14}/></button>
-                      <button onClick={(e) => { e.stopPropagation(); deleteView(v.id); }} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-500 hover:text-white text-rose-200' : 'hover:bg-rose-50 text-rose-400'}`} title="화면 삭제하기"><Trash2 size={14}/></button>
+                  );
+                })}
+              </div>
+            </div>
+            
+            <div>
+              <div className="flex justify-between items-center text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
+                <span>ACTIONS</span>
+                <button onClick={() => { 
+                  const id=`a_${Date.now()}`;
+                  setAppState({...appState, actions:[...appState.actions, {id, name:'새 액션', type:'alert', targetViewId:null, message:null}]}); 
+                  setActiveItem({type:'action', id});
+                }} className="p-1 hover:bg-slate-100 rounded-lg text-rose-500 transition-colors"><Plus size={18}/></button>
+              </div>
+              <div className="space-y-3">
+                {appState.actions.map((a, index) => {
+                  const ActIcon = a.icon && IconMap[a.icon] ? IconMap[a.icon] : null;
+                  const isActive = activeItem.id === a.id;
+
+                  return (
+                    <div key={a.id} onClick={() => setActiveItem({type:'action', id:a.id})} className={`w-full flex flex-col px-4 py-3 border-l-8 rounded-r-2xl text-sm font-black transition-all group cursor-pointer ${isActive ? 'bg-rose-50 border-rose-500 text-rose-800 shadow-md scale-[1.02]' : 'bg-white border-transparent hover:bg-slate-100 text-slate-600 hover:shadow-sm'}`}>
+                      <div className="flex items-center gap-2 text-left w-full">
+                        {ActIcon ? <ActIcon size={16} className={isActive ? "text-rose-500" : "text-slate-400"} /> : <span className="opacity-70">⚡</span>}
+                        <span className="truncate flex-1">{a.name}</span>
+                      </div>
+                      
+                      <div className={`flex items-center justify-end gap-1 overflow-hidden transition-all duration-300 ${isActive ? 'max-h-10 mt-3 opacity-100' : 'max-h-0 opacity-0 group-hover:max-h-10 group-hover:mt-3 group-hover:opacity-100'}`}>
+                        <button onClick={(e) => { e.stopPropagation(); moveAction(index, 'up'); }} disabled={index === 0} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-200 disabled:opacity-30' : 'hover:bg-slate-200 disabled:opacity-30'}`} title="순서 올리기"><ArrowUp size={14}/></button>
+                        <button onClick={(e) => { e.stopPropagation(); moveAction(index, 'down'); }} disabled={index === appState.actions.length - 1} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-200 disabled:opacity-30' : 'hover:bg-slate-200 disabled:opacity-30'}`} title="순서 내리기"><ArrowDown size={14}/></button>
+                        <div className={`w-[1px] h-3 mx-1 ${isActive ? 'bg-rose-200' : 'bg-slate-200'}`}></div>
+                        <button onClick={(e) => { e.stopPropagation(); duplicateAction(a.id); }} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-200' : 'hover:bg-slate-200'}`} title="액션 복사하기"><Copy size={14}/></button>
+                        <button onClick={(e) => { e.stopPropagation(); deleteAction(a.id); }} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-500 hover:text-white text-rose-500' : 'hover:bg-rose-50 text-rose-400'}`} title="액션 삭제하기"><Trash2 size={14}/></button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
-          
-          {/* 액션(Action) 리스트 렌더링 영역 */}
-          <div>
-            <div className="flex justify-between items-center text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
-              <span>ACTIONS</span>
-              <button onClick={() => { 
-                const id=`a_${Date.now()}`;
-                setAppState({...appState, actions:[...appState.actions, {id, name:'새 액션', type:'alert', targetViewId:null, message:null}]}); 
-                setActiveItem({type:'action', id});
-              }} className="p-1 hover:bg-slate-100 rounded-lg text-rose-500 transition-colors"><Plus size={18}/></button>
-            </div>
-            <div className="space-y-3">
-              {appState.actions.map((a, index) => {
-                const ActIcon = a.icon && IconMap[a.icon] ? IconMap[a.icon] : null;
-                const isActive = activeItem.id === a.id;
 
-                return (
-                  <div key={a.id} onClick={() => setActiveItem({type:'action', id:a.id})} className={`w-full flex flex-col px-4 py-3 border-l-8 rounded-r-2xl text-sm font-black transition-all group cursor-pointer ${isActive ? 'bg-rose-50 border-rose-500 text-rose-800 shadow-md scale-[1.02]' : 'bg-white border-transparent hover:bg-slate-100 text-slate-600 hover:shadow-sm'}`}>
-                    <div className="flex items-center gap-2 text-left w-full">
-                      {ActIcon ? <ActIcon size={16} className={isActive ? "text-rose-500" : "text-slate-400"} /> : <span className="opacity-70">⚡</span>}
-                      <span className="truncate flex-1">{a.name}</span>
-                    </div>
-                    
-                    {/* 🔥 액션 조작 바 */}
-                    <div className={`flex items-center justify-end gap-1 overflow-hidden transition-all duration-300 ${isActive ? 'max-h-10 mt-3 opacity-100' : 'max-h-0 opacity-0 group-hover:max-h-10 group-hover:mt-3 group-hover:opacity-100'}`}>
-                      <button onClick={(e) => { e.stopPropagation(); moveAction(index, 'up'); }} disabled={index === 0} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-200 disabled:opacity-30' : 'hover:bg-slate-200 disabled:opacity-30'}`} title="순서 올리기"><ArrowUp size={14}/></button>
-                      <button onClick={(e) => { e.stopPropagation(); moveAction(index, 'down'); }} disabled={index === appState.actions.length - 1} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-200 disabled:opacity-30' : 'hover:bg-slate-200 disabled:opacity-30'}`} title="순서 내리기"><ArrowDown size={14}/></button>
-                      <div className={`w-[1px] h-3 mx-1 ${isActive ? 'bg-rose-200' : 'bg-slate-200'}`}></div>
-                      <button onClick={(e) => { e.stopPropagation(); duplicateAction(a.id); }} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-200' : 'hover:bg-slate-200'}`} title="액션 복사하기"><Copy size={14}/></button>
-                      <button onClick={(e) => { e.stopPropagation(); deleteAction(a.id); }} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'hover:bg-rose-500 hover:text-white text-rose-500' : 'hover:bg-rose-50 text-rose-400'}`} title="액션 삭제하기"><Trash2 size={14}/></button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="p-6 bg-slate-50 border-t border-slate-200 shrink-0 z-30">
+            <button onClick={handleSaveAndDeploy} disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-black shadow-xl hover:shadow-indigo-500/30 transition-all active:scale-95 disabled:opacity-70 disabled:pointer-events-none">
+              {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
+              {isSaving ? '배포 진행 중...' : '🚀 실제 유저에게 배포하기'}
+            </button>
+            {appState.id && (
+              <div className="mt-3 flex items-center gap-2">
+                <a href={`/preview/${appState.id}`} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-2xl text-sm font-bold transition-all shadow-sm"><ExternalLink size={16} /> 라이브 앱 확인</a>
+                <button onClick={handleDeleteApp} className="p-3 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 hover:border-rose-300 rounded-2xl transition-all shadow-sm" title="현재 앱 완전 삭제"><Trash2 size={18} /></button>
+              </div>
+            )}
           </div>
-        </div>
-
-        <div className="p-6 bg-slate-50 border-t border-slate-200 shrink-0 z-30">
-          <button onClick={handleSaveAndDeploy} disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-black shadow-xl hover:shadow-indigo-500/30 transition-all active:scale-95 disabled:opacity-70 disabled:pointer-events-none">
-            {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
-            {isSaving ? '배포 진행 중...' : '🚀 실제 유저에게 배포하기'}
-          </button>
-          {appState.id && (
-            <div className="mt-3 flex items-center gap-2">
-              <a href={`/preview/${appState.id}`} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-2xl text-sm font-bold transition-all shadow-sm"><ExternalLink size={16} /> 라이브 앱 확인</a>
-              <button onClick={handleDeleteApp} className="p-3 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 hover:border-rose-300 rounded-2xl transition-all shadow-sm" title="현재 앱 완전 삭제"><Trash2 size={18} /></button>
-            </div>
-          )}
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col relative z-10 bg-slate-50 h-screen overflow-y-auto">
-        <header className="h-16 border-b bg-white px-10 flex items-center shadow-sm shrink-0 sticky top-0 z-20">
-          <span className="text-xs font-black text-slate-400 uppercase tracking-widest">{activeItem.type} MODE</span>
-          <span className="mx-4 text-slate-300">|</span>
-          <span className="text-lg font-black text-slate-900">{activeItem.type==='view' ? activeView?.name : activeAction?.name}</span>
+      <main className="flex-1 flex flex-col relative z-10 bg-slate-50 h-screen overflow-hidden">
+        <header className="h-16 border-b bg-white px-6 flex items-center shadow-sm shrink-0 z-20">
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+            className="mr-5 p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all shrink-0"
+            title="사이드바 토글"
+          >
+            {isSidebarOpen ? <PanelLeftClose size={22} /> : <PanelLeft size={22} />}
+          </button>
+          <span className="text-xs font-black text-slate-400 uppercase tracking-widest hidden sm:inline">
+            {activeItem.type} MODE
+          </span>
+          <span className="mx-4 text-slate-300 hidden sm:inline">|</span>
+          <span className="text-lg font-black text-slate-900 truncate">
+            {activeItem.type==='view' ? activeView?.name : activeAction?.name}
+          </span>
         </header>
         
-        <div className="flex-1 flex justify-center">
-          <div className="w-full max-w-4xl p-6">
+        {/* 🔥 [핵심 수정] 하위 개체들의 크기를 계산(min-w-max)하여 필요 시 가로 스크롤을 무조건 생성합니다. 절대 찌그러지지 않습니다. */}
+        <div className="flex-1 overflow-auto bg-slate-50">
+          <div className="min-w-max w-full p-6 lg:p-10">
             {activeItem.type==='view' && activeView && (
               <ViewEditor 
                 view={activeView} 
@@ -999,28 +1020,29 @@ export default function ActionEditor({
   onOpenIconPicker 
 }: ActionEditorProps) {
   return (
-    <div className="flex-1 overflow-y-auto p-8 lg:p-12 bg-white rounded-tl-3xl shadow-sm border-l border-t border-slate-200 relative">
-      <div className="max-w-3xl mx-auto space-y-8">
+    // 🔥 [핵심 래퍼] min-w-fit 적용
+    <div className="w-full min-w-fit mx-auto bg-white rounded-3xl shadow-sm border border-slate-200 relative p-8 lg:p-12">
+      <div className="w-full mx-auto space-y-8">
         
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4 min-w-max">
           <div>
-            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2 whitespace-nowrap">
               {action.icon && IconMap[action.icon] ? 
                 React.createElement(IconMap[action.icon], { className: "text-rose-500", size: 28 }) : 
                 <Settings2 className="text-rose-500" size={28} />
               }
               액션 설정: {action.name}
             </h2>
-            <p className="text-sm text-slate-500 mt-1">이벤트를 정의하세요.</p>
+            <p className="text-sm text-slate-500 mt-1 whitespace-nowrap">이벤트를 정의하세요.</p>
           </div>
           <button onClick={() => onDelete(action.id)} className="p-2 text-slate-400 hover:text-rose-500 rounded-lg transition-colors">
             <Trash2 size={20} />
           </button>
         </div>
 
-        <div className="space-y-6 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+        <div className="space-y-6 bg-slate-50 p-6 rounded-2xl border border-slate-200 min-w-max w-full">
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">액션 아이콘 및 이름</label>
+            <label className="block text-sm font-bold text-slate-700 mb-2 whitespace-nowrap">액션 아이콘 및 이름</label>
             <div className="flex items-center gap-3">
               <button 
                 onClick={onOpenIconPicker} 
@@ -1035,37 +1057,36 @@ export default function ActionEditor({
                 type="text"
                 value={action.name}
                 onChange={(e) => onUpdate({ ...action, name: e.target.value })}
-                className="flex-1 p-3 rounded-xl border border-slate-200 outline-none font-bold"
+                className="flex-1 p-3 rounded-xl border border-slate-200 outline-none font-bold min-w-[300px]"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">동작 유형</label>
+            <label className="block text-sm font-bold text-slate-700 mb-2 whitespace-nowrap">동작 유형</label>
             <select
               value={action.type}
               onChange={(e) => onUpdate({ ...action, type: e.target.value as Action['type'] })}
-              className="w-full p-3 rounded-xl border border-slate-200 bg-white font-black text-rose-600"
+              className="w-full p-3 rounded-xl border border-slate-200 bg-white font-black text-rose-600 min-w-[300px]"
             >
               <option value="navigate">다른 뷰로 이동</option>
               <option value="alert">알림 메시지</option>
               <option value="insert_row">데이터 추가 (Insert)</option>
-              {/* 🔥 신규 동작 유형 옵션 추가 */}
               <option value="update_row">데이터 수정 (Update Modal)</option>
               <option value="delete_row">선택한 데이터 삭제 (Delete)</option>
             </select>
           </div>
 
-          {/* 1. 데이터 추가 (Insert) UI */}
+          {/* 데이터 추가 (Insert) UI */}
           {action.type === 'insert_row' && (
             <div className="space-y-5 border-t border-slate-200 pt-5 mt-5">
-              <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <label className="flex items-center gap-2 text-sm font-bold text-slate-700 whitespace-nowrap">
                 <DatabaseZap size={16} className="text-rose-500"/> 추가할 대상 테이블
               </label>
               <select
                 value={action.insertTableName || ''}
                 onChange={(e) => onUpdate({ ...action, insertTableName: e.target.value, insertMappings: [] })}
-                className="w-full p-3 rounded-xl border border-rose-200 bg-rose-50 font-bold text-rose-800 outline-none"
+                className="w-full p-3 rounded-xl border border-rose-200 bg-rose-50 font-bold text-rose-800 outline-none min-w-[300px]"
               >
                 <option value="">테이블을 선택하세요</option>
                 {Object.keys(schemaData).map(table => <option key={table} value={table}>{table}</option>)}
@@ -1074,13 +1095,13 @@ export default function ActionEditor({
               {action.insertTableName && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <label className="block text-sm font-bold text-slate-700">필드 매핑 및 타입 설정</label>
+                    <label className="block text-sm font-bold text-slate-700 whitespace-nowrap">필드 매핑 및 타입 설정</label>
                     <button
                       onClick={() => {
                         const nm: InsertMapping = { id: `m_${Date.now()}`, targetColumn: '', mappingType: 'prompt', sourceValue: '', valueType: 'string' };
                         onUpdate({ ...action, insertMappings: [...(action.insertMappings || []), nm] });
                       }}
-                      className="text-xs bg-slate-800 text-white px-3 py-2 rounded-lg font-bold flex items-center gap-1"
+                      className="text-xs bg-slate-800 text-white px-3 py-2 rounded-lg font-bold flex items-center gap-1 whitespace-nowrap shrink-0"
                     >
                       <Plus size={14} /> 매핑 추가
                     </button>
@@ -1095,9 +1116,10 @@ export default function ActionEditor({
                         <Trash2 size={14} />
                       </button>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* 🔥 4단 그리드가 축소되지 않도록 본연의 크기(min-w-max)를 계산하게 만듭니다. */}
+                      <div className="grid grid-cols-4 gap-4 w-full min-w-max">
                         <div>
-                          <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider">1. 저장할 컬럼</span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider whitespace-nowrap">1. 저장할 컬럼</span>
                           <select
                             value={mapping.targetColumn}
                             onChange={(e) => {
@@ -1105,14 +1127,14 @@ export default function ActionEditor({
                               newArr[idx].targetColumn = e.target.value;
                               onUpdate({ ...action, insertMappings: newArr });
                             }}
-                            className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg bg-slate-50"
+                            className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg bg-slate-50 min-w-[160px]"
                           >
                             <option value="">-- 컬럼 선택 --</option>
                             {(schemaData[action.insertTableName!] || []).map(col => <option key={col} value={col}>{col}</option>)}
                           </select>
                         </div>
                         <div>
-                          <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider">2. 데이터 출처</span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider whitespace-nowrap">2. 데이터 출처</span>
                           <select
                             value={mapping.mappingType}
                             onChange={(e) => {
@@ -1120,7 +1142,7 @@ export default function ActionEditor({
                               newArr[idx].mappingType = e.target.value as any;
                               onUpdate({ ...action, insertMappings: newArr });
                             }}
-                            className="w-full p-2.5 text-sm font-bold border border-indigo-100 rounded-lg bg-indigo-50 text-indigo-700"
+                            className="w-full p-2.5 text-sm font-bold border border-indigo-100 rounded-lg bg-indigo-50 text-indigo-700 min-w-[180px]"
                           >
                             <option value="prompt">💬 폼에서 직접 입력받기</option>
                             <option value="card_data">📄 현재 카드 데이터 재사용</option>
@@ -1128,7 +1150,7 @@ export default function ActionEditor({
                           </select>
                         </div>
                         <div>
-                          <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider">3. 데이터 형식</span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider whitespace-nowrap">3. 데이터 형식</span>
                           <select
                             value={mapping.valueType || 'string'}
                             onChange={(e) => {
@@ -1136,14 +1158,14 @@ export default function ActionEditor({
                               newArr[idx].valueType = e.target.value as 'string' | 'number';
                               onUpdate({ ...action, insertMappings: newArr });
                             }}
-                            className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg"
+                            className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg min-w-[160px]"
                           >
                             <option value="string">Text (문자열)</option>
                             <option value="number">Number (숫자)</option>
                           </select>
                         </div>
                         <div>
-                          <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider">
+                          <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider whitespace-nowrap">
                             4. {mapping.mappingType === 'prompt' ? '입력 폼 레이블' : mapping.mappingType === 'card_data' ? '원본 컬럼명' : '고정값'}
                           </span>
                           <input
@@ -1155,7 +1177,7 @@ export default function ActionEditor({
                               onUpdate({ ...action, insertMappings: newArr });
                             }}
                             placeholder="설정값을 입력하세요"
-                            className="w-full p-2.5 text-sm font-bold border border-rose-200 rounded-lg focus:border-rose-500 outline-none"
+                            className="w-full p-2.5 text-sm font-bold border border-rose-200 rounded-lg focus:border-rose-500 outline-none min-w-[200px]"
                           />
                         </div>
                       </div>
@@ -1166,32 +1188,32 @@ export default function ActionEditor({
             </div>
           )}
 
-          {/* 🔥 2. 데이터 수정 (Update) UI */}
+          {/* 데이터 수정 (Update) UI */}
           {action.type === 'update_row' && (
             <div className="space-y-5 border-t border-slate-200 pt-5 mt-5">
-              <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <label className="flex items-center gap-2 text-sm font-bold text-slate-700 whitespace-nowrap">
                 <DatabaseZap size={16} className="text-rose-500"/> 수정할 대상 테이블
               </label>
               <select
                 value={action.updateTableName || ''}
                 onChange={(e) => onUpdate({ ...action, updateTableName: e.target.value, updateMappings: [] })}
-                className="w-full p-3 rounded-xl border border-rose-200 bg-rose-50 font-bold text-rose-800 outline-none"
+                className="w-full p-3 rounded-xl border border-rose-200 bg-rose-50 font-bold text-rose-800 outline-none min-w-[300px]"
               >
                 <option value="">테이블을 선택하세요</option>
                 {Object.keys(schemaData).map(table => <option key={table} value={table}>{table}</option>)}
               </select>
-              <p className="text-xs text-slate-500 font-bold">* 클릭한 카드의 고유 <strong>'id'</strong> 값을 기준으로 데이터가 수정됩니다.</p>
+              <p className="text-xs text-slate-500 font-bold whitespace-nowrap">* 클릭한 카드의 고유 <strong>'id'</strong> 값을 기준으로 데이터가 수정됩니다.</p>
 
               {action.updateTableName && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <label className="block text-sm font-bold text-slate-700">수정할 필드 매핑 및 타입 설정</label>
+                    <label className="block text-sm font-bold text-slate-700 whitespace-nowrap">수정할 필드 매핑 및 타입 설정</label>
                     <button
                       onClick={() => {
                         const nm: InsertMapping = { id: `m_${Date.now()}`, targetColumn: '', mappingType: 'prompt', sourceValue: '', valueType: 'string' };
                         onUpdate({ ...action, updateMappings: [...(action.updateMappings || []), nm] });
                       }}
-                      className="text-xs bg-slate-800 text-white px-3 py-2 rounded-lg font-bold flex items-center gap-1"
+                      className="text-xs bg-slate-800 text-white px-3 py-2 rounded-lg font-bold flex items-center gap-1 whitespace-nowrap shrink-0"
                     >
                       <Plus size={14} /> 매핑 추가
                     </button>
@@ -1206,9 +1228,9 @@ export default function ActionEditor({
                         <Trash2 size={14} />
                       </button>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-4 gap-4 w-full min-w-max">
                         <div>
-                          <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider">1. 수정될 컬럼</span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider whitespace-nowrap">1. 수정될 컬럼</span>
                           <select
                             value={mapping.targetColumn}
                             onChange={(e) => {
@@ -1216,14 +1238,14 @@ export default function ActionEditor({
                               newArr[idx].targetColumn = e.target.value;
                               onUpdate({ ...action, updateMappings: newArr });
                             }}
-                            className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg bg-slate-50"
+                            className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg bg-slate-50 min-w-[160px]"
                           >
                             <option value="">-- 컬럼 선택 --</option>
                             {(schemaData[action.updateTableName!] || []).map(col => <option key={col} value={col}>{col}</option>)}
                           </select>
                         </div>
                         <div>
-                          <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider">2. 데이터 출처</span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider whitespace-nowrap">2. 데이터 출처</span>
                           <select
                             value={mapping.mappingType}
                             onChange={(e) => {
@@ -1231,7 +1253,7 @@ export default function ActionEditor({
                               newArr[idx].mappingType = e.target.value as any;
                               onUpdate({ ...action, updateMappings: newArr });
                             }}
-                            className="w-full p-2.5 text-sm font-bold border border-indigo-100 rounded-lg bg-indigo-50 text-indigo-700"
+                            className="w-full p-2.5 text-sm font-bold border border-indigo-100 rounded-lg bg-indigo-50 text-indigo-700 min-w-[180px]"
                           >
                             <option value="prompt">💬 모달폼 띄워서 입력받기</option>
                             <option value="card_data">📄 현재 카드의 다른 데이터 사용</option>
@@ -1239,7 +1261,7 @@ export default function ActionEditor({
                           </select>
                         </div>
                         <div>
-                          <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider">3. 데이터 형식</span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider whitespace-nowrap">3. 데이터 형식</span>
                           <select
                             value={mapping.valueType || 'string'}
                             onChange={(e) => {
@@ -1247,14 +1269,14 @@ export default function ActionEditor({
                               newArr[idx].valueType = e.target.value as 'string' | 'number';
                               onUpdate({ ...action, updateMappings: newArr });
                             }}
-                            className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg"
+                            className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg min-w-[160px]"
                           >
                             <option value="string">Text (문자열)</option>
                             <option value="number">Number (숫자)</option>
                           </select>
                         </div>
                         <div>
-                          <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider">
+                          <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider whitespace-nowrap">
                             4. {mapping.mappingType === 'prompt' ? '수정 폼 레이블' : mapping.mappingType === 'card_data' ? '원본 컬럼명' : '고정값'}
                           </span>
                           <input
@@ -1266,7 +1288,7 @@ export default function ActionEditor({
                               onUpdate({ ...action, updateMappings: newArr });
                             }}
                             placeholder="설정값을 입력하세요"
-                            className="w-full p-2.5 text-sm font-bold border border-rose-200 rounded-lg focus:border-rose-500 outline-none"
+                            className="w-full p-2.5 text-sm font-bold border border-rose-200 rounded-lg focus:border-rose-500 outline-none min-w-[200px]"
                           />
                         </div>
                       </div>
@@ -1277,21 +1299,21 @@ export default function ActionEditor({
             </div>
           )}
 
-          {/* 🔥 3. 데이터 삭제 (Delete) UI */}
+          {/* 데이터 삭제 (Delete) UI */}
           {action.type === 'delete_row' && (
             <div className="space-y-5 border-t border-slate-200 pt-5 mt-5">
-              <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <label className="flex items-center gap-2 text-sm font-bold text-slate-700 whitespace-nowrap">
                 <DatabaseZap size={16} className="text-rose-500"/> 삭제할 대상 테이블
               </label>
               <select
                 value={action.deleteTableName || ''}
                 onChange={(e) => onUpdate({ ...action, deleteTableName: e.target.value })}
-                className="w-full p-3 rounded-xl border border-rose-200 bg-rose-50 font-bold text-rose-800 outline-none"
+                className="w-full p-3 rounded-xl border border-rose-200 bg-rose-50 font-bold text-rose-800 outline-none min-w-[300px]"
               >
                 <option value="">테이블을 선택하세요</option>
                 {Object.keys(schemaData).map(table => <option key={table} value={table}>{table}</option>)}
               </select>
-              <div className="p-4 bg-rose-50 text-rose-600 rounded-xl text-xs font-bold leading-relaxed border border-rose-100">
+              <div className="p-4 bg-rose-50 text-rose-600 rounded-xl text-xs font-bold leading-relaxed border border-rose-100 whitespace-nowrap">
                 * 사용자가 클릭한 카드의 고유 <strong>'id'</strong> 값을 기준으로 데이터가 즉시 삭제됩니다.<br/>
                 * 연결된 테이블에 반드시 'id' 컬럼이 존재해야 안전하게 작동합니다.
               </div>
@@ -1320,13 +1342,11 @@ import {
   ChevronRight, X, MousePointerClick, Star, Filter, Search, Smartphone, Eye, Loader2, TableProperties, ArrowUpDown, FolderTree
 } from 'lucide-react';
 
-// 아이콘 맵퍼 설정 (기존 유지)
 export const IconMap = Object.entries(LucideIcons).reduce((acc, [name, component]) => {
   if (/^[A-Z]/.test(name) && typeof component !== 'string') acc[name] = component as React.ElementType;
   return acc;
 }, {} as any);
 
-// 아이콘 피커 컴포넌트 (기존 유지 - 누락 없음)
 const IconPicker = ({ isOpen, onClose, onSelect, selectedIcon }: any) => {
   const [search, setSearch] = useState('');
   const filtered = useMemo(() => 
@@ -1381,7 +1401,6 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
-  // 데이터 미리보기 (필터 및 정렬 완벽 적용 - 누락 없음)
   const fetchPreviewData = async () => {
     if (!view.tableName) return alert("먼저 테이블을 선택해주세요.");
     
@@ -1426,9 +1445,9 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
     });
   };
 
-  // 재귀적 중첩 레이아웃 렌더러 (누락 없음)
   const RenderRowEditor = ({ row, depth = 0 }: { row: LayoutRow, depth: number }) => (
-    <div className={`flex gap-3 p-3 rounded-2xl border-2 border-slate-200 ${depth % 2 === 0 ? 'bg-slate-50' : 'bg-white'} relative mb-3 group/row transition-all`}>
+    // 🔥 [레이아웃 잠금] 최소 너비를 지정해 셀들이 무한히 쪼개지며 찌그러지는 현상 방지
+    <div className={`flex gap-3 p-3 rounded-2xl border-2 border-slate-200 ${depth % 2 === 0 ? 'bg-slate-50' : 'bg-white'} relative mb-3 group/row transition-all min-w-max w-full`}>
       <button onClick={() => mutate(rows => {
         const remove = (arr: LayoutRow[]) => {
           const idx = arr.findIndex(r => r.id === row.id);
@@ -1441,7 +1460,8 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
       </button>
 
       {row.cells.map(cell => (
-        <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col gap-2 border-2 border-indigo-200 bg-white rounded-2xl p-4 min-h-[120px] shadow-sm relative transition-all">
+        // 🔥 각 내부 셀도 최소 크기(min-w-[200px])를 확보하여 내용을 보장합니다.
+        <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col gap-2 border-2 border-indigo-200 bg-white rounded-2xl p-4 min-h-[120px] shadow-sm relative transition-all min-w-[200px]">
           <div className="flex justify-between items-center bg-indigo-50 px-2 py-1 rounded-xl">
             <div className="flex items-center gap-1.5">
               <button onClick={() => mutate(rows => {
@@ -1509,14 +1529,16 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           r.cells.forEach((c: any) => { if(c.nestedRows) find(c.nestedRows); });
         });
         find(rows);
-      })} className="w-12 flex items-center justify-center bg-indigo-600 text-white rounded-2xl shadow-md hover:bg-indigo-700 transition-colors hover:scale-105" title="옆으로 분할"><Columns size={20}/></button>
+      })} className="w-12 shrink-0 flex items-center justify-center bg-indigo-600 text-white rounded-2xl shadow-md hover:bg-indigo-700 transition-colors hover:scale-105" title="옆으로 분할"><Columns size={20}/></button>
     </div>
   );
 
   return (
-    <div className="max-w-5xl mx-auto space-y-10 pb-32">
+    // 🔥 [핵심 래퍼] min-w-fit을 통해 하위 개체들의 크기를 받아들여 무한히 확장되는 캔버스를 구현합니다.
+    <div className="w-full min-w-fit mx-auto space-y-10 pb-32">
+      
       {/* 1. 뷰 기본 정보 섹션 */}
-      <section className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <section className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-500 min-w-max">
         <label className="text-[11px] font-black text-slate-400 block mb-4 uppercase tracking-widest px-2">현재 화면(View) 기본 정보</label>
         <div className="flex items-center gap-6">
           <button 
@@ -1529,7 +1551,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
             }
           </button>
           <input 
-            className="flex-1 p-5 rounded-[1.5rem] border-2 border-slate-100 text-3xl font-black outline-none focus:border-indigo-500 transition-all text-slate-900" 
+            className="flex-1 p-5 rounded-[1.5rem] border-2 border-slate-100 text-3xl font-black outline-none focus:border-indigo-500 transition-all text-slate-900 min-w-[300px]" 
             value={view.name} 
             onChange={e => onUpdate({...view, name: e.target.value})} 
             placeholder="화면 이름을 입력하세요" 
@@ -1543,22 +1565,23 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           <div className="flex items-center gap-4">
             <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg"><Database size={24}/></div>
             <div>
-              <h2 className="text-xl font-black text-slate-900">1. 데이터 조회 규칙 설정</h2>
-              <p className="text-sm text-slate-500 font-bold">어떤 데이터를 어떻게 보여줄지(필터링/정렬/그룹화) 설정하세요.</p>
+              <h2 className="text-xl font-black text-slate-900 whitespace-nowrap">1. 데이터 조회 규칙 설정</h2>
+              <p className="text-sm text-slate-500 font-bold whitespace-nowrap">어떤 데이터를 어떻게 보여줄지(필터링/정렬/그룹화) 설정하세요.</p>
             </div>
           </div>
           
           {view.tableName && (
             <button 
               onClick={fetchPreviewData} 
-              className="px-6 py-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl font-black text-sm flex items-center gap-2 transition-colors border border-indigo-200"
+              className="px-6 py-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl font-black text-sm flex items-center gap-2 transition-colors border border-indigo-200 whitespace-nowrap"
             >
               <Eye size={18} /> 데이터 미리보기
             </button>
           )}
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* 🔥 그리드들이 강제로 아래로 떨어지거나 찌그러지지 않고 본연의 공간(min-w-max)을 계산하게 합니다. */}
+        <div className="grid grid-cols-2 gap-8 min-w-max w-full">
           <div className="space-y-4">
             <div>
               <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1">연결 테이블</label>
@@ -1587,10 +1610,10 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           <div className="bg-slate-50/50 rounded-3xl p-6 border-2 border-dashed border-slate-200 flex flex-col justify-center">
             {view.filterColumn ? (
               <div className="space-y-4 animate-in zoom-in-95 duration-300">
-                <div className="flex gap-2 items-center text-indigo-600 font-black mb-2 text-sm"><Filter size={16}/> 상세 필터 조건</div>
+                <div className="flex gap-2 items-center text-indigo-600 font-black mb-2 text-sm whitespace-nowrap"><Filter size={16}/> 상세 필터 조건</div>
                 <div className="flex gap-3">
                   <select 
-                    className="flex-1 p-3 rounded-xl border-2 border-indigo-100 font-bold text-sm outline-none bg-white cursor-pointer" 
+                    className="flex-1 p-3 rounded-xl border-2 border-indigo-100 font-bold text-sm outline-none bg-white cursor-pointer min-w-[150px]" 
                     value={view.filterOperator || 'eq'} 
                     onChange={e => onUpdate({...view, filterOperator: e.target.value as any})}
                   >
@@ -1600,7 +1623,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
                     <option value="lt">작음 (&lt;)</option>
                   </select>
                   <input 
-                    className="flex-[2] p-3 rounded-xl border-2 border-indigo-100 font-bold text-sm outline-none bg-white focus:border-indigo-500" 
+                    className="flex-[2] p-3 rounded-xl border-2 border-indigo-100 font-bold text-sm outline-none bg-white focus:border-indigo-500 min-w-[200px]" 
                     value={view.filterValue || ''} 
                     onChange={e => onUpdate({...view, filterValue: e.target.value})} 
                     placeholder="예: 1, 완료" 
@@ -1610,19 +1633,16 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
             ) : (
               <div className="text-center space-y-3">
                 <Smartphone className="mx-auto text-slate-300" size={40}/>
-                <p className="text-xs text-slate-400 font-bold leading-relaxed">필요한 경우 좌측에서 칼럼을<br/>선택해 데이터를 필터링하세요.</p>
+                <p className="text-xs text-slate-400 font-bold leading-relaxed whitespace-nowrap">필요한 경우 좌측에서 칼럼을<br/>선택해 데이터를 필터링하세요.</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* 🔥 데이터 그룹핑 및 정렬 설정 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8 pt-8 border-t border-slate-50">
-          
+        <div className="grid grid-cols-2 gap-8 mt-8 pt-8 border-t border-slate-50 min-w-max w-full">
           <div className="space-y-6">
-            {/* 데이터 그룹화 (아코디언) */}
             <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100">
-              <label className="text-[10px] font-black text-blue-600 block mb-3 uppercase tracking-wider flex items-center gap-1.5"><FolderTree size={14}/> 데이터 묶어주기 (아코디언 형태)</label>
+              <label className="text-[10px] font-black text-blue-600 block mb-3 uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap"><FolderTree size={14}/> 데이터 묶어주기 (아코디언 형태)</label>
               <select 
                 className="w-full p-3 rounded-xl bg-white border border-blue-200 font-black text-slate-800 cursor-pointer outline-none focus:border-blue-400" 
                 value={view.groupByColumn || ''} 
@@ -1631,12 +1651,11 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
                 <option value="">묶지 않음 (일반 리스트 형태)</option>
                 {availableColumns.map(col => <option key={col} value={col}>{col} 칼럼 기준으로 묶기</option>)}
               </select>
-              <p className="mt-2 text-[10px] text-blue-400 font-bold pl-1">* 선택 시, 해당 칼럼 값(예: 반, 부서)으로 폴더처럼 접혀서 표시됩니다.</p>
+              <p className="mt-2 text-[10px] text-blue-400 font-bold pl-1 whitespace-nowrap">* 선택 시, 해당 칼럼 값(예: 반, 부서)으로 폴더처럼 접혀서 표시됩니다.</p>
             </div>
 
-            {/* 정렬 설정 */}
             <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-50">
-              <label className="text-[10px] font-black text-indigo-600 block mb-3 uppercase tracking-wider flex items-center gap-1.5"><ArrowUpDown size={14}/> 정렬 기준 칼럼</label>
+              <label className="text-[10px] font-black text-indigo-600 block mb-3 uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap"><ArrowUpDown size={14}/> 정렬 기준 칼럼</label>
               <select 
                 className="w-full p-3 rounded-xl bg-white border border-indigo-100 font-black text-slate-800 cursor-pointer outline-none focus:border-indigo-400" 
                 value={view.sortColumn || ''} 
@@ -1663,7 +1682,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
 
           <div className="space-y-4">
             <div>
-              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1">카드 가로 배치 (열 개수)</label>
+              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 whitespace-nowrap">카드 가로 배치 (열 개수)</label>
               <select 
                 className="w-full p-3 rounded-xl bg-white border-2 border-slate-100 font-black text-slate-800 cursor-pointer outline-none" 
                 value={view.columnCount || 1} 
@@ -1673,7 +1692,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
               </select>
             </div>
             <div>
-              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5"><MousePointerClick size={14} className="text-indigo-500"/> 카드 클릭 액션</label>
+              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5 whitespace-nowrap"><MousePointerClick size={14} className="text-indigo-500"/> 카드 클릭 액션</label>
               <select 
                 className="w-full p-3 rounded-xl bg-white border-2 border-slate-100 font-black text-slate-800 cursor-pointer outline-none" 
                 value={view.onClickActionId || ''} 
@@ -1688,17 +1707,18 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
       </section>
 
       {/* 3. 카드 레이아웃 커스텀 섹션 */}
-      <section className={`bg-white p-10 rounded-[3.5rem] shadow-2xl border-2 border-indigo-50 relative overflow-hidden transition-all duration-500 ${!view.tableName ? 'opacity-40 pointer-events-none grayscale' : 'opacity-100'}`}>
-        <div className="absolute top-0 left-0 w-3 h-full bg-indigo-600"></div>
-        <div className="flex justify-between items-center mb-10">
+      <section className={`bg-white p-10 rounded-[3.5rem] shadow-2xl border-2 border-indigo-50 relative transition-all duration-500 ${!view.tableName ? 'opacity-40 pointer-events-none grayscale' : 'opacity-100'}`}>
+        <div className="absolute top-0 left-0 w-3 h-full bg-indigo-600 rounded-l-[3.5rem]"></div>
+        <div className="flex justify-between items-center mb-10 min-w-max">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-indigo-100 text-indigo-700 rounded-2xl"><LayoutTemplate size={28}/></div>
-            <h3 className="text-2xl font-black text-indigo-900">2. 카드 레이아웃 커스텀 설계</h3>
+            <h3 className="text-2xl font-black text-indigo-900 whitespace-nowrap">2. 카드 레이아웃 커스텀 설계</h3>
           </div>
-          <button onClick={addRootRow} className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2"><Plus size={18}/> 행(Row) 추가하기</button>
+          <button onClick={addRootRow} className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 whitespace-nowrap"><Plus size={18}/> 행(Row) 추가하기</button>
         </div>
         
-        <div className="space-y-4">
+        {/* 가로로 넓게 뻗어나가는 캔버스 영역 */}
+        <div className="space-y-4 overflow-visible w-full min-w-fit">
           {view.layoutRows.map(row => <RenderRowEditor key={row.id} row={row} depth={0} />)}
           {view.layoutRows.length === 0 && (
             <div className="py-24 border-4 border-dashed border-slate-100 rounded-[2.5rem] flex flex-col items-center justify-center text-slate-300 gap-4 bg-slate-50/50">
@@ -1709,10 +1729,8 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
         </div>
       </section>
 
-      {/* 아이콘 모달 */}
       <IconPicker isOpen={isIconPickerOpen} onClose={() => setIsIconPickerOpen(false)} selectedIcon={view.icon} onSelect={(n: string) => onUpdate({...view, icon: n})} />
 
-      {/* 데이터 미리보기 모달 */}
       {isPreviewModalOpen && (
         <div className="fixed inset-0 z-[700] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-5xl h-[85vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden">
