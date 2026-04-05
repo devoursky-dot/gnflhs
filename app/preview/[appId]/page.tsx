@@ -4,8 +4,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
-import { X, CheckCircle2, ChevronLeft, RefreshCw, Layout, Search, ChevronDown, Folder } from 'lucide-react';
-import { IconMap } from '../../design/picker'; 
+import { X, CheckCircle2, ChevronLeft, RefreshCw, Layout, Search, ChevronDown, Folder, ChevronsUpDown, ChevronsUp } from 'lucide-react';
+
+// 절대 경로를 사용하여 안전하게 아이콘 맵을 불러옵니다.
+import { IconMap } from '@/app/design/picker'; 
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
@@ -19,10 +21,8 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
   };
 
   return (
-    // 🔥 flex-1을 추가하여 카드의 전체 높이 안에서 렌더러가 꽉 차게 만듭니다.
     <div className="flex flex-col gap-0 w-full h-full flex-1 text-slate-900">
       {rows?.map((row: any) => (
-        // 🔥 row.flex 값을 인지하여 세로 높이를 비율에 맞춰 분할합니다.
         <div key={row.id} style={{ flex: row.flex || 1 }} className="flex gap-0 w-full items-stretch">
           {row.cells?.map((cell: any) => {
             const cellValue = rowData[cell.contentValue || ''];
@@ -249,13 +249,26 @@ export default function LiveAppPreview() {
     setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const groupKeys = Object.keys(groupedData);
+  const isAllExpanded = groupKeys.length > 0 && groupKeys.every(k => expandedGroups[k]);
+
+  const handleToggleAllGroups = () => {
+    if (isAllExpanded) {
+      setExpandedGroups({}); 
+    } else {
+      const allOpen: Record<string, boolean> = {};
+      groupKeys.forEach(k => allOpen[k] = true);
+      setExpandedGroups(allOpen); 
+    }
+  };
+
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-slate-50 font-black text-slate-400">LOADING...</div>;
 
   return (
     <div className="min-h-screen bg-slate-100 flex justify-center font-sans">
       <div className="w-full max-w-md bg-white shadow-2xl flex flex-col relative h-screen overflow-hidden">
         
-        {/* 상단 헤더 및 검색 바 */}
+        {/* 상단 헤더 및 검색 바 (여기에 토글 버튼이 예쁘게 통합됩니다!) */}
         <div className="pt-8 pb-3 px-6 border-b bg-white sticky top-0 z-10 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="w-10">
@@ -275,29 +288,42 @@ export default function LiveAppPreview() {
             </div>
           </div>
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <input 
-              type="text"
-              placeholder={currentView?.groupByColumn ? "전체 그룹에서 검색..." : "데이터 검색..."}
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                if (e.target.value !== '' && currentView?.groupByColumn) {
-                  const allOpen: Record<string, boolean> = {};
-                  Object.keys(groupedData).forEach(k => allOpen[k] = true);
-                  setExpandedGroups(allOpen);
-                }
-              }}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-100 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-700"
-            />
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input 
+                type="text"
+                placeholder={currentView?.groupByColumn ? "전체 그룹에서 검색..." : "데이터 검색..."}
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  if (e.target.value !== '' && currentView?.groupByColumn) {
+                    const allOpen: Record<string, boolean> = {};
+                    Object.keys(groupedData).forEach(k => allOpen[k] = true);
+                    setExpandedGroups(allOpen);
+                  }
+                }}
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-100 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-700"
+              />
+            </div>
+            
+            {/* ✨ 검색창 바로 옆에 배치되어 항상 고정되는 펼치기/접기 버튼 */}
+            {currentView?.groupByColumn && groupKeys.length > 0 && (
+              <button
+                onClick={handleToggleAllGroups}
+                className="flex items-center justify-center gap-1.5 px-3.5 bg-white border-2 border-slate-100 text-slate-600 rounded-2xl font-black text-[11px] hover:border-indigo-200 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all shrink-0"
+              >
+                {isAllExpanded ? <ChevronsUp size={16} /> : <ChevronsUpDown size={16} />}
+                {isAllExpanded ? '접기' : '펼치기'}
+              </button>
+            )}
           </div>
         </div>
 
         {/* 메인 콘텐츠 영역 */}
         <div className="flex-1 overflow-y-auto bg-slate-50 pb-20">
           {currentView?.groupByColumn ? (
-            <div className="flex flex-col">
+            <div className="flex flex-col pt-1">
               {Object.entries(groupedData).map(([groupKey, rows]) => {
                 const isExpanded = !!expandedGroups[groupKey];
                 return (
@@ -323,7 +349,6 @@ export default function LiveAppPreview() {
                         currentView?.columnCount === 4 ? 'grid-cols-4' : 'grid-cols-1'
                       }`}>
                         {rows.map((row, idx) => (
-                          // 🔥 루트 컨테이너에 flex flex-col 속성을 부여하여 세로 비율(row.flex)이 정상적으로 꽉 차도록 만듭니다.
                           <div key={idx} className="flex flex-col bg-white border-b border-r border-slate-100 overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors" style={{ minHeight: `${currentView?.cardHeight || 120}px` }} onClick={() => {
                             const act = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId);
                             if (act) handleAction(act, row);
@@ -344,7 +369,6 @@ export default function LiveAppPreview() {
               currentView?.columnCount === 4 ? 'grid-cols-4' : 'grid-cols-1'
             }`}>
               {displayData.map((row, idx) => (
-                // 🔥 리스트 형태에서도 동일하게 flex flex-col을 적용합니다.
                 <div key={idx} className="flex flex-col bg-white border-b border-r border-slate-100 overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors" style={{ minHeight: `${currentView?.cardHeight || 120}px` }} onClick={() => {
                   const act = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId);
                   if (act) handleAction(act, row);
@@ -388,7 +412,7 @@ export default function LiveAppPreview() {
         </div>
       </div>
 
-      {/* 모달 UI 생략 없이 전체 유지 */}
+      {/* 모달 UI */}
       {isInputModalOpen && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
