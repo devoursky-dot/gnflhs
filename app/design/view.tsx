@@ -92,7 +92,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
     if (!view.tableName) return alert("먼저 테이블을 선택해주세요.");
     setIsPreviewModalOpen(true); setIsLoadingPreview(true);
     try {
-      let query = supabase.from(view.tableName).select('*').limit(3000); 
+      let query = supabase.from(view.tableName).select('*').limit(30000); 
       if (view.filterColumn && view.filterValue) {
         if (view.filterOperator === 'like') query = query.ilike(view.filterColumn, `%${view.filterValue}%`);
         else if (view.filterOperator === 'gt') query = query.gt(view.filterColumn, view.filterValue);
