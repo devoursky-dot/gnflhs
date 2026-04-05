@@ -15,7 +15,7 @@ const supabase = createClient(
 const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) => {
   const isImageUrl = (url: any) => {
     if (typeof url !== 'string') return false;
-    return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url) || (url.startsWith('http') && url.includes('/storage/v1/object/public/'));
+    return /\\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url) || (url.startsWith('http') && url.includes('/storage/v1/object/public/'));
   };
 
   return (
@@ -25,16 +25,10 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
           {row.cells?.map((cell: any) => {
             const cellValue = rowData[cell.contentValue || ''];
             
-            // 🔥 이미지 처리 로직 (원형, 둥근사각, 위쪽 정렬 등)
             const shouldShowImage = cell.isImage || isImageUrl(cellValue);
             if (cell.contentType === 'field' && shouldShowImage) {
-              const shapeClass = cell.imageShape === 'circle' 
-                ? 'rounded-full aspect-square object-top shadow-sm mx-auto' 
-                : cell.imageShape === 'rounded' 
-                ? 'rounded-2xl shadow-sm' 
-                : 'rounded-none';
+              const shapeClass = cell.imageShape === 'circle' ? 'rounded-full aspect-square object-top shadow-sm mx-auto' : cell.imageShape === 'rounded' ? 'rounded-2xl shadow-sm' : 'rounded-none';
               const paddingClass = cell.imageShape === 'circle' ? 'p-3' : cell.imageShape === 'rounded' ? 'p-1.5' : 'p-0';
-              
               return (
                 <div key={cell.id} style={{ flex: cell.flex }} className={`flex flex-col justify-center min-w-0 overflow-hidden relative border-slate-100/50 bg-slate-50/30 ${paddingClass}`}>
                   <img src={String(cellValue)} alt="img" className={`object-cover w-full h-full max-h-full ${shapeClass}`} />
@@ -42,7 +36,6 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
               );
             }
 
-            // 🔥 텍스트 처리 로직 (정규식 치환 및 접두사/접미사 템플릿)
             if (cell.contentType === 'field' && !shouldShowImage) {
               let displayText = cellValue !== null && cellValue !== undefined && cellValue !== '' ? String(cellValue) : '-';
               
@@ -50,36 +43,32 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
                 try {
                   const regex = new RegExp(cell.textRegexPattern, 'g');
                   displayText = displayText.replace(regex, cell.textRegexReplace || '');
-                } catch (err) { /* 정규식 오류 시 무시하고 원본 출력 */ }
+                } catch (err) { }
               }
               
-              if (displayText !== '-') {
-                displayText = `${cell.textPrefix || ''}${displayText}${cell.textSuffix || ''}`;
-              }
+              if (displayText !== '-') displayText = `${cell.textPrefix || ''}${displayText}${cell.textSuffix || ''}`;
+
+              // 🔥 [신규] 타이포그래피(크기, 굵기, 정렬) 동적 CSS 클래스 생성
+              const alignItemClass = cell.textAlign === 'center' ? 'items-center text-center' : cell.textAlign === 'right' ? 'items-end text-right' : 'items-start text-left';
+              const textSizeClass = cell.textSize || 'text-[14px]';
+              const textWeightClass = cell.textWeight || 'font-black';
 
               return (
-                <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col justify-center min-w-0 overflow-hidden relative border-slate-100/50 p-2.5">
-                  <span className="text-[14px] font-black text-slate-800 break-words leading-snug">
+                <div key={cell.id} style={{ flex: cell.flex }} className={`flex flex-col justify-center min-w-0 overflow-hidden relative border-slate-100/50 p-2.5 ${alignItemClass}`}>
+                  <span className={`${textSizeClass} ${textWeightClass} text-slate-800 break-words leading-snug w-full`}>
                     {displayText}
                   </span>
                 </div>
               );
             }
 
-            // 기타 액션 및 네스티드 분할
             return (
               <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col justify-center min-w-0 overflow-hidden relative border-slate-100/50">
                 {cell.contentType === 'action' && (() => {
                   const act = actions?.find((a: any) => a.id === cell.contentValue);
-                  return act ? (
-                    <button onClick={(e) => { e.stopPropagation(); onExecuteAction(act, rowData); }} className="w-full h-full bg-slate-900 text-white text-[11px] font-black py-3 active:bg-indigo-600 transition-colors">
-                      {act.name}
-                    </button>
-                  ) : null;
+                  return act ? <button onClick={(e) => { e.stopPropagation(); onExecuteAction(act, rowData); }} className="w-full h-full bg-slate-900 text-white text-[11px] font-black py-3 active:bg-indigo-600 transition-colors">{act.name}</button> : null;
                 })()}
-                {cell.contentType === 'nested' && cell.nestedRows && (
-                  <RenderPreviewLayout rows={cell.nestedRows} rowData={rowData} actions={actions} onExecuteAction={onExecuteAction} />
-                )}
+                {cell.contentType === 'nested' && cell.nestedRows && <RenderPreviewLayout rows={cell.nestedRows} rowData={rowData} actions={actions} onExecuteAction={onExecuteAction} />}
               </div>
             );
           })}
@@ -153,10 +142,7 @@ export default function LiveAppPreview() {
   };
 
   useEffect(() => {
-    if (currentView) {
-      fetchTableData(currentView);
-      setExpandedGroups({}); 
-    }
+    if (currentView) { fetchTableData(currentView); setExpandedGroups({}); }
   }, [currentViewId, currentView]);
 
   const handleAction = async (action: any, rowData: any) => {
