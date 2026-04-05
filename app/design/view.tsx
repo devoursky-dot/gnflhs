@@ -1,53 +1,17 @@
 // 파일 경로: app/design/view.tsx
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { View, SchemaData, LayoutRow, Action } from './types';
-import * as LucideIcons from 'lucide-react';
 import { 
   Database, LayoutTemplate, Plus, Columns, Rows, ChevronLeft, 
   ChevronRight, X, MousePointerClick, Star, Filter, Search, Smartphone, Eye, Loader2, TableProperties, ArrowUpDown, FolderTree, Trash2, Minus
 } from 'lucide-react';
-
-export const IconMap = Object.entries(LucideIcons).reduce((acc, [name, component]) => {
-  if (/^[A-Z]/.test(name) && typeof component !== 'string') acc[name] = component as React.ElementType;
-  return acc;
-}, {} as any);
-
-const IconPicker = ({ isOpen, onClose, onSelect, selectedIcon }: any) => {
-  const [search, setSearch] = useState('');
-  const filtered = useMemo(() => 
-    Object.keys(IconMap).filter(n => n.toLowerCase().includes(search.toLowerCase())).slice(0, 150), 
-    [search]
-  );
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-[600] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-4xl h-[80vh] rounded-[2.5rem] flex flex-col overflow-hidden shadow-2xl border border-slate-200">
-        <div className="p-8 border-b flex gap-4 items-center bg-slate-50">
-          <div className="relative flex-1">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-indigo-400" size={20} />
-            <input className="w-full pl-14 pr-6 py-4 bg-white border-2 border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-100 font-bold" placeholder="아이콘 이름을 검색하세요..." value={search} onChange={e => setSearch(e.target.value)} />
-          </div>
-          <button onClick={onClose} className="p-3 hover:bg-slate-200 rounded-full transition-colors"><X/></button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-8 grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
-          {filtered.map(n => { 
-            const I = IconMap[n]; 
-            return (
-              <button key={n} onClick={() => { onSelect(n); onClose(); }} className={`flex flex-col items-center p-4 rounded-2xl border-2 transition-all ${selectedIcon === n ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl' : 'bg-white border-slate-100 hover:border-indigo-300 text-slate-500'}`}>
-                <I size={28}/>
-                <span className="text-[10px] mt-2 truncate w-full text-center font-bold">{n}</span>
-              </button>
-            ); 
-          })}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 import { createClient } from '@supabase/supabase-js'; 
+
+// 외부 파일(picker.tsx)에서 아이콘 피커와 맵을 불러옵니다.
+import IconPicker, { IconMap } from './picker';
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
@@ -108,7 +72,6 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
   const addRootRow = () => {
     onUpdate({ 
       ...view, 
-      // 🔥 생성 시 flex: 1을 기본 부여합니다.
       layoutRows: [...view.layoutRows, { id: `r_${Date.now()}`, flex: 1, cells: [{ id: `c_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }] 
     });
   };
@@ -116,7 +79,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
   const RenderRowEditor = ({ row, depth = 0 }: { row: LayoutRow, depth: number }) => (
     <div className={`flex gap-3 p-3 rounded-2xl border-2 border-slate-200 ${depth % 2 === 0 ? 'bg-slate-50' : 'bg-white'} relative mb-3 group/row transition-all min-w-max w-full`}>
       
-      {/* 🔥 [신규] 세로(행) 비율 조절 뱃지 UI */}
+      {/* 세로(행) 비율 조절 뱃지 UI */}
       <div className="absolute -left-3 -top-3 flex items-center bg-indigo-600 text-white rounded-full shadow-lg opacity-0 group-hover/row:opacity-100 z-40 overflow-hidden transition-all border-2 border-white">
         <button onClick={(e) => {
           e.stopPropagation();
@@ -179,7 +142,6 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
                 const find = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => {
                   if(c.id === cell.id) {
                     c.contentType = 'nested';
-                    // 🔥 세로 분할 추가 시에도 flex: 1을 기본 부여합니다.
                     c.nestedRows = [{ id: `nr_${Date.now()}`, flex: 1, cells: [{ id: `nc_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }];
                   } else if(c.nestedRows) find(c.nestedRows);
                 }));
@@ -204,7 +166,6 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
               {cell.nestedRows?.map(nr => <RenderRowEditor key={nr.id} row={nr} depth={depth + 1} />)}
               <button onClick={() => mutate(rows => {
                 const find = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => { 
-                  // 🔥 분할 버튼 클릭 시에도 flex: 1을 부여
                   if(c.id === cell.id) c.nestedRows?.push({ id: `nr_${Date.now()}`, flex: 1, cells: [{ id: `nc_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }); 
                   if(c.nestedRows) find(c.nestedRows); 
                 }));
@@ -423,8 +384,8 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
       </section>
 
       {/* 3. 카드 레이아웃 커스텀 섹션 */}
+      {/* ✨ 파란색 장식 제거로 위 섹션과 완벽하게 정렬을 통일한 클린 버전입니다! */}
       <section className={`bg-white p-10 rounded-[3.5rem] shadow-2xl border-2 border-indigo-50 relative transition-all duration-500 ${!view.tableName ? 'opacity-40 pointer-events-none grayscale' : 'opacity-100'}`}>
-        <div className="absolute top-0 left-0 w-3 h-full bg-indigo-600 rounded-l-[3.5rem]"></div>
         <div className="flex justify-between items-center mb-10 min-w-max">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-indigo-100 text-indigo-700 rounded-2xl"><LayoutTemplate size={28}/></div>
