@@ -12,7 +12,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
 
-// 재귀적으로 UI를 그려주는 레이아웃 렌더러 (기존 누락 없음)
 const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) => {
   const isImageUrl = (url: any) => {
     if (typeof url !== 'string') return false;
@@ -69,13 +68,19 @@ export default function LiveAppPreview() {
   const [currentViewId, setCurrentViewId] = useState<string>('');
   const [tableData, setTableData] = useState<Record<string, any[]>>({});
   
-  // 데이터 입력 폼을 위한 상태 (기존 유지)
+  // 데이터 추가(Insert) 폼 상태
   const [isInputModalOpen, setIsInputModalOpen] = useState(false);
   const [activeInsertAction, setActiveInsertAction] = useState<any>(null);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 🔥 [신규] 데이터 수정(Update) 폼 상태
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [activeUpdateAction, setActiveUpdateAction] = useState<any>(null);
+  const [activeRowData, setActiveRowData] = useState<any>(null);
+  const [updateFormData, setUpdateFormData] = useState<Record<string, any>>({});
+  const [isUpdating, setIsUpdating] = useState(false);
   
-  // 검색 및 아코디언 그룹 접기/펴기 상태 관리
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
@@ -102,7 +107,6 @@ export default function LiveAppPreview() {
 
   const currentView = appData?.app_config?.views?.find((v: any) => v.id === currentViewId);
 
-  // 서버 필터링 및 정렬 실행 (타입 경고 없음)
   const fetchTableData = async (view: any) => {
     if (!view || !view.tableName) return;
     
@@ -130,11 +134,11 @@ export default function LiveAppPreview() {
   useEffect(() => {
     if (currentView) {
       fetchTableData(currentView);
-      setExpandedGroups({}); // 뷰 변경 시 모든 그룹 닫기 초기화
+      setExpandedGroups({}); 
     }
   }, [currentViewId, currentView]);
 
-  // 액션 제어 핸들러 (입력 폼 모달 오픈 등 전체 로직 유지)
+  // 액션 제어 핸들러 (Insert, Delete, Update 분기 처리 완료)
   const handleAction = async (action: any, rowData: any) => {
     if (action.type === 'alert') {
       alert(action.message || '알림');
@@ -152,10 +156,48 @@ export default function LiveAppPreview() {
       });
       setFormData(initialData);
       setIsInputModalOpen(true);
+    } 
+    // 🔥 [신규] 삭제 이벤트
+    else if (action.type === 'delete_row') {
+      if (!action.deleteTableName || !rowData.id) return alert("테이블 설정 또는 대상의 고유 ID가 누락되었습니다.");
+      if (!window.confirm("정말로 이 데이터를 영구 삭제하시겠습니까?")) return;
+      
+      try {
+        const { error } = await supabase.from(action.deleteTableName).delete().eq('id', rowData.id);
+        if (error) throw error;
+        
+        alert("성공적으로 삭제되었습니다.");
+        if (currentView?.tableName === action.deleteTableName) {
+          fetchTableData(currentView);
+        }
+      } catch (err: any) {
+        alert(`삭제 실패: ${err.message}`);
+      }
+    } 
+    // 🔥 [신규] 수정 이벤트
+    else if (action.type === 'update_row') {
+      if (!action.updateTableName || !rowData.id) return alert("테이블 설정 또는 대상의 고유 ID가 누락되었습니다.");
+      
+      setActiveUpdateAction(action);
+      setActiveRowData(rowData);
+      
+      const initialData: Record<string, any> = {};
+      action.updateMappings?.forEach((m: any) => {
+        if (m.mappingType === 'card_data') {
+          initialData[m.targetColumn] = rowData[m.sourceValue];
+        } else if (m.mappingType === 'static') {
+          initialData[m.targetColumn] = m.sourceValue;
+        } else if (m.mappingType === 'prompt') {
+          // 👉 핵심 UX: 사용자가 폼에서 수정하기 편하도록 "기존 데이터의 값"을 폼 초기값으로 프리필(Pre-fill) 해줍니다.
+          initialData[m.targetColumn] = rowData[m.targetColumn] !== undefined && rowData[m.targetColumn] !== null ? rowData[m.targetColumn] : '';
+        }
+      });
+      
+      setUpdateFormData(initialData);
+      setIsUpdateModalOpen(true);
     }
   };
 
-  // 데이터 최종 저장 핸들러 (전체 로직 유지)
   const handleSubmitInsert = async () => {
     if (!activeInsertAction || isSubmitting) return;
     if (!window.confirm("입력하신 내용을 저장하시겠습니까?")) return;
@@ -184,7 +226,36 @@ export default function LiveAppPreview() {
     }
   };
 
-  // 실시간 검색어 기반 1차 필터링
+  // 🔥 [신규] 데이터 수정 최종 저장 핸들러
+  const handleSubmitUpdate = async () => {
+    if (!activeUpdateAction || isUpdating || !activeRowData) return;
+    if (!window.confirm("수정하신 내용을 최종 반영하시겠습니까?")) return;
+
+    setIsUpdating(true);
+    try {
+      const finalPayload = { ...updateFormData };
+      activeUpdateAction.updateMappings?.forEach((m: any) => {
+        if (m.valueType === 'number') {
+          finalPayload[m.targetColumn] = Number(finalPayload[m.targetColumn]) || 0;
+        }
+      });
+      
+      const { error } = await supabase.from(activeUpdateAction.updateTableName).update(finalPayload).eq('id', activeRowData.id);
+      if (error) throw error;
+      
+      alert("성공적으로 데이터가 수정되었습니다.");
+      setIsUpdateModalOpen(false);
+      
+      if (currentView?.tableName === activeUpdateAction.updateTableName) {
+        fetchTableData(currentView);
+      }
+    } catch (err: any) {
+      alert(`수정 처리 실패: ${err.message}`);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const getFilteredData = () => {
     const rawData = tableData[currentView?.tableName || ''] || [];
     if (!searchTerm) return rawData; 
@@ -198,19 +269,16 @@ export default function LiveAppPreview() {
 
   const displayData = getFilteredData();
 
-  // 🔥 검색 후 가져온 데이터를 그룹핑 기준에 맞게 2차 가공하기
   let groupedData: Record<string, any[]> = {};
   if (currentView?.groupByColumn) {
     displayData.forEach(row => {
       const groupKey = row[currentView.groupByColumn as string];
-      // 그룹 기준값이 비어있다면 '미분류'로 깔끔하게 묶음 처리
       const key = (groupKey === null || groupKey === undefined || groupKey === '') ? '미분류' : String(groupKey);
       if (!groupedData[key]) groupedData[key] = [];
       groupedData[key].push(row);
     });
   }
 
-  // 그룹 탭 열기/닫기 토글 함수
   const toggleGroup = (key: string) => {
     setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -249,7 +317,6 @@ export default function LiveAppPreview() {
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
-                // 트렌디 UX: 검색어를 입력할 때는 사용자가 내용을 바로 확인할 수 있도록 모든 그룹을 활짝 열어줍니다.
                 if (e.target.value !== '' && currentView?.groupByColumn) {
                   const allOpen: Record<string, boolean> = {};
                   Object.keys(groupedData).forEach(k => allOpen[k] = true);
@@ -261,11 +328,9 @@ export default function LiveAppPreview() {
           </div>
         </div>
 
-        {/* 메인 콘텐츠 영역 (조건부 렌더링) */}
+        {/* 메인 콘텐츠 영역 */}
         <div className="flex-1 overflow-y-auto bg-slate-50 pb-20">
-          
           {currentView?.groupByColumn ? (
-            // [UX 개선] 폴더형 아코디언 리스트 렌더링
             <div className="flex flex-col">
               {Object.entries(groupedData).map(([groupKey, rows]) => {
                 const isExpanded = !!expandedGroups[groupKey];
@@ -306,7 +371,6 @@ export default function LiveAppPreview() {
               })}
             </div>
           ) : (
-            // 일반 카드 리스트 렌더링
             <div className={`grid gap-0 ${
               currentView?.columnCount === 2 ? 'grid-cols-2' : 
               currentView?.columnCount === 3 ? 'grid-cols-3' : 
@@ -356,13 +420,13 @@ export default function LiveAppPreview() {
         </div>
       </div>
 
-      {/* 데이터 입력(Insert)용 모달 UI (전체 유지) */}
+      {/* 데이터 추가(Insert) 모달 UI */}
       {isInputModalOpen && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
             <div className="p-6 border-b flex justify-between items-center bg-white">
               <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
-                <CheckCircle2 className="text-indigo-600" /> 데이터 입력
+                <CheckCircle2 className="text-indigo-600" /> 데이터 추가
               </h3>
               <button onClick={() => setIsInputModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"><X /></button>
             </div>
@@ -382,7 +446,7 @@ export default function LiveAppPreview() {
               ))}
               {activeInsertAction?.insertMappings?.filter((m: any) => m.mappingType !== 'prompt').length > 0 && (
                 <div className="pt-4 border-t border-slate-200">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase italic">* 나머지 데이터는 자동 매핑되어 저장됩니다.</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase italic">* 나머지 설정된 데이터는 백그라운드에서 함께 저장됩니다.</p>
                 </div>
               )}
             </div>
@@ -395,6 +459,51 @@ export default function LiveAppPreview() {
                 className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
               >
                 {isSubmitting ? "저장 중..." : "최종 저장"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔥 [신규] 데이터 수정(Update) 모달 UI */}
+      {isUpdateModalOpen && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
+            <div className="p-6 border-b flex justify-between items-center bg-white">
+              <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                <CheckCircle2 className="text-indigo-600" /> 데이터 정보 수정
+              </h3>
+              <button onClick={() => setIsUpdateModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"><X /></button>
+            </div>
+            
+            <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto bg-slate-50">
+              {activeUpdateAction?.updateMappings?.filter((m: any) => m.mappingType === 'prompt').map((mapping: any) => (
+                <div key={mapping.id} className="space-y-2">
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-wider pl-1">{mapping.sourceValue}</label>
+                  <input
+                    type={mapping.valueType === 'number' ? 'number' : 'text'}
+                    value={updateFormData[mapping.targetColumn] || ''}
+                    onChange={(e) => setUpdateFormData({ ...updateFormData, [mapping.targetColumn]: e.target.value })}
+                    className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-white focus:border-indigo-500 outline-none font-bold text-slate-900 transition-all shadow-sm"
+                    placeholder="수정할 내용을 입력하세요..."
+                  />
+                </div>
+              ))}
+              {activeUpdateAction?.updateMappings?.filter((m: any) => m.mappingType !== 'prompt').length > 0 && (
+                <div className="pt-4 border-t border-slate-200">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase italic">* 나머지 설정된 데이터는 백그라운드에서 함께 수정됩니다.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 bg-white border-t flex gap-3">
+              <button onClick={() => setIsUpdateModalOpen(false)} className="flex-1 py-4 text-slate-500 font-black rounded-2xl hover:bg-slate-100 transition-all border border-slate-100">취소</button>
+              <button 
+                onClick={handleSubmitUpdate} 
+                disabled={isUpdating}
+                className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
+              >
+                {isUpdating ? "수정 중..." : "수정 완료"}
               </button>
             </div>
           </div>

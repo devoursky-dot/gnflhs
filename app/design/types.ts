@@ -14,16 +14,13 @@ export type View = {
   icon?: string | null;
   tableName: string | null;
   
-  // 1단계 서버 필터 속성
   filterColumn?: string | null;  
   filterOperator?: 'eq' | 'neq' | 'like' | 'gt' | 'lt'; 
   filterValue?: string | null;   
   
-  // 서버 정렬 속성
   sortColumn?: string | null;    
   sortDirection?: 'asc' | 'desc';
   
-  // 🔥 [신규] 데이터를 묶어서 보여줄 그룹핑 기준 칼럼
   groupByColumn?: string | null; 
   
   cardHeight: number;
@@ -47,7 +44,6 @@ export type LayoutCell = {
   nestedRows?: LayoutRow[]; 
 };
 
-// [누락 방지] 인서트(데이터 추가) 시 필요한 맵핑 세부 규칙 전체 유지
 export type InsertMapping = {
   id: string;
   targetColumn: string;
@@ -56,16 +52,26 @@ export type InsertMapping = {
   valueType?: 'string' | 'number';
 };
 
-// [누락 방지] 액션(기능) 세부 규칙 전체 유지
 export type Action = {
   id: string;
   name: string;
   icon?: string | null;
-  type: 'navigate' | 'alert' | 'link' | 'insert_row';
+  // 🔥 [수정됨] 동작 유형에 delete_row와 update_row 추가
+  type: 'navigate' | 'alert' | 'link' | 'insert_row' | 'delete_row' | 'update_row';
   targetViewId: string | null;
   message: string | null;
+  
+  // 데이터 추가(Insert)
   insertTableName?: string | null;
   insertMappings?: InsertMapping[];
+  
+  // 🔥 [신규] 데이터 삭제(Delete) 설정
+  deleteTableName?: string | null;
+  
+  // 🔥 [신규] 데이터 수정(Update) 설정
+  updateTableName?: string | null;
+  updateMappings?: InsertMapping[];
+  
   requireConfirmation?: boolean;
   confirmationMessage?: string | null;
 };
