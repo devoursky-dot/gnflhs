@@ -19,14 +19,16 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
   };
 
   return (
-    <div className="flex flex-col gap-0 w-full h-full text-slate-900">
+    // 🔥 flex-1을 추가하여 카드의 전체 높이 안에서 렌더러가 꽉 차게 만듭니다.
+    <div className="flex flex-col gap-0 w-full h-full flex-1 text-slate-900">
       {rows?.map((row: any) => (
-        <div key={row.id} className="flex gap-0 w-full items-stretch">
+        // 🔥 row.flex 값을 인지하여 세로 높이를 비율에 맞춰 분할합니다.
+        <div key={row.id} style={{ flex: row.flex || 1 }} className="flex gap-0 w-full items-stretch">
           {row.cells?.map((cell: any) => {
             const cellValue = rowData[cell.contentValue || ''];
             const shouldShowImage = cell.isImage || isImageUrl(cellValue);
             return (
-              <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col justify-center min-w-0 overflow-hidden relative">
+              <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col justify-center min-w-0 overflow-hidden relative border-slate-100/50">
                 {cell.contentType === 'field' && shouldShowImage && (
                   <div className="w-full h-full overflow-hidden bg-slate-50">
                     <img src={String(cellValue)} alt="img" className="w-full h-full object-cover" />
@@ -68,13 +70,11 @@ export default function LiveAppPreview() {
   const [currentViewId, setCurrentViewId] = useState<string>('');
   const [tableData, setTableData] = useState<Record<string, any[]>>({});
   
-  // 데이터 추가(Insert) 폼 상태
   const [isInputModalOpen, setIsInputModalOpen] = useState(false);
   const [activeInsertAction, setActiveInsertAction] = useState<any>(null);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 🔥 [신규] 데이터 수정(Update) 폼 상태
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [activeUpdateAction, setActiveUpdateAction] = useState<any>(null);
   const [activeRowData, setActiveRowData] = useState<any>(null);
@@ -138,7 +138,6 @@ export default function LiveAppPreview() {
     }
   }, [currentViewId, currentView]);
 
-  // 액션 제어 핸들러 (Insert, Delete, Update 분기 처리 완료)
   const handleAction = async (action: any, rowData: any) => {
     if (action.type === 'alert') {
       alert(action.message || '알림');
@@ -157,7 +156,6 @@ export default function LiveAppPreview() {
       setFormData(initialData);
       setIsInputModalOpen(true);
     } 
-    // 🔥 [신규] 삭제 이벤트
     else if (action.type === 'delete_row') {
       if (!action.deleteTableName || !rowData.id) return alert("테이블 설정 또는 대상의 고유 ID가 누락되었습니다.");
       if (!window.confirm("정말로 이 데이터를 영구 삭제하시겠습니까?")) return;
@@ -167,14 +165,9 @@ export default function LiveAppPreview() {
         if (error) throw error;
         
         alert("성공적으로 삭제되었습니다.");
-        if (currentView?.tableName === action.deleteTableName) {
-          fetchTableData(currentView);
-        }
-      } catch (err: any) {
-        alert(`삭제 실패: ${err.message}`);
-      }
+        if (currentView?.tableName === action.deleteTableName) fetchTableData(currentView);
+      } catch (err: any) { alert(`삭제 실패: ${err.message}`); }
     } 
-    // 🔥 [신규] 수정 이벤트
     else if (action.type === 'update_row') {
       if (!action.updateTableName || !rowData.id) return alert("테이블 설정 또는 대상의 고유 ID가 누락되었습니다.");
       
@@ -183,14 +176,9 @@ export default function LiveAppPreview() {
       
       const initialData: Record<string, any> = {};
       action.updateMappings?.forEach((m: any) => {
-        if (m.mappingType === 'card_data') {
-          initialData[m.targetColumn] = rowData[m.sourceValue];
-        } else if (m.mappingType === 'static') {
-          initialData[m.targetColumn] = m.sourceValue;
-        } else if (m.mappingType === 'prompt') {
-          // 👉 핵심 UX: 사용자가 폼에서 수정하기 편하도록 "기존 데이터의 값"을 폼 초기값으로 프리필(Pre-fill) 해줍니다.
-          initialData[m.targetColumn] = rowData[m.targetColumn] !== undefined && rowData[m.targetColumn] !== null ? rowData[m.targetColumn] : '';
-        }
+        if (m.mappingType === 'card_data') initialData[m.targetColumn] = rowData[m.sourceValue];
+        else if (m.mappingType === 'static') initialData[m.targetColumn] = m.sourceValue;
+        else if (m.mappingType === 'prompt') initialData[m.targetColumn] = rowData[m.targetColumn] !== undefined && rowData[m.targetColumn] !== null ? rowData[m.targetColumn] : '';
       });
       
       setUpdateFormData(initialData);
@@ -206,27 +194,18 @@ export default function LiveAppPreview() {
     try {
       const finalPayload = { ...formData };
       activeInsertAction.insertMappings?.forEach((m: any) => {
-        if (m.valueType === 'number') {
-          finalPayload[m.targetColumn] = Number(finalPayload[m.targetColumn]) || 0;
-        }
+        if (m.valueType === 'number') finalPayload[m.targetColumn] = Number(finalPayload[m.targetColumn]) || 0;
       });
       const { error } = await supabase.from(activeInsertAction.insertTableName).insert([finalPayload]);
       if (error) throw error;
       
       alert("성공적으로 저장되었습니다.");
       setIsInputModalOpen(false);
-      
-      if (currentView?.tableName === activeInsertAction.insertTableName) {
-        fetchTableData(currentView);
-      }
-    } catch (err: any) {
-      alert(`저장 실패: ${err.message}`);
-    } finally {
-      setIsSubmitting(false);
-    }
+      if (currentView?.tableName === activeInsertAction.insertTableName) fetchTableData(currentView);
+    } catch (err: any) { alert(`저장 실패: ${err.message}`); } 
+    finally { setIsSubmitting(false); }
   };
 
-  // 🔥 [신규] 데이터 수정 최종 저장 핸들러
   const handleSubmitUpdate = async () => {
     if (!activeUpdateAction || isUpdating || !activeRowData) return;
     if (!window.confirm("수정하신 내용을 최종 반영하시겠습니까?")) return;
@@ -235,9 +214,7 @@ export default function LiveAppPreview() {
     try {
       const finalPayload = { ...updateFormData };
       activeUpdateAction.updateMappings?.forEach((m: any) => {
-        if (m.valueType === 'number') {
-          finalPayload[m.targetColumn] = Number(finalPayload[m.targetColumn]) || 0;
-        }
+        if (m.valueType === 'number') finalPayload[m.targetColumn] = Number(finalPayload[m.targetColumn]) || 0;
       });
       
       const { error } = await supabase.from(activeUpdateAction.updateTableName).update(finalPayload).eq('id', activeRowData.id);
@@ -245,26 +222,15 @@ export default function LiveAppPreview() {
       
       alert("성공적으로 데이터가 수정되었습니다.");
       setIsUpdateModalOpen(false);
-      
-      if (currentView?.tableName === activeUpdateAction.updateTableName) {
-        fetchTableData(currentView);
-      }
-    } catch (err: any) {
-      alert(`수정 처리 실패: ${err.message}`);
-    } finally {
-      setIsUpdating(false);
-    }
+      if (currentView?.tableName === activeUpdateAction.updateTableName) fetchTableData(currentView);
+    } catch (err: any) { alert(`수정 처리 실패: ${err.message}`); } 
+    finally { setIsUpdating(false); }
   };
 
   const getFilteredData = () => {
     const rawData = tableData[currentView?.tableName || ''] || [];
     if (!searchTerm) return rawData; 
-
-    return rawData.filter((row: any) => 
-      Object.values(row).some(val => 
-        String(val).toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    );
+    return rawData.filter((row: any) => Object.values(row).some(val => String(val).toLowerCase().includes(searchTerm.toLowerCase())));
   };
 
   const displayData = getFilteredData();
@@ -357,7 +323,8 @@ export default function LiveAppPreview() {
                         currentView?.columnCount === 4 ? 'grid-cols-4' : 'grid-cols-1'
                       }`}>
                         {rows.map((row, idx) => (
-                          <div key={idx} className="bg-white border-b border-r border-slate-100 overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors" style={{ minHeight: `${currentView?.cardHeight || 120}px` }} onClick={() => {
+                          // 🔥 루트 컨테이너에 flex flex-col 속성을 부여하여 세로 비율(row.flex)이 정상적으로 꽉 차도록 만듭니다.
+                          <div key={idx} className="flex flex-col bg-white border-b border-r border-slate-100 overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors" style={{ minHeight: `${currentView?.cardHeight || 120}px` }} onClick={() => {
                             const act = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId);
                             if (act) handleAction(act, row);
                           }}>
@@ -377,7 +344,8 @@ export default function LiveAppPreview() {
               currentView?.columnCount === 4 ? 'grid-cols-4' : 'grid-cols-1'
             }`}>
               {displayData.map((row, idx) => (
-                <div key={idx} className="bg-white border-b border-r border-slate-100 overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors" style={{ minHeight: `${currentView?.cardHeight || 120}px` }} onClick={() => {
+                // 🔥 리스트 형태에서도 동일하게 flex flex-col을 적용합니다.
+                <div key={idx} className="flex flex-col bg-white border-b border-r border-slate-100 overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors" style={{ minHeight: `${currentView?.cardHeight || 120}px` }} onClick={() => {
                   const act = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId);
                   if (act) handleAction(act, row);
                 }}>
@@ -420,7 +388,7 @@ export default function LiveAppPreview() {
         </div>
       </div>
 
-      {/* 데이터 추가(Insert) 모달 UI */}
+      {/* 모달 UI 생략 없이 전체 유지 */}
       {isInputModalOpen && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
@@ -465,7 +433,6 @@ export default function LiveAppPreview() {
         </div>
       )}
 
-      {/* 🔥 [신규] 데이터 수정(Update) 모달 UI */}
       {isUpdateModalOpen && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">

@@ -1339,7 +1339,7 @@ import { View, SchemaData, LayoutRow, Action } from './types';
 import * as LucideIcons from 'lucide-react';
 import { 
   Database, LayoutTemplate, Plus, Columns, Rows, ChevronLeft, 
-  ChevronRight, X, MousePointerClick, Star, Filter, Search, Smartphone, Eye, Loader2, TableProperties, ArrowUpDown, FolderTree
+  ChevronRight, X, MousePointerClick, Star, Filter, Search, Smartphone, Eye, Loader2, TableProperties, ArrowUpDown, FolderTree, Trash2, Minus
 } from 'lucide-react';
 
 export const IconMap = Object.entries(LucideIcons).reduce((acc, [name, component]) => {
@@ -1441,13 +1441,46 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
   const addRootRow = () => {
     onUpdate({ 
       ...view, 
-      layoutRows: [...view.layoutRows, { id: `r_${Date.now()}`, cells: [{ id: `c_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }] 
+      // 🔥 생성 시 flex: 1을 기본 부여합니다.
+      layoutRows: [...view.layoutRows, { id: `r_${Date.now()}`, flex: 1, cells: [{ id: `c_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }] 
     });
   };
 
   const RenderRowEditor = ({ row, depth = 0 }: { row: LayoutRow, depth: number }) => (
-    // 🔥 [레이아웃 잠금] 최소 너비를 지정해 셀들이 무한히 쪼개지며 찌그러지는 현상 방지
     <div className={`flex gap-3 p-3 rounded-2xl border-2 border-slate-200 ${depth % 2 === 0 ? 'bg-slate-50' : 'bg-white'} relative mb-3 group/row transition-all min-w-max w-full`}>
+      
+      {/* 🔥 [신규] 세로(행) 비율 조절 뱃지 UI */}
+      <div className="absolute -left-3 -top-3 flex items-center bg-indigo-600 text-white rounded-full shadow-lg opacity-0 group-hover/row:opacity-100 z-40 overflow-hidden transition-all border-2 border-white">
+        <button onClick={(e) => {
+          e.stopPropagation();
+          mutate(rows => {
+            const findAndUpdate = (arr: any[]) => {
+              for (const r of arr) {
+                if (r.id === row.id) { r.flex = Math.max(1, (r.flex || 1) - 1); return true; }
+                for (const c of r.cells) if (c.nestedRows && findAndUpdate(c.nestedRows)) return true;
+              }
+              return false;
+            };
+            findAndUpdate(rows);
+          });
+        }} className="p-1 hover:bg-indigo-700 transition-colors" title="세로 비율 줄이기"><Minus size={14} strokeWidth={3}/></button>
+        <span className="text-[10px] font-black px-1 whitespace-nowrap">세로 비율 : {row.flex || 1}</span>
+        <button onClick={(e) => {
+          e.stopPropagation();
+          mutate(rows => {
+            const findAndUpdate = (arr: any[]) => {
+              for (const r of arr) {
+                if (r.id === row.id) { r.flex = (r.flex || 1) + 1; return true; }
+                for (const c of r.cells) if (c.nestedRows && findAndUpdate(c.nestedRows)) return true;
+              }
+              return false;
+            };
+            findAndUpdate(rows);
+          });
+        }} className="p-1 hover:bg-indigo-700 transition-colors" title="세로 비율 늘리기"><Plus size={14} strokeWidth={3}/></button>
+      </div>
+
+      {/* 행(Row) 삭제 버튼 */}
       <button onClick={() => mutate(rows => {
         const remove = (arr: LayoutRow[]) => {
           const idx = arr.findIndex(r => r.id === row.id);
@@ -1460,36 +1493,54 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
       </button>
 
       {row.cells.map(cell => (
-        // 🔥 각 내부 셀도 최소 크기(min-w-[200px])를 확보하여 내용을 보장합니다.
         <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col gap-2 border-2 border-indigo-200 bg-white rounded-2xl p-4 min-h-[120px] shadow-sm relative transition-all min-w-[200px]">
           <div className="flex justify-between items-center bg-indigo-50 px-2 py-1 rounded-xl">
             <div className="flex items-center gap-1.5">
               <button onClick={() => mutate(rows => {
                 const find = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => { if(c.id === cell.id) c.flex = Math.max(1, c.flex - 1); if(c.nestedRows) find(c.nestedRows); }));
                 find(rows);
-              })} className="text-indigo-700 hover:scale-125 transition-transform p-1"><ChevronLeft size={16}/></button>
-              <span className="text-[11px] font-black text-indigo-700 tracking-tighter">비율:{cell.flex}</span>
+              })} className="text-indigo-700 hover:scale-125 transition-transform p-1" title="가로 비율 줄이기"><ChevronLeft size={16}/></button>
+              <span className="text-[11px] font-black text-indigo-700 tracking-tighter">가로비율:{cell.flex}</span>
               <button onClick={() => mutate(rows => {
                 const find = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => { if(c.id === cell.id) c.flex += 1; if(c.nestedRows) find(c.nestedRows); }));
                 find(rows);
-              })} className="text-indigo-700 hover:scale-125 transition-transform p-1"><ChevronRight size={16}/></button>
+              })} className="text-indigo-700 hover:scale-125 transition-transform p-1" title="가로 비율 늘리기"><ChevronRight size={16}/></button>
             </div>
-            <button onClick={() => mutate(rows => {
-              const find = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => {
-                if(c.id === cell.id) {
-                  c.contentType = 'nested';
-                  c.nestedRows = [{ id: `nr_${Date.now()}`, cells: [{ id: `nc_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }];
-                } else if(c.nestedRows) find(c.nestedRows);
-              }));
-              find(rows);
-            })} className="text-indigo-400 hover:text-indigo-700 p-1" title="세로 분할"><Rows size={18}/></button>
+            
+            <div className="flex items-center gap-1">
+              <button onClick={() => mutate(rows => {
+                const find = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => {
+                  if(c.id === cell.id) {
+                    c.contentType = 'nested';
+                    // 🔥 세로 분할 추가 시에도 flex: 1을 기본 부여합니다.
+                    c.nestedRows = [{ id: `nr_${Date.now()}`, flex: 1, cells: [{ id: `nc_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }];
+                  } else if(c.nestedRows) find(c.nestedRows);
+                }));
+                find(rows);
+              })} className="text-indigo-400 hover:text-indigo-700 p-1" title="아래로 세로 분할"><Rows size={18}/></button>
+              
+              {row.cells.length > 1 && (
+                <button onClick={() => mutate(rows => {
+                  const findAndRemove = (arr: any[]) => arr.forEach(r => {
+                    const idx = r.cells.findIndex((c: any) => c.id === cell.id);
+                    if (idx > -1) r.cells.splice(idx, 1);
+                    else r.cells.forEach((c: any) => { if(c.nestedRows) findAndRemove(c.nestedRows); });
+                  });
+                  findAndRemove(rows);
+                })} className="text-rose-300 hover:text-rose-600 p-1 transition-colors" title="현재 열(Cell) 삭제"><Trash2 size={16}/></button>
+              )}
+            </div>
           </div>
 
           {cell.contentType === 'nested' ? (
             <div className="space-y-3 pt-2 h-full">
               {cell.nestedRows?.map(nr => <RenderRowEditor key={nr.id} row={nr} depth={depth + 1} />)}
               <button onClick={() => mutate(rows => {
-                const find = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => { if(c.id === cell.id) c.nestedRows?.push({ id: `nr_${Date.now()}`, cells: [{ id: `nc_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }); if(c.nestedRows) find(c.nestedRows); }));
+                const find = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => { 
+                  // 🔥 분할 버튼 클릭 시에도 flex: 1을 부여
+                  if(c.id === cell.id) c.nestedRows?.push({ id: `nr_${Date.now()}`, flex: 1, cells: [{ id: `nc_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }); 
+                  if(c.nestedRows) find(c.nestedRows); 
+                }));
                 find(rows);
               })} className="w-full py-3 border-2 border-dashed border-slate-200 text-[10px] font-black text-slate-400 rounded-xl hover:bg-slate-50 transition-colors">+ 세로 분할 추가</button>
             </div>
@@ -1529,12 +1580,11 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           r.cells.forEach((c: any) => { if(c.nestedRows) find(c.nestedRows); });
         });
         find(rows);
-      })} className="w-12 shrink-0 flex items-center justify-center bg-indigo-600 text-white rounded-2xl shadow-md hover:bg-indigo-700 transition-colors hover:scale-105" title="옆으로 분할"><Columns size={20}/></button>
+      })} className="w-12 shrink-0 flex items-center justify-center bg-indigo-600 text-white rounded-2xl shadow-md hover:bg-indigo-700 transition-colors hover:scale-105" title="옆으로 열(Column) 분할"><Columns size={20}/></button>
     </div>
   );
 
   return (
-    // 🔥 [핵심 래퍼] min-w-fit을 통해 하위 개체들의 크기를 받아들여 무한히 확장되는 캔버스를 구현합니다.
     <div className="w-full min-w-fit mx-auto space-y-10 pb-32">
       
       {/* 1. 뷰 기본 정보 섹션 */}
@@ -1580,7 +1630,6 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           )}
         </div>
         
-        {/* 🔥 그리드들이 강제로 아래로 떨어지거나 찌그러지지 않고 본연의 공간(min-w-max)을 계산하게 합니다. */}
         <div className="grid grid-cols-2 gap-8 min-w-max w-full">
           <div className="space-y-4">
             <div>
@@ -1717,8 +1766,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           <button onClick={addRootRow} className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 whitespace-nowrap"><Plus size={18}/> 행(Row) 추가하기</button>
         </div>
         
-        {/* 가로로 넓게 뻗어나가는 캔버스 영역 */}
-        <div className="space-y-4 overflow-visible w-full min-w-fit">
+        <div className="space-y-4 overflow-visible w-full min-w-fit mt-10">
           {view.layoutRows.map(row => <RenderRowEditor key={row.id} row={row} depth={0} />)}
           {view.layoutRows.length === 0 && (
             <div className="py-24 border-4 border-dashed border-slate-100 rounded-[2.5rem] flex flex-col items-center justify-center text-slate-300 gap-4 bg-slate-50/50">
@@ -1997,13 +2045,16 @@ export type View = {
   icon?: string | null;
   tableName: string | null;
   
+  // 1단계 서버 필터 속성
   filterColumn?: string | null;  
   filterOperator?: 'eq' | 'neq' | 'like' | 'gt' | 'lt'; 
   filterValue?: string | null;   
   
+  // 서버 정렬 속성
   sortColumn?: string | null;    
   sortDirection?: 'asc' | 'desc';
   
+  // 서버 그룹화 속성
   groupByColumn?: string | null; 
   
   cardHeight: number;
@@ -2015,6 +2066,7 @@ export type View = {
 export type LayoutRow = {
   id: string;
   type?: 'row';
+  flex?: number; // 🔥 [신규] 세로(행) 높이 비율을 제어하는 속성 추가
   cells: LayoutCell[];
 };
 
@@ -2039,7 +2091,6 @@ export type Action = {
   id: string;
   name: string;
   icon?: string | null;
-  // 🔥 [수정됨] 동작 유형에 delete_row와 update_row 추가
   type: 'navigate' | 'alert' | 'link' | 'insert_row' | 'delete_row' | 'update_row';
   targetViewId: string | null;
   message: string | null;
@@ -2048,10 +2099,10 @@ export type Action = {
   insertTableName?: string | null;
   insertMappings?: InsertMapping[];
   
-  // 🔥 [신규] 데이터 삭제(Delete) 설정
+  // 데이터 삭제(Delete) 설정
   deleteTableName?: string | null;
   
-  // 🔥 [신규] 데이터 수정(Update) 설정
+  // 데이터 수정(Update) 설정
   updateTableName?: string | null;
   updateMappings?: InsertMapping[];
   

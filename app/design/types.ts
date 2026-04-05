@@ -14,13 +14,16 @@ export type View = {
   icon?: string | null;
   tableName: string | null;
   
+  // 1단계 서버 필터 속성
   filterColumn?: string | null;  
   filterOperator?: 'eq' | 'neq' | 'like' | 'gt' | 'lt'; 
   filterValue?: string | null;   
   
+  // 서버 정렬 속성
   sortColumn?: string | null;    
   sortDirection?: 'asc' | 'desc';
   
+  // 서버 그룹화 속성
   groupByColumn?: string | null; 
   
   cardHeight: number;
@@ -32,6 +35,7 @@ export type View = {
 export type LayoutRow = {
   id: string;
   type?: 'row';
+  flex?: number; // 🔥 [신규] 세로(행) 높이 비율을 제어하는 속성 추가
   cells: LayoutCell[];
 };
 
@@ -56,7 +60,6 @@ export type Action = {
   id: string;
   name: string;
   icon?: string | null;
-  // 🔥 [수정됨] 동작 유형에 delete_row와 update_row 추가
   type: 'navigate' | 'alert' | 'link' | 'insert_row' | 'delete_row' | 'update_row';
   targetViewId: string | null;
   message: string | null;
@@ -65,10 +68,10 @@ export type Action = {
   insertTableName?: string | null;
   insertMappings?: InsertMapping[];
   
-  // 🔥 [신규] 데이터 삭제(Delete) 설정
+  // 데이터 삭제(Delete) 설정
   deleteTableName?: string | null;
   
-  // 🔥 [신규] 데이터 수정(Update) 설정
+  // 데이터 수정(Update) 설정
   updateTableName?: string | null;
   updateMappings?: InsertMapping[];
   
