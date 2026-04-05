@@ -42,20 +42,22 @@ export type LayoutCell = {
   contentType: 'empty' | 'field' | 'action' | 'nested';
   contentValue: string | null;
   
-  // 🔥 카드 데코레이션(꾸미기) 속성들
   isImage?: boolean; 
   imageShape?: 'square' | 'rounded' | 'circle';
   
-  // 🔥 [신규] 타이포그래피(글꼴 스타일) 속성
   textSize?: string;
   textWeight?: string;
   textAlign?: 'left' | 'center' | 'right';
   
-  // 🔥 정규식 및 문자열 처리 속성
   textRegexPattern?: string;
   textRegexReplace?: string;
   textPrefix?: string;
   textSuffix?: string;
+  
+  // 🔥 [신규] 액션 버튼 스타일링 속성
+  buttonShape?: 'square' | 'rounded' | 'pill';
+  buttonAlign?: 'full' | 'left' | 'center' | 'right';
+  buttonStyle?: 'text' | 'icon' | 'both';
   
   nestedRows?: LayoutRow[]; 
 };

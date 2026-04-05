@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
-import { X, CheckCircle2, ChevronLeft, RefreshCw, Layout, Search, ChevronDown, Folder, ChevronsUpDown, ChevronsUp } from 'lucide-react';
+import { X, CheckCircle2, ChevronLeft, RefreshCw, Layout, Search, ChevronDown, Folder, ChevronsUpDown, ChevronsUp, MousePointerClick } from 'lucide-react';
 import { IconMap } from '@/app/design/picker'; 
 
 const supabase = createClient(
@@ -15,7 +15,7 @@ const supabase = createClient(
 const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) => {
   const isImageUrl = (url: any) => {
     if (typeof url !== 'string') return false;
-    return /\\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url) || (url.startsWith('http') && url.includes('/storage/v1/object/public/'));
+    return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url) || (url.startsWith('http') && url.includes('/storage/v1/object/public/'));
   };
 
   return (
@@ -24,8 +24,9 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
         <div key={row.id} style={{ flex: row.flex || 1 }} className="flex gap-0 w-full items-stretch">
           {row.cells?.map((cell: any) => {
             const cellValue = rowData[cell.contentValue || ''];
-            
             const shouldShowImage = cell.isImage || isImageUrl(cellValue);
+            
+            // 1. 이미지 처리
             if (cell.contentType === 'field' && shouldShowImage) {
               const shapeClass = cell.imageShape === 'circle' ? 'rounded-full aspect-square object-top shadow-sm mx-auto' : cell.imageShape === 'rounded' ? 'rounded-2xl shadow-sm' : 'rounded-none';
               const paddingClass = cell.imageShape === 'circle' ? 'p-3' : cell.imageShape === 'rounded' ? 'p-1.5' : 'p-0';
@@ -36,37 +37,51 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
               );
             }
 
+            // 2. 텍스트 처리
             if (cell.contentType === 'field' && !shouldShowImage) {
               let displayText = cellValue !== null && cellValue !== undefined && cellValue !== '' ? String(cellValue) : '-';
-              
               if (displayText !== '-' && cell.textRegexPattern) {
-                try {
-                  const regex = new RegExp(cell.textRegexPattern, 'g');
-                  displayText = displayText.replace(regex, cell.textRegexReplace || '');
-                } catch (err) { }
+                try { const regex = new RegExp(cell.textRegexPattern, 'g'); displayText = displayText.replace(regex, cell.textRegexReplace || ''); } catch (err) { }
               }
-              
               if (displayText !== '-') displayText = `${cell.textPrefix || ''}${displayText}${cell.textSuffix || ''}`;
 
-              // 🔥 [신규] 타이포그래피(크기, 굵기, 정렬) 동적 CSS 클래스 생성
               const alignItemClass = cell.textAlign === 'center' ? 'items-center text-center' : cell.textAlign === 'right' ? 'items-end text-right' : 'items-start text-left';
               const textSizeClass = cell.textSize || 'text-[14px]';
               const textWeightClass = cell.textWeight || 'font-black';
 
               return (
                 <div key={cell.id} style={{ flex: cell.flex }} className={`flex flex-col justify-center min-w-0 overflow-hidden relative border-slate-100/50 p-2.5 ${alignItemClass}`}>
-                  <span className={`${textSizeClass} ${textWeightClass} text-slate-800 break-words leading-snug w-full`}>
-                    {displayText}
-                  </span>
+                  <span className={`${textSizeClass} ${textWeightClass} text-slate-800 break-words leading-snug w-full`}>{displayText}</span>
                 </div>
               );
             }
 
+            // 3. 액션(버튼) & 네스티드 레이아웃 처리
             return (
               <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col justify-center min-w-0 overflow-hidden relative border-slate-100/50">
                 {cell.contentType === 'action' && (() => {
                   const act = actions?.find((a: any) => a.id === cell.contentValue);
-                  return act ? <button onClick={(e) => { e.stopPropagation(); onExecuteAction(act, rowData); }} className="w-full h-full bg-slate-900 text-white text-[11px] font-black py-3 active:bg-indigo-600 transition-colors">{act.name}</button> : null;
+                  if (!act) return null;
+                  
+                  // 🔥 [신규] 설정된 버튼 디자인 로직 적용
+                  const btnShape = cell.buttonShape || 'square';
+                  const shapeClass = btnShape === 'pill' ? 'rounded-full' : btnShape === 'rounded' ? 'rounded-xl' : 'rounded-none';
+                  
+                  const btnAlign = cell.buttonAlign || 'full';
+                  const wrapperAlignClass = btnAlign === 'left' ? 'justify-start' : btnAlign === 'right' ? 'justify-end' : btnAlign === 'center' ? 'justify-center' : 'justify-stretch';
+                  const btnWidthClass = btnAlign === 'full' ? 'w-full h-full' : 'px-5 py-3';
+                  
+                  const bStyle = cell.buttonStyle || 'both';
+                  const ActIcon = act.icon && IconMap[act.icon] ? IconMap[act.icon] : MousePointerClick;
+
+                  return (
+                    <div className={`w-full h-full flex items-center p-1.5 ${wrapperAlignClass}`}>
+                      <button onClick={(e) => { e.stopPropagation(); onExecuteAction(act, rowData); }} className={`bg-slate-900 text-white text-[11px] font-black active:scale-95 hover:bg-indigo-600 transition-all shadow-md flex items-center justify-center gap-2 overflow-hidden ${shapeClass} ${btnWidthClass}`}>
+                        {(bStyle === 'icon' || bStyle === 'both') && <ActIcon size={14} className="shrink-0" />}
+                        {(bStyle === 'text' || bStyle === 'both') && <span className="truncate">{act.name}</span>}
+                      </button>
+                    </div>
+                  );
                 })()}
                 {cell.contentType === 'nested' && cell.nestedRows && <RenderPreviewLayout rows={cell.nestedRows} rowData={rowData} actions={actions} onExecuteAction={onExecuteAction} />}
               </div>
