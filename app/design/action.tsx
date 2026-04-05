@@ -24,8 +24,9 @@ export default function ActionEditor({
   onOpenIconPicker 
 }: ActionEditorProps) {
   return (
-    <div className="flex-1 overflow-y-auto p-8 lg:p-12 bg-white rounded-tl-3xl shadow-sm border-l border-t border-slate-200 relative">
-      <div className="max-w-3xl mx-auto space-y-8">
+    <div className="flex-1 overflow-y-auto bg-white rounded-3xl shadow-sm border border-slate-200 relative p-8 lg:p-12">
+      {/* 🔥 [신규] max-w-3xl을 완전히 제거하여 전체 폭(w-full)을 쾌적하게 사용하도록 수정 */}
+      <div className="w-full mx-auto space-y-8">
         
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div>
@@ -75,13 +76,12 @@ export default function ActionEditor({
               <option value="navigate">다른 뷰로 이동</option>
               <option value="alert">알림 메시지</option>
               <option value="insert_row">데이터 추가 (Insert)</option>
-              {/* 🔥 신규 동작 유형 옵션 추가 */}
               <option value="update_row">데이터 수정 (Update Modal)</option>
               <option value="delete_row">선택한 데이터 삭제 (Delete)</option>
             </select>
           </div>
 
-          {/* 1. 데이터 추가 (Insert) UI */}
+          {/* 데이터 추가 (Insert) UI */}
           {action.type === 'insert_row' && (
             <div className="space-y-5 border-t border-slate-200 pt-5 mt-5">
               <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
@@ -120,7 +120,8 @@ export default function ActionEditor({
                         <Trash2 size={14} />
                       </button>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* 가로 폭이 넓어졌으므로 컬럼들을 grid-cols-4로 깔끔하게 배치합니다. */}
+                      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
                         <div>
                           <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider">1. 저장할 컬럼</span>
                           <select
@@ -191,7 +192,7 @@ export default function ActionEditor({
             </div>
           )}
 
-          {/* 🔥 2. 데이터 수정 (Update) UI */}
+          {/* 데이터 수정 (Update) UI */}
           {action.type === 'update_row' && (
             <div className="space-y-5 border-t border-slate-200 pt-5 mt-5">
               <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
@@ -231,7 +232,7 @@ export default function ActionEditor({
                         <Trash2 size={14} />
                       </button>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
                         <div>
                           <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider">1. 수정될 컬럼</span>
                           <select
@@ -302,7 +303,7 @@ export default function ActionEditor({
             </div>
           )}
 
-          {/* 🔥 3. 데이터 삭제 (Delete) UI */}
+          {/* 데이터 삭제 (Delete) UI */}
           {action.type === 'delete_row' && (
             <div className="space-y-5 border-t border-slate-200 pt-5 mt-5">
               <label className="flex items-center gap-2 text-sm font-bold text-slate-700">

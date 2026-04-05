@@ -9,13 +9,11 @@ import {
   ChevronRight, X, MousePointerClick, Star, Filter, Search, Smartphone, Eye, Loader2, TableProperties, ArrowUpDown, FolderTree
 } from 'lucide-react';
 
-// 아이콘 맵퍼 설정 (기존 유지)
 export const IconMap = Object.entries(LucideIcons).reduce((acc, [name, component]) => {
   if (/^[A-Z]/.test(name) && typeof component !== 'string') acc[name] = component as React.ElementType;
   return acc;
 }, {} as any);
 
-// 아이콘 피커 컴포넌트 (기존 유지 - 누락 없음)
 const IconPicker = ({ isOpen, onClose, onSelect, selectedIcon }: any) => {
   const [search, setSearch] = useState('');
   const filtered = useMemo(() => 
@@ -70,7 +68,6 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
-  // 데이터 미리보기 (필터 및 정렬 완벽 적용 - 누락 없음)
   const fetchPreviewData = async () => {
     if (!view.tableName) return alert("먼저 테이블을 선택해주세요.");
     
@@ -115,7 +112,6 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
     });
   };
 
-  // 재귀적 중첩 레이아웃 렌더러 (누락 없음)
   const RenderRowEditor = ({ row, depth = 0 }: { row: LayoutRow, depth: number }) => (
     <div className={`flex gap-3 p-3 rounded-2xl border-2 border-slate-200 ${depth % 2 === 0 ? 'bg-slate-50' : 'bg-white'} relative mb-3 group/row transition-all`}>
       <button onClick={() => mutate(rows => {
@@ -130,7 +126,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
       </button>
 
       {row.cells.map(cell => (
-        <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col gap-2 border-2 border-indigo-200 bg-white rounded-2xl p-4 min-h-[120px] shadow-sm relative transition-all">
+        <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col gap-2 border-2 border-indigo-200 bg-white rounded-2xl p-4 min-h-[120px] shadow-sm relative transition-all w-full">
           <div className="flex justify-between items-center bg-indigo-50 px-2 py-1 rounded-xl">
             <div className="flex items-center gap-1.5">
               <button onClick={() => mutate(rows => {
@@ -198,12 +194,13 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           r.cells.forEach((c: any) => { if(c.nestedRows) find(c.nestedRows); });
         });
         find(rows);
-      })} className="w-12 flex items-center justify-center bg-indigo-600 text-white rounded-2xl shadow-md hover:bg-indigo-700 transition-colors hover:scale-105" title="옆으로 분할"><Columns size={20}/></button>
+      })} className="w-12 shrink-0 flex items-center justify-center bg-indigo-600 text-white rounded-2xl shadow-md hover:bg-indigo-700 transition-colors hover:scale-105" title="옆으로 분할"><Columns size={20}/></button>
     </div>
   );
 
   return (
-    <div className="max-w-5xl mx-auto space-y-10 pb-32">
+    // 🔥 [신규] max-w-5xl을 제거하고 w-full로 넓고 쾌적하게 구성했습니다.
+    <div className="w-full mx-auto space-y-10 pb-32">
       {/* 1. 뷰 기본 정보 섹션 */}
       <section className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <label className="text-[11px] font-black text-slate-400 block mb-4 uppercase tracking-widest px-2">현재 화면(View) 기본 정보</label>
@@ -247,7 +244,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           )}
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-4">
             <div>
               <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1">연결 테이블</label>
@@ -305,11 +302,8 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           </div>
         </div>
 
-        {/* 🔥 데이터 그룹핑 및 정렬 설정 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8 pt-8 border-t border-slate-50">
-          
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8 pt-8 border-t border-slate-50">
           <div className="space-y-6">
-            {/* 데이터 그룹화 (아코디언) */}
             <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100">
               <label className="text-[10px] font-black text-blue-600 block mb-3 uppercase tracking-wider flex items-center gap-1.5"><FolderTree size={14}/> 데이터 묶어주기 (아코디언 형태)</label>
               <select 
@@ -323,7 +317,6 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
               <p className="mt-2 text-[10px] text-blue-400 font-bold pl-1">* 선택 시, 해당 칼럼 값(예: 반, 부서)으로 폴더처럼 접혀서 표시됩니다.</p>
             </div>
 
-            {/* 정렬 설정 */}
             <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-50">
               <label className="text-[10px] font-black text-indigo-600 block mb-3 uppercase tracking-wider flex items-center gap-1.5"><ArrowUpDown size={14}/> 정렬 기준 칼럼</label>
               <select 
@@ -398,10 +391,8 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
         </div>
       </section>
 
-      {/* 아이콘 모달 */}
       <IconPicker isOpen={isIconPickerOpen} onClose={() => setIsIconPickerOpen(false)} selectedIcon={view.icon} onSelect={(n: string) => onUpdate({...view, icon: n})} />
 
-      {/* 데이터 미리보기 모달 */}
       {isPreviewModalOpen && (
         <div className="fixed inset-0 z-[700] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-5xl h-[85vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden">
