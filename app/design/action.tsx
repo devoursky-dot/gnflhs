@@ -61,7 +61,8 @@ export default function ActionEditor({
                 type="text"
                 value={action.name}
                 onChange={(e) => onUpdate({ ...action, name: e.target.value })}
-                className="flex-1 p-3 rounded-xl border border-slate-200 outline-none font-bold min-w-[300px]"
+                className="flex-1 p-3 rounded-xl border border-slate-200 outline-none font-bold text-slate-900 min-w-[300px]"
+                style={{ color: 'var(--text-primary)' }}
               />
             </div>
           </div>
@@ -131,7 +132,8 @@ export default function ActionEditor({
                               newArr[idx].targetColumn = e.target.value;
                               onUpdate({ ...action, insertMappings: newArr });
                             }}
-                            className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg bg-slate-50 min-w-[160px]"
+                            className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg bg-slate-50 text-slate-900 min-w-[160px]"
+                            style={{ color: 'var(--text-primary)' }}
                           >
                             <option value="">-- 컬럼 선택 --</option>
                             {(schemaData[action.insertTableName!] || []).map(col => <option key={col} value={col}>{col}</option>)}
@@ -162,7 +164,8 @@ export default function ActionEditor({
                               newArr[idx].valueType = e.target.value as 'string' | 'number';
                               onUpdate({ ...action, insertMappings: newArr });
                             }}
-                            className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg min-w-[160px]"
+                            className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg text-slate-900 min-w-[160px]"
+                            style={{ color: 'var(--text-primary)' }}
                           >
                             <option value="string">Text (문자열)</option>
                             <option value="number">Number (숫자)</option>
@@ -181,7 +184,8 @@ export default function ActionEditor({
                               onUpdate({ ...action, insertMappings: newArr });
                             }}
                             placeholder="설정값을 입력하세요"
-                            className="w-full p-2.5 text-sm font-bold border border-rose-200 rounded-lg focus:border-rose-500 outline-none min-w-[200px]"
+                            className="w-full p-2.5 text-sm font-bold border border-rose-200 rounded-lg focus:border-rose-500 outline-none text-slate-900 min-w-[200px]"
+                            style={{ color: 'var(--text-primary)' }}
                           />
                         </div>
                       </div>
@@ -242,7 +246,8 @@ export default function ActionEditor({
                               newArr[idx].targetColumn = e.target.value;
                               onUpdate({ ...action, updateMappings: newArr });
                             }}
-                            className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg bg-slate-50 min-w-[160px]"
+                            className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg bg-slate-50 text-slate-900 min-w-[160px]"
+                            style={{ color: 'var(--text-primary)' }}
                           >
                             <option value="">-- 컬럼 선택 --</option>
                             {(schemaData[action.updateTableName!] || []).map(col => <option key={col} value={col}>{col}</option>)}
@@ -273,7 +278,8 @@ export default function ActionEditor({
                               newArr[idx].valueType = e.target.value as 'string' | 'number';
                               onUpdate({ ...action, updateMappings: newArr });
                             }}
-                            className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg min-w-[160px]"
+                            className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg text-slate-900 min-w-[160px]"
+                            style={{ color: 'var(--text-primary)' }}
                           >
                             <option value="string">Text (문자열)</option>
                             <option value="number">Number (숫자)</option>
@@ -292,7 +298,8 @@ export default function ActionEditor({
                               onUpdate({ ...action, updateMappings: newArr });
                             }}
                             placeholder="설정값을 입력하세요"
-                            className="w-full p-2.5 text-sm font-bold border border-rose-200 rounded-lg focus:border-rose-500 outline-none min-w-[200px]"
+                            className="w-full p-2.5 text-sm font-bold border border-rose-200 rounded-lg focus:border-rose-500 outline-none text-slate-900 min-w-[200px]"
+                            style={{ color: 'var(--text-primary)' }}
                           />
                         </div>
                       </div>
@@ -325,6 +332,15 @@ export default function ActionEditor({
           )}
 
         </div>
+
+        <style jsx global>{`
+          input, select, textarea {
+            color: var(--text-primary, #0f172a) !important;
+          }
+          input::placeholder {
+            color: var(--text-secondary, #64748b) !important;
+          }
+        `}</style>
       </div>
     </div>
   );

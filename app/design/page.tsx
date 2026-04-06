@@ -7,7 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 import { AppState, View, Action, SchemaData } from './types';
 import ViewEditor from './view';
 import ActionEditor from './action';
-import { Plus, Send, Loader2, ExternalLink, Trash2, FolderOpen, X, Star, ArrowUp, ArrowDown, Copy, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { Plus, Send, Loader2, ExternalLink, Trash2, FolderOpen, X, Star, ArrowUp, ArrowDown, Copy, PanelLeftClose, PanelLeft, Database, AppWindow } from 'lucide-react';
 import IconPicker, { IconMap } from './picker'; 
 
 const supabase = createClient(
@@ -295,8 +295,9 @@ export default function AppBuilder() {
             <div className="flex justify-between items-center">
               <span className="text-[10px] font-black text-indigo-300 tracking-widest uppercase">My Workspace</span>
               <div className="flex items-center gap-1.5">
-                <button onClick={handleCreateNewApp} className="flex items-center gap-1 text-[11px] font-bold bg-indigo-800 hover:bg-indigo-900 px-2.5 py-1.5 rounded-full" title="새 앱"><Plus size={12} /> 새 앱</button>
-                <button onClick={openAppListModal} className="flex items-center gap-1 text-[11px] font-bold bg-indigo-800 hover:bg-indigo-900 px-2.5 py-1.5 rounded-full" title="열기"><FolderOpen size={12} /> 열기</button>
+                <button onClick={() => window.open('/admin', 'TableManager', 'width=1400,height=900,resizable=yes')} className="p-2 bg-indigo-800 hover:bg-emerald-500 text-white rounded-xl transition-all" title="DB 관리 (새 창)"><Database size={16} /></button>
+                <button onClick={handleCreateNewApp} className="p-2 bg-indigo-800 hover:bg-indigo-900 text-white rounded-xl transition-all" title="새 앱 만들기"><Plus size={16} /></button>
+                <button onClick={openAppListModal} className="p-2 bg-indigo-800 hover:bg-indigo-900 text-white rounded-xl transition-all" title="기존 앱 열기"><FolderOpen size={16} /></button>
               </div>
             </div>
             
