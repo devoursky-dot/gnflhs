@@ -3,6 +3,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import DataEditor from '../data';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { AppState, View, Action, SchemaData } from './types';
 import ViewEditor from './view';
@@ -23,6 +26,9 @@ export default function AppBuilder() {
     views: [{ id: 'v1', name: '메인 홈 (첫 화면)', tableName: null, cardHeight: 120, columnCount: 1, layoutRows: [], onClickActionId: null }],
     actions: []
   });
+export default function DatabasePage() {
+  const router = useRouter();
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   const [schemaData, setSchemaData] = useState<SchemaData>({});
   const [activeItem, setActiveItem] = useState<{ type: 'view' | 'action' | 'app', id: string }>({ type: 'view', id: 'v1' });
@@ -159,6 +165,9 @@ export default function AppBuilder() {
     try {
       const config = { views: appState.views, actions: appState.actions, icon: appState.icon };
       const payload = { name: appState.name, app_config: config, draft_config: config };
+    const checkAuth = async () => {
+      const savedSession = localStorage.getItem('gnflhs_session');
+      if (!savedSession) { router.replace('/'); return; }
       
       if (!appState.id) {
         const { data, error } = await supabase.from('apps').insert([payload]).select('id');
@@ -243,6 +252,8 @@ export default function AppBuilder() {
 
   return (
     <div className="flex h-screen w-full bg-slate-100 font-sans overflow-hidden">
+      const { email } = JSON.parse(savedSession);
+      const { data } = await supabase.from('teachers').select('role').eq('users', email).single();
       
       {isAppListModalOpen && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -278,6 +289,11 @@ export default function AppBuilder() {
           </div>
         </div>
       )}
+      if (data?.role === 'admin') setIsAuthorized(true);
+      else router.replace('/');
+    };
+    checkAuth();
+  }, [router]);
 
       {isSidebarOpen && (
         <div 
@@ -463,4 +479,6 @@ export default function AppBuilder() {
       />
     </div>
   );
+  if (!isAuthorized) return null;
+  return <DataEditor />;
 }

@@ -4,9 +4,9 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
-import { Search, Plus, LayoutGrid, Star, ArrowRight } from 'lucide-react';
+import { Search, Plus, LayoutGrid, Star, ArrowRight, LogIn, LogOut, Mail, Lock, ShieldCheck, User as UserIcon } from 'lucide-react';
 // 🔥 앞서 만든 picker.tsx에서 IconMap을 가져와 앱의 고유 아이콘을 표시합니다.
-import { IconMap } from './design/picker'; 
+import { IconMap } from './design/picker';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
@@ -17,31 +17,154 @@ export default function MainAppLauncher() {
   const [apps, setApps] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  
+  // --- 인증 상태 관리 ---
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPass, setLoginPass] = useState('');
+  const [authError, setAuthError] = useState('');
 
   useEffect(() => {
-    async function fetchApps() {
-      try {
-        const { data, error } = await supabase
-          .from('apps')
-          .select('id, name, created_at, app_config')
-          .order('id', { ascending: false }); // 최신순 정렬
-        
-        if (error) throw error;
-        if (data) setApps(data);
-      } catch (error) {
-        console.error('앱 목록을 불러오는 중 오류 발생:', error);
-      } finally {
+    // 1. 로컬 스토리지에서 세션 확인 (로그인 유지)
+    const savedSession = localStorage.getItem('gnflhs_session');
+    if (savedSession) {
+      const sessionData = JSON.parse(savedSession);
+      setUser({ email: sessionData.email });
+      fetchUserProfile(sessionData.email).then(() => {
         setLoading(false);
-      }
+      });
+    } else {
+      setLoading(false);
     }
-    fetchApps();
+
+    // 2. 인증 상태 변경 리스너
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      // 구글 로그인 등 외부 인증 사용 시를 대비해 유지하되, 현재는 비워둡니다.
+    });
+    return () => subscription.unsubscribe();
   }, []);
+
+  // teachers 테이블에서 사용자 정보(이름, 역할) 가져오기
+  const fetchUserProfile = async (email: string | undefined) => {
+    if (!email) return;
+    const { data, error } = await supabase
+      .from('teachers')
+      .select('users, name, role, pass')
+      .eq('users', email)
+      .single();
+    
+    if (data) {
+      setProfile(data);
+      fetchApps(); 
+    } else {
+      console.error("User not found in teachers table:", error);
+    }
+  };
+
+  async function fetchApps() {
+    try {
+      const { data, error } = await supabase
+        .from('apps')
+        .select('id, name, created_at, app_config')
+        .order('id', { ascending: false });
+      
+      if (error) throw error;
+      if (data) setApps(data);
+    } catch (error) {
+      console.error('앱 목록 로드 실패:', error);
+    }
+  }
+
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    try {
+      // teachers 테이블에서 직접 유저와 비밀번호 확인
+      const { data: teacher, error } = await supabase
+        .from('teachers')
+        .select('*')
+        .eq('users', loginEmail)
+        .single();
+
+      if (!teacher || teacher.pass !== loginPass) {
+        throw new Error('이메일 또는 비밀번호가 올바르지 않습니다.');
+      }
+
+      // 로그인 성공 처리
+      const sessionInfo = { email: loginEmail };
+      localStorage.setItem('gnflhs_session', JSON.stringify(sessionInfo));
+      setUser(sessionInfo);
+      setProfile(teacher);
+      fetchApps();
+
+    } catch (error: any) {
+      setAuthError(error.message);
+    }
+  };
+
+  const handleLogout = async () => {
+    localStorage.removeItem('gnflhs_session');
+    window.location.reload();
+  };
 
   // 검색어에 따른 앱 필터링 로직
   const filteredApps = apps.filter(app => 
     app.name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // --- 권한 확인 로직 ---
+  const isAuthorized = profile?.role === 'admin' || profile?.role === 'tch';
+
+  // 1. 세션이 없거나 프로필이 없는 경우 (로그인 폼)
+  if (!user || !profile || !isAuthorized) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
+        <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 p-10 animate-in fade-in zoom-in-95 duration-500">
+          <div className="flex flex-col items-center text-center mb-10">
+            <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center shadow-xl shadow-indigo-200 mb-6">
+              <ShieldCheck className="text-white" size={40} />
+            </div>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight">경남외고 통합 관리</h1>
+            <p className="text-slate-500 font-bold mt-2 italic">Teacher Access Only</p>
+          </div>
+
+          {/* 로그인은 되었으나 권한이 없는 경우 (그외) */}
+          {user && profile && !isAuthorized ? (
+            <div className="text-center space-y-6">
+              <div className="p-4 bg-amber-50 border border-amber-100 text-amber-700 text-sm font-bold rounded-2xl">
+                '{profile.name}'님은 등록된 교사/관리자 계정이 아닙니다. 접근 권한이 없습니다.
+              </div>
+              <button 
+                onClick={handleLogout}
+                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black flex items-center justify-center gap-2"
+              >
+                <LogOut size={18} /> 다른 계정으로 로그인
+              </button>
+            </div>
+          ) : (
+            // 일반 로그인 폼
+            <>
+              {authError && <div className="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-600 text-sm font-bold rounded-2xl">{authError}</div>}
+              <form onSubmit={handlePasswordLogin} className="space-y-4">
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input type="email" placeholder="이메일 계정" value={loginEmail} onChange={(e)=>setLoginEmail(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-50 transition-all text-slate-900" style={{ color: '#0f172a' }} required />
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input type="password" placeholder="비밀번호" value={loginPass} onChange={(e)=>setLoginPass(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-50 transition-all text-slate-900" style={{ color: '#0f172a' }} required />
+                </div>
+                <button type="submit" className="w-full py-4 bg-slate-900 hover:bg-indigo-600 text-white rounded-2xl font-black shadow-lg transition-all active:scale-95">로그인</button>
+              </form>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // --- 로그인 완료된 상태의 UI ---
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans overflow-hidden">
       
@@ -52,15 +175,40 @@ export default function MainAppLauncher() {
             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
               <LayoutGrid className="text-white" size={20} />
             </div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">App Launcher</h1>
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">App Launcher</h1>
+              {/* 로그인 상태 표시 */}
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${profile?.role === 'admin' ? 'text-indigo-600 bg-indigo-50' : 'text-emerald-600 bg-emerald-50'}`}>
+                  <UserIcon size={10} /> {profile?.role === 'admin' ? 'Super Admin' : 'Teacher'}
+                </span>
+                <span className="text-[11px] font-bold text-slate-400">{profile?.name} ({user?.email})</span>
+              </div>
+            </div>
           </div>
           
-          <Link 
-            href="/design" 
-            className="flex items-center gap-2 bg-slate-900 hover:bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-md active:scale-95"
-          >
-            <Plus size={18} /> 빌더 열기 (새 앱 만들기)
-          </Link>
+          <div className="flex items-center gap-3">
+            {/* 로그아웃 버튼 */}
+            <button 
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl text-sm font-black transition-all"
+              title="로그아웃"
+            >
+              <LogOut size={18} /> <span className="hidden sm:inline">로그아웃</span>
+            </button>
+
+            {/* 빌더 버튼 (Admin인 경우만 활성화) */}
+            <Link 
+              href="/design" 
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-md active:scale-95 
+                ${profile?.role === 'admin' 
+                  ? 'bg-slate-900 hover:bg-indigo-600 text-white opacity-100' 
+                  : 'bg-slate-100 text-slate-400 cursor-not-allowed grayscale'}`}
+              onClick={(e) => profile?.role !== 'admin' && e.preventDefault()}
+            >
+              <Plus size={18} /> 빌더 열기
+            </Link>
+          </div>
         </div>
       </header>
 
