@@ -149,11 +149,11 @@ export default function MainAppLauncher() {
               <form onSubmit={handlePasswordLogin} className="space-y-4">
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input type="email" placeholder="이메일 계정" value={loginEmail} onChange={(e)=>setLoginEmail(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-50 transition-all text-slate-900" style={{ color: '#0f172a' }} required />
+              <input type="email" placeholder="이메일 계정" value={loginEmail} onChange={(e)=>setLoginEmail(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-50 transition-all text-slate-900" style={{ color: '#0f172a' }} required />
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input type="password" placeholder="비밀번호" value={loginPass} onChange={(e)=>setLoginPass(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-50 transition-all text-slate-900" style={{ color: '#0f172a' }} required />
+              <input type="password" placeholder="비밀번호" value={loginPass} onChange={(e)=>setLoginPass(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-50 transition-all text-slate-900" style={{ color: '#0f172a' }} required />
                 </div>
                 <button type="submit" className="w-full py-4 bg-slate-900 hover:bg-indigo-600 text-white rounded-2xl font-black shadow-lg transition-all active:scale-95">로그인</button>
               </form>

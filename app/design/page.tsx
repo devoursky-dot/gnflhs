@@ -2,43 +2,23 @@
 
 "use client";
 
-import React, { useState, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useEffect } from 'react'; 
+import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { AppState, View, Action, SchemaData } from './types';
 import ViewEditor from './view';
 import ActionEditor from './action';
-import { useRouter } from 'next/navigation';
 import { Plus, Send, Loader2, ExternalLink, Trash2, FolderOpen, X, Star, ArrowUp, ArrowDown, Copy, PanelLeftClose, PanelLeft, Database } from 'lucide-react';
 import IconPicker, { IconMap } from './picker'; 
+import withAuth from '../withAuth';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
 
-export default function AppBuilder() {
+function AppBuilder() { 
   const router = useRouter();
-  const [isAuthorized, setIsAuthorized] = useState(false);
-
-  // 권한 체크: admin이 아니면 메인으로 이동
-  useLayoutEffect(() => {
-    const checkAuth = async () => {
-      const savedSession = localStorage.getItem('gnflhs_session');
-      if (!savedSession) {
-        router.replace('/');
-        return;
-      }
-      const { email } = JSON.parse(savedSession);
-      const { data } = await supabase.from('teachers').select('role').eq('users', email).single();
-      
-      if (data?.role === 'admin') {
-        setIsAuthorized(true);
-      } else {
-        router.replace('/');
-      }
-    };
-    checkAuth();
-  }, [router]);
 
   const [appState, setAppState] = useState<AppState>({
     id: null, 
@@ -47,34 +27,23 @@ export default function AppBuilder() {
     views: [{ id: 'v1', name: '메인 홈 (첫 화면)', tableName: null, cardHeight: 120, columnCount: 1, layoutRows: [], onClickActionId: null }],
     actions: []
   });
-
+  // 기존 AppBuilder 상태들 및 함수들은 그대로 유지
   const [schemaData, setSchemaData] = useState<SchemaData>({});
   const [activeItem, setActiveItem] = useState<{ type: 'view' | 'action' | 'app', id: string }>({ type: 'view', id: 'v1' });
-  
-  const [isSaving, setIsSaving] = useState(false); 
+  const [isSaving, setIsSaving] = useState(false);
   const [isPreviewSaving, setIsPreviewSaving] = useState<string | null>(null);
-
   const [isAppListModalOpen, setIsAppListModalOpen] = useState(false);
   const [savedAppsList, setSavedAppsList] = useState<any[]>([]);
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
-
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // 인증 확인 중에는 아무것도 렌더링하지 않거나 로딩바 표시
-  if (!isAuthorized) {
-    return (
-      <div className="h-screen w-full flex items-center justify-center bg-slate-50">
-        <Loader2 className="animate-spin text-indigo-600" size={40} />
-      </div>
-    );
-  }
 
+  // 나머지 useEffect 및 핸들러 함수들은 기존대로 유지
   useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
       setIsSidebarOpen(false);
     }
   }, []);
-
   useEffect(() => {
     async function fetchSchema() {
       const { data } = await supabase.rpc("get_schema_info");
@@ -89,7 +58,6 @@ export default function AppBuilder() {
     }
     fetchSchema();
   }, []);
-
   const moveView = (index: number, direction: 'up' | 'down') => {
     if ((direction === 'up' && index === 0) || (direction === 'down' && index === appState.views.length - 1)) return;
     const newViews = [...appState.views];
@@ -276,7 +244,41 @@ export default function AppBuilder() {
 
   return (
     <div className="flex h-screen w-full bg-slate-100 font-sans overflow-hidden">
-      {/* 앱 목록 모달 등 기존 UI 코드 유지 */}
+      {/* --- [기존 앱 열기 모달] --- */}
+      {isAppListModalOpen && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white">
+               <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                <FolderOpen className="text-indigo-600" /> 내 앱 목록
+              </h2>
+              <button onClick={() => setIsAppListModalOpen(false)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4 max-h-[400px] overflow-y-auto bg-slate-50 space-y-2">
+              {savedAppsList.length === 0 ? (
+                <div className="py-10 text-center text-slate-400 font-bold text-sm">저장된 앱이 없습니다.</div>
+              ) : (
+                savedAppsList.map(app => (
+                  <button key={app.id} onClick={() => loadAppToBuilder(app.id)} className="w-full flex items-center justify-between p-4 bg-white border border-slate-200 rounded-2xl hover:border-indigo-400 hover:shadow-md transition-all text-left group">
+                    <div>
+                      <h3 className="font-black text-slate-800 text-base group-hover:text-indigo-700">{app.name || '이름 없는 앱'}</h3>
+                      <p className="text-xs text-slate-400 font-bold mt-1">ID: {app.id} • {new Date(app.created_at).toLocaleDateString()}</p>
+                    </div>
+                    <span className="text-sm font-black text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity">열기 &rarr;</span>
+                  </button>
+                ))
+              )}
+            </div>
+            <div className="p-6 bg-white border-t border-slate-100">
+               <button onClick={handleCreateNewApp} className="w-full py-4 border-2 border-dashed border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2">
+                <Plus size={18} /> 아예 새로운 앱 만들기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isSidebarOpen && (
         <div 
@@ -463,3 +465,6 @@ export default function AppBuilder() {
     </div>
   );
 }
+
+// ✅ [전문가 제안] withAuth HOC를 사용하여 관리자(adminOnly) 전용 페이지로 보호합니다.
+export default withAuth(AppBuilder, { adminOnly: true });
