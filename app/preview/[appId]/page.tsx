@@ -2,16 +2,18 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation'; // useRouter 추가
 import { createClient } from '@supabase/supabase-js';
 import { X, CheckCircle2, ChevronLeft, RefreshCw, Layout, Search, ChevronDown, Folder, ChevronsUpDown, ChevronsUp, MousePointerClick } from 'lucide-react';
 import { IconMap } from '@/app/design/picker'; 
+import withAuth from '@/app/withAuth'; // 🔥 인증 HOC 임포트 (경로 확인 필요)
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
 
+// 레이아웃 렌더링 컴포넌트 (기존과 동일)
 const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) => {
   const isImageUrl = (url: any) => {
     if (typeof url !== 'string') return false;
@@ -26,7 +28,6 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
             const cellValue = rowData[cell.contentValue || ''];
             const shouldShowImage = cell.isImage || isImageUrl(cellValue);
             
-            // 1. 이미지 처리
             if (cell.contentType === 'field' && shouldShowImage) {
               const shapeClass = cell.imageShape === 'circle' ? 'rounded-full aspect-square object-top shadow-sm mx-auto' : cell.imageShape === 'rounded' ? 'rounded-2xl shadow-sm' : 'rounded-none';
               const paddingClass = cell.imageShape === 'circle' ? 'p-3' : cell.imageShape === 'rounded' ? 'p-1.5' : 'p-0';
@@ -37,7 +38,6 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
               );
             }
 
-            // 2. 텍스트 처리
             if (cell.contentType === 'field' && !shouldShowImage) {
               let displayText = cellValue !== null && cellValue !== undefined && cellValue !== '' ? String(cellValue) : '-';
               if (displayText !== '-' && cell.textRegexPattern) {
@@ -56,21 +56,16 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
               );
             }
 
-            // 3. 액션(버튼) & 네스티드 레이아웃 처리
             return (
               <div key={cell.id} style={{ flex: cell.flex }} className="flex flex-col justify-center min-w-0 overflow-hidden relative border-slate-100/50">
                 {cell.contentType === 'action' && (() => {
                   const act = actions?.find((a: any) => a.id === cell.contentValue);
                   if (!act) return null;
-                  
-                  // 🔥 [신규] 설정된 버튼 디자인 로직 적용
                   const btnShape = cell.buttonShape || 'square';
                   const shapeClass = btnShape === 'pill' ? 'rounded-full' : btnShape === 'rounded' ? 'rounded-xl' : 'rounded-none';
-                  
                   const btnAlign = cell.buttonAlign || 'full';
                   const wrapperAlignClass = btnAlign === 'left' ? 'justify-start' : btnAlign === 'right' ? 'justify-end' : btnAlign === 'center' ? 'justify-center' : 'justify-stretch';
                   const btnWidthClass = btnAlign === 'full' ? 'w-full h-full' : 'px-5 py-3';
-                  
                   const bStyle = cell.buttonStyle || 'both';
                   const ActIcon = act.icon && IconMap[act.icon] ? IconMap[act.icon] : MousePointerClick;
 
@@ -93,8 +88,10 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
   );
 };
 
-export default function LiveAppPreview() {
+// 메인 컴포넌트: export default 제거 후 withAuth로 감쌈
+function LiveAppPreview() {
   const params = useParams();
+  const router = useRouter(); // router 추가
   const appId = params?.appId;
 
   const [loading, setLoading] = useState(true);
@@ -236,7 +233,6 @@ export default function LiveAppPreview() {
   };
 
   const displayData = getFilteredData();
-
   let groupedData: Record<string, any[]> = {};
   if (currentView?.groupByColumn) {
     displayData.forEach(row => {
@@ -335,6 +331,7 @@ export default function LiveAppPreview() {
         </div>
       </div>
 
+      {/* 모달 등 나머지 UI (기존과 동일) */}
       {isInputModalOpen && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
@@ -379,3 +376,6 @@ export default function LiveAppPreview() {
     </div>
   );
 }
+
+// 🔥 중요: withAuth로 감싸서 내보내야 차단이 작동합니다.
+export default withAuth(LiveAppPreview);

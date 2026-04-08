@@ -4,6 +4,7 @@ import React, { useState, useLayoutEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { Loader2 } from 'lucide-react';
+import Cookies from 'js-cookie';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
@@ -28,7 +29,8 @@ export default function withAuth<P extends object>(
     useLayoutEffect(() => {
       const verify = async () => {
         try {
-          const session = localStorage.getItem('gnflhs_session');
+          // localStorage 대신 Cookies에서 세션 획득
+          const session = Cookies.get('gnflhs_session');
           if (!session) {
             router.replace('/');
             return;

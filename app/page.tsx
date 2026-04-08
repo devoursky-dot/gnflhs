@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import { Search, Plus, LayoutGrid, Star, ArrowRight, LogIn, LogOut, Mail, Lock, ShieldCheck, User as UserIcon } from 'lucide-react';
+import Cookies from 'js-cookie';
 // 🔥 앞서 만든 picker.tsx에서 IconMap을 가져와 앱의 고유 아이콘을 표시합니다.
 import { IconMap } from './design/picker';
 
@@ -26,8 +27,8 @@ export default function MainAppLauncher() {
   const [authError, setAuthError] = useState('');
 
   useEffect(() => {
-    // 1. 로컬 스토리지에서 세션 확인 (로그인 유지)
-    const savedSession = localStorage.getItem('gnflhs_session');
+    // 1. 쿠키에서 세션 확인 (로그인 유지)
+    const savedSession = Cookies.get('gnflhs_session');
     if (savedSession) {
       const sessionData = JSON.parse(savedSession);
       setUser({ email: sessionData.email });
@@ -93,18 +94,24 @@ export default function MainAppLauncher() {
 
       // 로그인 성공 처리
       const sessionInfo = { email: loginEmail };
-      localStorage.setItem('gnflhs_session', JSON.stringify(sessionInfo));
+      // 기존 localStorage 대신 쿠키에 저장 (7일 유지, 모든 경로 허용)
+      Cookies.set('gnflhs_session', JSON.stringify(sessionInfo), { 
+        expires: 7, 
+        path: '/',
+        sameSite: 'lax'
+      });
+      
       setUser(sessionInfo);
       setProfile(teacher);
       fetchApps();
-
     } catch (error: any) {
       setAuthError(error.message);
     }
   };
 
   const handleLogout = async () => {
-    localStorage.removeItem('gnflhs_session');
+    // 쿠키 삭제 시에도 path를 명시해야 정확하게 삭제됩니다.
+    Cookies.remove('gnflhs_session', { path: '/' });
     window.location.reload();
   };
 
