@@ -25,6 +25,7 @@ export default function withAuth<P extends object>(
   return function AuthenticatedComponent(props: P) {
     const router = useRouter();
     const [isChecking, setIsChecking] = useState(true);
+    const [userProfile, setUserProfile] = useState<any>(null);
 
     useLayoutEffect(() => {
       const verify = async () => {
@@ -39,7 +40,7 @@ export default function withAuth<P extends object>(
           const { email } = JSON.parse(session);
           const { data: profile, error } = await supabase
             .from('teachers')
-            .select('role')
+            .select('role, name')
             .eq('users', email)
             .single();
 
@@ -57,6 +58,7 @@ export default function withAuth<P extends object>(
             return;
           }
 
+          setUserProfile({ email, name: profile.name, role: profile.role });
           setIsChecking(false);
         } catch (e) {
           router.replace('/');
@@ -73,6 +75,6 @@ export default function withAuth<P extends object>(
       );
     }
 
-    return <WrappedComponent {...props} />;
+    return <WrappedComponent {...props} userProfile={userProfile} />;
   };
 }

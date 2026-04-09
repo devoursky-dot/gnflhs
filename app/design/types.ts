@@ -65,7 +65,7 @@ export type LayoutCell = {
 export type InsertMapping = {
   id: string;
   targetColumn: string;
-  mappingType: 'card_data' | 'static' | 'prompt';
+  mappingType: 'card_data' | 'static' | 'prompt' | 'user_name' | 'user_email';
   sourceValue: string;
   valueType?: 'string' | 'number';
 };

@@ -89,7 +89,7 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
 };
 
 // 메인 컴포넌트: export default 제거 후 withAuth로 감쌈
-function LiveAppPreview() {
+function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   const params = useParams();
   const router = useRouter(); // router 추가
   const appId = params?.appId;
@@ -169,6 +169,8 @@ function LiveAppPreview() {
       action.insertMappings?.forEach((m: any) => {
         if (m.mappingType === 'card_data') initialData[m.targetColumn] = rowData[m.sourceValue];
         else if (m.mappingType === 'static') initialData[m.targetColumn] = m.sourceValue;
+        else if (m.mappingType === 'user_name') initialData[m.targetColumn] = userProfile?.name || '';
+        else if (m.mappingType === 'user_email') initialData[m.targetColumn] = userProfile?.email || '';
         else initialData[m.targetColumn] = '';
       });
       setFormData(initialData); setIsInputModalOpen(true);
@@ -188,6 +190,8 @@ function LiveAppPreview() {
       action.updateMappings?.forEach((m: any) => {
         if (m.mappingType === 'card_data') initialData[m.targetColumn] = rowData[m.sourceValue];
         else if (m.mappingType === 'static') initialData[m.targetColumn] = m.sourceValue;
+        else if (m.mappingType === 'user_name') initialData[m.targetColumn] = userProfile?.name || '';
+        else if (m.mappingType === 'user_email') initialData[m.targetColumn] = userProfile?.email || '';
         else if (m.mappingType === 'prompt') initialData[m.targetColumn] = rowData[m.targetColumn] !== undefined && rowData[m.targetColumn] !== null ? rowData[m.targetColumn] : '';
       });
       setUpdateFormData(initialData); setIsUpdateModalOpen(true);

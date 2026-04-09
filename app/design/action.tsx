@@ -153,6 +153,8 @@ export default function ActionEditor({
                             <option value="prompt">💬 폼에서 직접 입력받기</option>
                             <option value="card_data">📄 현재 카드 데이터 재사용</option>
                             <option value="static">✍️ 고정 값 입력</option>
+                            <option value="user_name">👤 계정 사용자 이름</option>
+                            <option value="user_email">📧 계정 사용자 이메일</option>
                           </select>
                         </div>
                         <div>
@@ -173,18 +175,19 @@ export default function ActionEditor({
                         </div>
                         <div>
                           <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider whitespace-nowrap">
-                            4. {mapping.mappingType === 'prompt' ? '입력 폼 레이블' : mapping.mappingType === 'card_data' ? '원본 컬럼명' : '고정값'}
+                            4. {mapping.mappingType === 'prompt' ? '입력 폼 레이블' : mapping.mappingType === 'card_data' ? '원본 컬럼명' : mapping.mappingType === 'static' ? '고정값' : '설정 불필요'}
                           </span>
                           <input
                             type="text"
-                            value={mapping.sourceValue}
+                            value={mapping.mappingType === 'user_name' || mapping.mappingType === 'user_email' ? '(자동 적용)' : mapping.sourceValue}
+                            disabled={mapping.mappingType === 'user_name' || mapping.mappingType === 'user_email'}
                             onChange={(e) => {
                               const newArr = [...action.insertMappings!];
                               newArr[idx].sourceValue = e.target.value;
                               onUpdate({ ...action, insertMappings: newArr });
                             }}
                             placeholder="설정값을 입력하세요"
-                            className="w-full p-2.5 text-sm font-bold border border-rose-200 rounded-lg focus:border-rose-500 outline-none text-slate-900 min-w-[200px]"
+                            className="w-full p-2.5 text-sm font-bold border border-rose-200 rounded-lg focus:border-rose-500 outline-none text-slate-900 min-w-[200px] disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed"
                             style={{ color: 'var(--text-primary)' }}
                           />
                         </div>
@@ -266,7 +269,9 @@ export default function ActionEditor({
                           >
                             <option value="prompt">💬 모달폼 띄워서 입력받기</option>
                             <option value="card_data">📄 현재 카드의 다른 데이터 사용</option>
-                            <option value="static">✍️ 백그라운드 고정 값 일괄수정</option>
+                            <option value="static">✍️ 백그라운 고정 값 일괄수정</option>
+                            <option value="user_name">👤 계정 사용자 이름</option>
+                            <option value="user_email">📧 계정 사용자 이메일</option>
                           </select>
                         </div>
                         <div>
@@ -287,18 +292,19 @@ export default function ActionEditor({
                         </div>
                         <div>
                           <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider whitespace-nowrap">
-                            4. {mapping.mappingType === 'prompt' ? '수정 폼 레이블' : mapping.mappingType === 'card_data' ? '원본 컬럼명' : '고정값'}
+                            4. {mapping.mappingType === 'prompt' ? '수정 폼 레이블' : mapping.mappingType === 'card_data' ? '원본 컬럼명' : mapping.mappingType === 'static' ? '고정값' : '설정 불필요'}
                           </span>
                           <input
                             type="text"
-                            value={mapping.sourceValue}
+                            value={mapping.mappingType === 'user_name' || mapping.mappingType === 'user_email' ? '(자동 적용)' : mapping.sourceValue}
+                            disabled={mapping.mappingType === 'user_name' || mapping.mappingType === 'user_email'}
                             onChange={(e) => {
                               const newArr = [...action.updateMappings!];
                               newArr[idx].sourceValue = e.target.value;
                               onUpdate({ ...action, updateMappings: newArr });
                             }}
                             placeholder="설정값을 입력하세요"
-                            className="w-full p-2.5 text-sm font-bold border border-rose-200 rounded-lg focus:border-rose-500 outline-none text-slate-900 min-w-[200px]"
+                            className="w-full p-2.5 text-sm font-bold border border-rose-200 rounded-lg focus:border-rose-500 outline-none text-slate-900 min-w-[200px] disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed"
                             style={{ color: 'var(--text-primary)' }}
                           />
                         </div>
