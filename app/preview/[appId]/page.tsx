@@ -256,10 +256,10 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   };
 
   const getGridColsClass = (cols: number) => {
-    if (cols === 4) return 'grid-cols-4 md:grid-cols-8';
-    if (cols === 3) return 'grid-cols-3 md:grid-cols-6';
-    if (cols === 2) return 'grid-cols-2 md:grid-cols-4';
-    return 'grid-cols-1 md:grid-cols-2';
+    if (cols === 4) return 'grid-cols-4 lg:grid-cols-8';
+    if (cols === 3) return 'grid-cols-3 lg:grid-cols-6';
+    if (cols === 2) return 'grid-cols-2 lg:grid-cols-4';
+    return 'grid-cols-1 lg:grid-cols-2';
   };
   const gridColsClass = getGridColsClass(currentView?.columnCount || 1);
 
