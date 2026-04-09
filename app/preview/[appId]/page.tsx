@@ -122,6 +122,18 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
           const urlParams = new URLSearchParams(window.location.search);
           const mode = urlParams.get('mode');
           let activeConfig = mode === 'draft' ? (data.draft_config || data.app_config) : data.app_config;
+          
+          // 권한 검사 (어드민이 아니고, 퍼블릭이 아니며, 허용된 유저 목록에 없을 때)
+          const config = activeConfig || {};
+          const isPublic = config.isPublic !== false;
+          if (userProfile?.role !== 'admin' && !isPublic) {
+            if (!config.allowedUsers || !config.allowedUsers.includes(userProfile?.email)) {
+              alert("이 앱에 접근할 권한이 없습니다.");
+              router.push('/');
+              return;
+            }
+          }
+          
           document.title = mode === 'draft' ? `[Draft] ${data.name}` : data.name;
           setAppData({ ...data, app_config: activeConfig });
           if (activeConfig?.views?.length > 0) {

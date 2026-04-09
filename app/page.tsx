@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
-import { Search, Plus, LayoutGrid, Star, ArrowRight, LogIn, LogOut, Mail, Lock, ShieldCheck, User as UserIcon } from 'lucide-react';
+import { Search, Plus, LayoutGrid, Star, ArrowRight, LogIn, LogOut, Mail, Lock, ShieldCheck, User as UserIcon, X, CheckCircle2 } from 'lucide-react';
 import Cookies from 'js-cookie';
 // 🔥 앞서 만든 picker.tsx에서 IconMap을 가져와 앱의 고유 아이콘을 표시합니다.
 import { IconMap } from './design/picker';
@@ -63,6 +63,15 @@ export default function MainAppLauncher() {
     }
   };
 
+  // 권한 모달 관련 상태
+  const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+  const [selectedAppForAccess, setSelectedAppForAccess] = useState<any>(null);
+  const [allTeachers, setAllTeachers] = useState<any[]>([]);
+  const [accessIsPublic, setAccessIsPublic] = useState(true);
+  const [accessAllowedUsers, setAccessAllowedUsers] = useState<string[]>([]);
+  const [isSavingAccess, setIsSavingAccess] = useState(false);
+  const [teacherSearchTerm, setTeacherSearchTerm] = useState('');
+
   async function fetchApps() {
     try {
       const { data, error } = await supabase
@@ -71,11 +80,64 @@ export default function MainAppLauncher() {
         .order('id', { ascending: false });
       
       if (error) throw error;
-      if (data) setApps(data);
+      
+      if (data) {
+        setApps(data);
+      }
     } catch (error) {
       console.error('앱 목록 로드 실패:', error);
     }
   }
+
+  const openAccessModal = async (e: React.MouseEvent, app: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    setSelectedAppForAccess(app);
+    const config = app.app_config || {};
+    setAccessIsPublic(config.isPublic !== false);
+    setAccessAllowedUsers(config.allowedUsers || []);
+    setIsAccessModalOpen(true);
+    setTeacherSearchTerm('');
+
+    if (allTeachers.length === 0) {
+      const { data } = await supabase.from('teachers').select('users, name');
+      if (data) setAllTeachers(data);
+    }
+  };
+
+  const handleSaveAccess = async () => {
+    if (!selectedAppForAccess) return;
+    setIsSavingAccess(true);
+    try {
+      const updatedConfig = { 
+        ...selectedAppForAccess.app_config, 
+        isPublic: accessIsPublic, 
+        allowedUsers: accessIsPublic ? [] : accessAllowedUsers 
+      };
+      
+      const { error } = await supabase
+        .from('apps')
+        .update({ app_config: updatedConfig })
+        .eq('id', selectedAppForAccess.id);
+        
+      if (error) throw error;
+      
+      alert('앱 접근 권한이 업데이트되었습니다.');
+      setIsAccessModalOpen(false);
+      fetchApps(); 
+    } catch (err: any) {
+      alert(`오류 발생: ${err.message}`);
+    } finally {
+      setIsSavingAccess(false);
+    }
+  };
+
+  const toggleTeacherAccess = (email: string) => {
+    setAccessAllowedUsers(prev => 
+      prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email]
+    );
+  };
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,10 +177,20 @@ export default function MainAppLauncher() {
     window.location.reload();
   };
 
-  // 검색어에 따른 앱 필터링 로직
-  const filteredApps = apps.filter(app => 
-    app.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // 검색어 및 권한에 따른 앱 필터링 로직
+  const filteredApps = apps.filter(app => {
+    // 1. 키워드 필터
+    if (!app.name?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    
+    // 2. 권한 필터
+    if (profile?.role === 'admin') return true;
+    
+    const config = app.app_config || {};
+    const isPublic = config.isPublic !== false;
+    if (isPublic) return true;
+    
+    return config.allowedUsers && config.allowedUsers.includes(user?.email);
+  });
 
   // --- 권한 확인 로직 ---
   const isAuthorized = profile?.role === 'admin' || profile?.role === 'tch';
@@ -269,6 +341,16 @@ export default function MainAppLauncher() {
                     {/* 카드 호버 시 나타나는 배경 이펙트 */}
                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-[2] duration-500 ease-out z-0"></div>
                     
+                    {profile?.role === 'admin' && (
+                      <button
+                        onClick={(e) => openAccessModal(e, app)}
+                        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white border border-slate-200 text-slate-400 flex items-center justify-center hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all z-20 shadow-sm opacity-0 group-hover:opacity-100"
+                        title="접근 권한 설정"
+                      >
+                        <Lock size={16} />
+                      </button>
+                    )}
+                    
                     <div className="relative z-10 flex items-start gap-4 mb-8">
                       <div className="w-14 h-14 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300 shadow-sm shrink-0">
                         <AppIcon size={28} strokeWidth={2.5} />
@@ -298,6 +380,107 @@ export default function MainAppLauncher() {
           )}
         </div>
       </main>
+
+      {/* 권한 관리 모달 */}
+      {isAccessModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="px-6 py-5 border-b flex justify-between items-center bg-white shrink-0">
+              <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                <Lock className="text-indigo-600" /> 접근 권한 설정
+              </h3>
+              <button 
+                onClick={() => setIsAccessModalOpen(false)} 
+                className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[60vh] bg-slate-50 flex flex-col gap-6">
+              <div>
+                <label className="text-sm font-black text-slate-700 mb-2 block">권한 범위</label>
+                <div className="flex bg-slate-200/50 p-1 rounded-2xl">
+                  <button 
+                    onClick={() => setAccessIsPublic(true)}
+                    className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all ${accessIsPublic ? 'bg-white shadow-md text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    🚀 전체 공개 (Public)
+                  </button>
+                  <button 
+                    onClick={() => setAccessIsPublic(false)}
+                    className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all ${!accessIsPublic ? 'bg-white shadow-md text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    🔒 제한됨 (Private)
+                  </button>
+                </div>
+                <p className="text-xs font-bold text-slate-400 mt-2 ml-1">
+                  {accessIsPublic ? '모든 등록된 교사가 앱 목록에서 보고 자유롭게 접근할 수 있습니다.' : '오직 선택된 교사들만 앱 목록에서 볼 수 있고 접속이 허용됩니다.'}
+                </p>
+              </div>
+
+              {!accessIsPublic && (
+                <div className="animate-in fade-in slide-in-from-top-2 duration-300 flex-1 flex flex-col min-h-0">
+                  <label className="text-sm font-black text-slate-700 mb-2 block">접속을 허용할 선생님 ({accessAllowedUsers.length}명 선택됨)</label>
+                  <div className="relative mb-3 shrink-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                    <input 
+                      type="text" 
+                      placeholder="이름 또는 이메일 검색..." 
+                      value={teacherSearchTerm} 
+                      onChange={(e) => setTeacherSearchTerm(e.target.value)} 
+                      className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-700" 
+                    />
+                  </div>
+                  <div className="flex-1 bg-white border border-slate-200 rounded-2xl overflow-y-auto max-h-[30vh]">
+                    {allTeachers
+                      .filter(t => t.name.includes(teacherSearchTerm) || t.users.includes(teacherSearchTerm))
+                      .map(t => {
+                        const isSelected = accessAllowedUsers.includes(t.users);
+                        return (
+                          <div 
+                            key={t.users} 
+                            onClick={() => toggleTeacherAccess(t.users)}
+                            className="flex items-center justify-between px-4 py-3 border-b border-slate-100 last:border-0 cursor-pointer hover:bg-slate-50 transition-colors"
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-800 text-sm">{t.name}</span>
+                              <span className="font-bold text-slate-400 text-xs">{t.users}</span>
+                            </div>
+                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all border-2 ${isSelected ? 'bg-indigo-600 border-indigo-600 shadow-sm text-white' : 'border-slate-200 text-transparent'}`}>
+                              <CheckCircle2 size={14} strokeWidth={4} />
+                            </div>
+                          </div>
+                        );
+                    })}
+                    {allTeachers.filter(t => t.name.includes(teacherSearchTerm) || t.users.includes(teacherSearchTerm)).length === 0 && (
+                      <div className="p-8 text-center text-slate-400 font-bold text-sm">
+                        검색된 선생님이 없습니다.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="px-6 py-5 bg-white border-t flex gap-3 shrink-0">
+              <button 
+                onClick={() => setIsAccessModalOpen(false)} 
+                className="flex-1 py-4 text-slate-500 font-black rounded-2xl hover:bg-slate-100 transition-all border border-slate-100"
+              >
+                취소
+              </button>
+              <button 
+                onClick={handleSaveAccess} 
+                disabled={isSavingAccess} 
+                className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
+              >
+                {isSavingAccess ? "저장 중..." : "권한 설정 저장"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
