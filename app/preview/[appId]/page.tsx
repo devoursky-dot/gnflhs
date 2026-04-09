@@ -247,7 +247,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     });
   }
 
-  const toggleGroup = (key: string) => setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
+  const toggleGroup = (key: string) => setExpandedGroups(prev => prev[key] ? {} : { [key]: true });
   const groupKeys = Object.keys(groupedData);
   const isAllExpanded = groupKeys.length > 0 && groupKeys.every(k => expandedGroups[k]);
   const handleToggleAllGroups = () => {
@@ -255,83 +255,118 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     else { const allOpen: Record<string, boolean> = {}; groupKeys.forEach(k => allOpen[k] = true); setExpandedGroups(allOpen); }
   };
 
+  const getGridColsClass = (cols: number) => {
+    if (cols === 4) return 'grid-cols-4 md:grid-cols-8';
+    if (cols === 3) return 'grid-cols-3 md:grid-cols-6';
+    if (cols === 2) return 'grid-cols-2 md:grid-cols-4';
+    return 'grid-cols-1 md:grid-cols-2';
+  };
+  const gridColsClass = getGridColsClass(currentView?.columnCount || 1);
+
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-slate-50 font-black text-slate-400">LOADING...</div>;
 
   return (
     <div className="min-h-screen bg-slate-100 flex justify-center font-sans">
-      <div className="w-full max-w-md bg-white shadow-2xl flex flex-col relative h-screen overflow-hidden">
+      <div className="w-full bg-slate-50 flex flex-col md:flex-row relative h-screen overflow-hidden">
         
-        <div className="pt-8 pb-3 px-6 border-b bg-white sticky top-0 z-10 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
+        {/* Header / Sidebar Area */}
+        <div className="pt-6 pb-4 px-5 border-b md:border-r md:border-b-0 bg-white relative z-10 shadow-[0_2px_15px_rgba(0,0,0,0.03)] flex flex-col shrink-0 md:w-80 lg:w-96 md:h-screen">
+          <div className="flex items-center justify-between mb-5">
             <div className="w-10">
               {currentViewId !== appData?.app_config?.views?.[0]?.id && (
-                <button onClick={() => { setCurrentViewId(appData.app_config.views[0].id); setSearchTerm(''); setExpandedGroups({}); }} className="p-2 text-slate-400 hover:text-slate-600 transition-colors"><ChevronLeft /></button>
+                <button onClick={() => { setCurrentViewId(appData.app_config.views[0].id); setSearchTerm(''); setExpandedGroups({}); }} className="p-2 sm:p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all"><ChevronLeft size={22} /></button>
               )}
             </div>
-            <div className="font-black text-slate-900 text-xl truncate">{currentView?.name || appData.name}</div>
+            <div className="font-extrabold text-slate-900 text-xl sm:text-2xl truncate flex-1 text-center tracking-tight">{currentView?.name || appData.name}</div>
             <div className="w-10 text-right">
-              {currentView?.tableName && <button onClick={() => fetchTableData(currentView)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"><RefreshCw size={18} /></button>}
+              {currentView?.tableName && <button onClick={() => fetchTableData(currentView)} className="p-2 sm:p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><RefreshCw size={20} /></button>}
             </div>
           </div>
+          
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input type="text" placeholder={currentView?.groupByColumn ? "전체 그룹에서 검색..." : "데이터 검색..."} value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); if (e.target.value !== '' && currentView?.groupByColumn) { const allOpen: Record<string, boolean> = {}; Object.keys(groupedData).forEach(k => allOpen[k] = true); setExpandedGroups(allOpen); } }} className="w-full pl-10 pr-4 py-2.5 bg-slate-100 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-700" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input type="text" placeholder={currentView?.groupByColumn ? "그룹에서 검색..." : "데이터 검색..."} value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); if (e.target.value !== '' && currentView?.groupByColumn) { const allOpen: Record<string, boolean> = {}; Object.keys(groupedData).forEach(k => allOpen[k] = true); setExpandedGroups(allOpen); } }} className="w-full pl-12 pr-4 py-3 bg-slate-100/80 hover:bg-slate-100 rounded-2xl text-[15px] font-bold outline-none focus:bg-white focus:ring-4 focus:ring-indigo-50 transition-all text-slate-800" />
             </div>
             {currentView?.groupByColumn && groupKeys.length > 0 && (
-              <button onClick={handleToggleAllGroups} className="flex items-center justify-center gap-1.5 px-3.5 bg-white border-2 border-slate-100 text-slate-600 rounded-2xl font-black text-[11px] hover:border-indigo-200 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all shrink-0">
+              <button onClick={handleToggleAllGroups} className="flex items-center justify-center gap-1.5 px-3.5 bg-white border-2 border-slate-100 text-slate-600 rounded-2xl font-black text-xs hover:border-indigo-200 hover:text-indigo-600 hover:bg-indigo-50 transition-all shrink-0">
                 {isAllExpanded ? <ChevronsUp size={16} /> : <ChevronsUpDown size={16} />}{isAllExpanded ? '접기' : '펼치기'}
               </button>
             )}
           </div>
+          
+          {/* Desktop Sidebar Navigation */}
+          <div className="hidden md:flex flex-col gap-2 mt-8 flex-1 overflow-y-auto pr-2 pb-8 scrollbar-hide">
+            <h3 className="text-[11px] font-black text-slate-300 uppercase tracking-widest pl-3 mb-2 flex items-center gap-2"><Layout size={14}/> App Views</h3>
+            {appData?.app_config?.views?.map((v: any) => {
+              const IconComp = v.icon && IconMap[v.icon] ? IconMap[v.icon] : Layout;
+              const isActive = currentViewId === v.id;
+              return (
+                <button 
+                  key={`desktop-${v.id}`} 
+                  onClick={() => { setCurrentViewId(v.id); setSearchTerm(''); setExpandedGroups({}); }} 
+                  className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl transition-all border ${isActive ? 'bg-indigo-50 border-indigo-100 text-indigo-700 font-black shadow-sm' : 'border-transparent text-slate-500 hover:bg-slate-50 font-bold hover:border-slate-200'}`}
+                >
+                  <IconComp size={22} strokeWidth={isActive ? 3 : 2} className={isActive ? 'text-indigo-600' : 'text-slate-400'} />
+                  <span className="truncate flex-1 text-left text-[15px]">{v.name}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-slate-50 pb-20">
-          {currentView?.groupByColumn ? (
-            <div className="flex flex-col pt-1">
-              {Object.entries(groupedData).map(([groupKey, rows]) => {
-                const isExpanded = !!expandedGroups[groupKey];
-                return (
-                  <div key={groupKey} className="mb-1">
-                    <button onClick={() => toggleGroup(groupKey)} className="w-full flex items-center justify-between px-5 py-4 bg-white border-b border-slate-200 hover:bg-indigo-50/50 transition-colors">
-                      <div className="flex items-center gap-3"><Folder className={isExpanded ? "text-indigo-500" : "text-slate-400"} size={18} /><span className={`text-[15px] font-black ${isExpanded ? 'text-indigo-900' : 'text-slate-700'}`}>{groupKey}</span><span className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-0.5 rounded-full">{rows.length}건</span></div>
-                      <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : 'rotate-0'}`}><ChevronDown className={isExpanded ? "text-indigo-500" : "text-slate-300"} size={20} /></div>
-                    </button>
-                    {isExpanded && (
-                      <div className={`grid gap-0 bg-slate-50 border-b border-slate-200 shadow-inner ${currentView?.columnCount === 2 ? 'grid-cols-2' : currentView?.columnCount === 3 ? 'grid-cols-3' : currentView?.columnCount === 4 ? 'grid-cols-4' : 'grid-cols-1'}`}>
-                        {rows.map((row, idx) => (
-                          <div key={idx} className="flex flex-col bg-white border-b border-r border-slate-100 overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors" style={{ minHeight: `${currentView?.cardHeight || 120}px` }} onClick={() => { const act = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (act) handleAction(act, row); }}>
-                            <RenderPreviewLayout rows={currentView?.layoutRows || []} rowData={row} actions={appData.app_config.actions} onExecuteAction={handleAction} />
+        {/* Content Area */}
+        <div className="flex-1 flex flex-col relative overflow-hidden bg-slate-50">
+          <div className="flex-1 flex flex-col overflow-hidden md:p-6 pb-24 md:pb-6">
+            <div className="w-full flex-1 md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 overflow-y-auto scrollbar-hide flex flex-col">
+              {currentView?.groupByColumn ? (
+                <div className="flex flex-col pt-0 flex-1">
+                  {Object.entries(groupedData).map(([groupKey, rows]) => {
+                    const isExpanded = !!expandedGroups[groupKey];
+                    return (
+                      <div key={groupKey} className="mb-0">
+                        <button onClick={() => toggleGroup(groupKey)} className="w-full flex items-center justify-between px-5 py-4 bg-white border-b border-slate-200 hover:bg-indigo-50/50 transition-colors">
+                          <div className="flex items-center gap-3"><Folder className={isExpanded ? "text-indigo-500" : "text-slate-400"} size={18} /><span className={`text-[15px] font-black ${isExpanded ? 'text-indigo-900' : 'text-slate-700'}`}>{groupKey}</span><span className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-0.5 rounded-full">{rows.length}건</span></div>
+                          <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : 'rotate-0'}`}><ChevronDown className={isExpanded ? "text-indigo-500" : "text-slate-300"} size={20} /></div>
+                        </button>
+                        {isExpanded && (
+                          <div className={`grid gap-0 bg-slate-50/50 border-b border-slate-200 shadow-inner ${gridColsClass}`}>
+                            {rows.map((row, idx) => (
+                              <div key={idx} className="flex flex-col bg-white border-b border-r border-slate-100 overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors" style={{ minHeight: `${currentView?.cardHeight || 120}px` }} onClick={() => { const act = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (act) handleAction(act, row); }}>
+                                <RenderPreviewLayout rows={currentView?.layoutRows || []} rowData={row} actions={appData.app_config.actions} onExecuteAction={handleAction} />
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className={`grid gap-0 ${currentView?.columnCount === 2 ? 'grid-cols-2' : currentView?.columnCount === 3 ? 'grid-cols-3' : currentView?.columnCount === 4 ? 'grid-cols-4' : 'grid-cols-1'}`}>
-              {displayData.map((row, idx) => (
-                <div key={idx} className="flex flex-col bg-white border-b border-r border-slate-100 overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors" style={{ minHeight: `${currentView?.cardHeight || 120}px` }} onClick={() => { const act = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (act) handleAction(act, row); }}>
-                  <RenderPreviewLayout rows={currentView?.layoutRows || []} rowData={row} actions={appData.app_config.actions} onExecuteAction={handleAction} />
+                    );
+                  })}
                 </div>
-              ))}
+              ) : (
+                <div className={`grid gap-0 flex-1 content-start ${gridColsClass}`}>
+                  {displayData.map((row, idx) => (
+                    <div key={idx} className="flex flex-col bg-white border-b border-r border-slate-100 overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors" style={{ minHeight: `${currentView?.cardHeight || 120}px` }} onClick={() => { const act = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (act) handleAction(act, row); }}>
+                      <RenderPreviewLayout rows={currentView?.layoutRows || []} rowData={row} actions={appData.app_config.actions} onExecuteAction={handleAction} />
+                    </div>
+                  ))}
+                </div>
+              )}
+              {displayData.length === 0 && <div className="p-20 text-center flex flex-col items-center gap-3 text-slate-400 mt-10"><Search size={40} className="opacity-20" /><p className="font-bold">조건에 맞는 데이터가 없습니다.</p></div>}
             </div>
-          )}
-          {displayData.length === 0 && <div className="p-20 text-center flex flex-col items-center gap-3 text-slate-400 mt-10"><Search size={40} className="opacity-20" /><p className="font-bold">조건에 맞는 데이터가 없습니다.</p></div>}
-        </div>
-
-        <div className="h-20 bg-white border-t flex items-center justify-around px-2 absolute bottom-0 w-full z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
-          {appData?.app_config?.views?.slice(0, 5).map((v: any) => {
-            const IconComp = v.icon && IconMap[v.icon] ? IconMap[v.icon] : Layout;
-            const isActive = currentViewId === v.id;
-            return (
-              <button key={v.id} onClick={() => { setCurrentViewId(v.id); setSearchTerm(''); setExpandedGroups({}); }} className={`flex-1 flex flex-col items-center gap-1.5 transition-all ${isActive ? 'text-indigo-600 scale-105' : 'text-slate-300 hover:text-slate-500'}`}>
-                <IconComp size={22} strokeWidth={isActive ? 3 : 2} /><span className={`text-[10px] font-black uppercase tracking-tighter truncate w-16 text-center ${isActive ? 'opacity-100' : 'opacity-60'}`}>{v.name}</span>
-              </button>
-            );
-          })}
+          </div>
+          
+          {/* Mobile Bottom Tab Bar */}
+          <div className="h-20 bg-white border-t flex items-center justify-around px-2 absolute bottom-0 w-full z-20 md:hidden shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+            {appData?.app_config?.views?.slice(0, 5).map((v: any) => {
+              const IconComp = v.icon && IconMap[v.icon] ? IconMap[v.icon] : Layout;
+              const isActive = currentViewId === v.id;
+              return (
+                <button key={`mobile-${v.id}`} onClick={() => { setCurrentViewId(v.id); setSearchTerm(''); setExpandedGroups({}); }} className={`flex-1 flex flex-col items-center gap-1.5 transition-all ${isActive ? 'text-indigo-600 scale-105' : 'text-slate-300 hover:text-slate-500'}`}>
+                  <IconComp size={22} strokeWidth={isActive ? 3 : 2} /><span className={`text-[10px] font-black uppercase tracking-tighter truncate w-16 text-center ${isActive ? 'opacity-100' : 'opacity-60'}`}>{v.name}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
