@@ -248,14 +248,24 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       });
 
       const targetName = rowData.name || rowData.NAME || rowData.students || rowData.STUDENTS || "대상자";
-      const confirmMessage = `[${targetName}] 학생의 전화번호(${phone})로 문자를 보내시겠습니까?`;
-      
-      if (window.confirm(confirmMessage)) {
-        const isIOS = navigator.userAgent.match(/iPad|iPhone|iPod/i) != null;
-        const separator = isIOS ? '&' : '?';
-        const smsUrl = `sms:${phone}${separator}body=${encodeURIComponent(message)}`;
-        
-        window.location.href = smsUrl;
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+      if (isMobile) {
+        const confirmMessage = `[${targetName}] 학생의 전화번호(${phone})로 문자를 보내시겠습니까?`;
+        if (window.confirm(confirmMessage)) {
+          const isIOS = navigator.userAgent.match(/iPad|iPhone|iPod/i) != null;
+          const separator = isIOS ? '&' : '?';
+          window.location.href = `sms:${phone}${separator}body=${encodeURIComponent(message)}`;
+        }
+      } else {
+        const confirmMessage = `[PC 환경] [${targetName}] 학생(${phone})에게 보낼 문자 내용입니다.\n\n클립보드에 바로 복사할까요? (크로샷 등에 편하게 붙여넣기 하세요)\n\n─────────────────\n${message}\n─────────────────`;
+        if (window.confirm(confirmMessage)) {
+          navigator.clipboard.writeText(`${phone}\n\n${message}`).then(() => {
+            alert("✅ 클립보드에 번호와 내용이 성공적으로 복사되었습니다!\n크로샷 등 원하시는 화면에서 Ctrl+V 를 눌러 붙여넣기 하세요.");
+          }).catch(() => {
+            alert("복사 권한이 없어 실패했습니다. 사용하시는 기기 설정을 확인해주세요.");
+          });
+        }
       }
     }
   };
