@@ -238,8 +238,6 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
         }
       }
 
-      if (!phone) return alert("해당 학생과 연결된 전화번호를 자동으로 찾을 수 없습니다.");
-      
       let message = action.smsMessageTemplate || '';
       // {{컬럼명}} 템플릿 치환
       message = message.replace(/\{\{\s*(.*?)\s*\}\}/g, (match: string, p1: string) => {
@@ -249,21 +247,28 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
 
       const targetName = rowData.name || rowData.NAME || rowData.students || rowData.STUDENTS || "대상자";
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      const safePhone = phone || "";
 
       if (isMobile) {
-        const confirmMessage = `[${targetName}] 학생의 전화번호(${phone})로 문자를 보내시겠습니까?`;
+        const confirmMessage = safePhone 
+          ? `[${targetName}] 학생의 전화번호(${safePhone})로 문자를 보내시겠습니까?`
+          : `[${targetName}] 학생의 전화번호를 찾지 못했습니다.\n문자 앱을 열어 내용만 자동으로 입력하시겠습니까? (수신자는 직접 입력)`;
+          
         if (window.confirm(confirmMessage)) {
           const isIOS = navigator.userAgent.match(/iPad|iPhone|iPod/i) != null;
           const separator = isIOS ? '&' : '?';
-          window.location.href = `sms:${phone}${separator}body=${encodeURIComponent(message)}`;
+          window.location.href = `sms:${safePhone}${separator}body=${encodeURIComponent(message)}`;
         }
       } else {
-        const confirmMessage = `[PC 환경] [${targetName}] 학생(${phone})에게 보낼 문자 내용입니다.\n\n클립보드에 바로 복사할까요? (크로샷 등에 편하게 붙여넣기 하세요)\n\n─────────────────\n${message}\n─────────────────`;
+        const confirmMessage = safePhone 
+          ? `[PC 환경] [${targetName}] 학생(${safePhone})에게 보낼 문자 내용입니다.\n\n크로샷 등에 사용하기 위해 클립보드에 바로 복사할까요?\n\n─────────────────\n${message}\n─────────────────`
+          : `[PC 환경] [${targetName}] 학생의 전화번호를 찾지 못했습니다.\n\n연락처 부분을 비워두고 문자 내용만 클립보드에 복사할까요?\n\n─────────────────\n${message}\n─────────────────`;
+          
         if (window.confirm(confirmMessage)) {
-          navigator.clipboard.writeText(`${phone}\n\n${message}`).then(() => {
-            alert("✅ 클립보드에 번호와 내용이 성공적으로 복사되었습니다!\n크로샷 등 원하시는 화면에서 Ctrl+V 를 눌러 붙여넣기 하세요.");
-          }).catch(() => {
-            alert("복사 권한이 없어 실패했습니다. 사용하시는 기기 설정을 확인해주세요.");
+          const clipText = safePhone ? `${safePhone}\n\n${message}` : `\n\n${message}`;
+          navigator.clipboard.writeText(clipText).catch(() => {
+            alert("복사 권한이 없어 실패했습니다. 브라우저 설정을 확인해주세요.");
           });
         }
       }
