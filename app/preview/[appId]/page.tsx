@@ -242,7 +242,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       
       let message = action.smsMessageTemplate || '';
       // {{컬럼명}} 템플릿 치환
-      message = message.replace(/\{\{\s*(.*?)\s*\}\}/g, (match, p1) => {
+      message = message.replace(/\{\{\s*(.*?)\s*\}\}/g, (match: string, p1: string) => {
         const val = rowData[p1.trim()];
         return val !== undefined && val !== null ? String(val) : '';
       });
