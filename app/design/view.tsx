@@ -180,6 +180,16 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           </button>
           <input className="flex-1 p-5 rounded-[1.5rem] border-2 border-slate-100 text-3xl font-black outline-none focus:border-indigo-500 transition-all text-slate-900 min-w-[300px]" value={view.name} onChange={e => onUpdate({...view, name: e.target.value})} placeholder="화면 이름을 입력하세요" />
         </div>
+        <div className="mt-8 pt-6 border-t border-slate-100 whitespace-normal">
+          <label className="text-[12px] font-black text-slate-600 block px-2 mb-3 tracking-tight">메뉴 버튼 표시 위치 (Nav Position)</label>
+          <div className="flex gap-3 px-2 flex-wrap min-w-[400px]">
+            <button onClick={() => onUpdate({ ...view, navPosition: 'both' })} className={`flex-1 min-w-[140px] py-3 px-4 rounded-2xl text-[13px] font-bold border-2 transition-all ${(!view.navPosition || view.navPosition === 'both') ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-indigo-200'}`}>🔸 모두 노출</button>
+            <button onClick={() => onUpdate({ ...view, navPosition: 'bottom' })} className={`flex-1 min-w-[140px] py-3 px-4 rounded-2xl text-[13px] font-bold border-2 transition-all ${(view.navPosition === 'bottom') ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-indigo-200'}`}>🔹 하단/사이드만</button>
+            <button onClick={() => onUpdate({ ...view, navPosition: 'menu' })} className={`flex-1 min-w-[140px] py-3 px-4 rounded-2xl text-[13px] font-bold border-2 transition-all ${(view.navPosition === 'menu') ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-indigo-200'}`}>🔹 우측 숨김버튼만</button>
+            <button onClick={() => onUpdate({ ...view, navPosition: 'hidden' })} className={`flex-1 min-w-[140px] py-3 px-4 rounded-2xl text-[13px] font-bold border-2 transition-all ${(view.navPosition === 'hidden') ? 'border-amber-500 bg-amber-50 text-amber-700 shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-indigo-200'}`}>🚫 메뉴에서 숨김</button>
+          </div>
+          <p className="text-[11px] font-bold text-slate-400 px-3 mt-3 w-full max-w-[800px] whitespace-normal">※ 이 화면으로 진입할 수 있는 바로가기 메뉴가 어디에 표시될지 결정합니다. 다른 화면에서 이동 액션으로 연결하려면 '숨김'으로 설정하세요.</p>
+        </div>
       </section>
 
       <section className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 animate-in fade-in slide-in-from-bottom-8 duration-600 relative overflow-hidden">

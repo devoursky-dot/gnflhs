@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation'; // useRouter 추가
 import { createClient } from '@supabase/supabase-js';
-import { X, CheckCircle2, ChevronLeft, RefreshCw, Layout, Search, ChevronDown, Folder, ChevronsUpDown, ChevronsUp, MousePointerClick } from 'lucide-react';
+import { X, CheckCircle2, ChevronLeft, Menu, Home, Layout, Search, ChevronDown, Folder, ChevronsUpDown, ChevronsUp, MousePointerClick } from 'lucide-react';
 import { IconMap } from '@/app/design/picker'; 
 import withAuth from '@/app/withAuth'; // 🔥 인증 HOC 임포트 (경로 확인 필요)
 
@@ -112,6 +112,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!appId) return;
@@ -355,8 +356,42 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
               )}
             </div>
             <div className="font-extrabold text-slate-900 text-xl sm:text-2xl truncate flex-1 text-center tracking-tight">{currentView?.name || appData.name}</div>
-            <div className="w-10 text-right">
-              {currentView?.tableName && <button onClick={() => fetchTableData(currentView)} className="p-2 sm:p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><RefreshCw size={20} /></button>}
+            <div className="w-10 text-right relative">
+              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 sm:p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
+                <Menu size={22} />
+              </button>
+              
+              {isMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)}></div>
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden flex flex-col py-2 animate-in fade-in slide-in-from-top-2">
+                    <button 
+                      onClick={() => { router.push('/'); setIsMenuOpen(false); }}
+                      className="w-full px-4 py-3 text-left flex items-center gap-3 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 font-bold transition-colors border-b border-slate-100"
+                    >
+                      <Home size={18} /> 홈으로 이동
+                    </button>
+                    <div className="px-4 py-2 mt-1 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">
+                      App Views
+                    </div>
+                    {(appData?.app_config?.views || [])
+                      .filter((v: any) => !v.navPosition || v.navPosition === 'both' || v.navPosition === 'menu')
+                      .map((v: any) => {
+                      const IconComp = v.icon && IconMap[v.icon] ? IconMap[v.icon] : Layout;
+                      const isActive = currentViewId === v.id;
+                      return (
+                        <button 
+                          key={`menu-${v.id}`} 
+                          onClick={() => { setCurrentViewId(v.id); setSearchTerm(''); setExpandedGroups({}); setIsMenuOpen(false); }} 
+                          className={`w-full px-4 py-3 text-left flex items-center gap-3 font-bold transition-colors ${isActive ? 'text-indigo-600 bg-indigo-50/50' : 'text-slate-600 hover:bg-slate-50'}`}
+                        >
+                          <IconComp size={18} /> <span className="truncate">{v.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           </div>
           
@@ -375,7 +410,9 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
           {/* Desktop Sidebar Navigation */}
           <div className="hidden md:flex flex-col gap-2 mt-8 flex-1 overflow-y-auto pr-2 pb-8 scrollbar-hide">
             <h3 className="text-[11px] font-black text-slate-300 uppercase tracking-widest pl-3 mb-2 flex items-center gap-2"><Layout size={14}/> App Views</h3>
-            {appData?.app_config?.views?.map((v: any) => {
+            {(appData?.app_config?.views || [])
+              .filter((v: any) => !v.navPosition || v.navPosition === 'both' || v.navPosition === 'bottom')
+              .map((v: any) => {
               const IconComp = v.icon && IconMap[v.icon] ? IconMap[v.icon] : Layout;
               const isActive = currentViewId === v.id;
               return (
@@ -434,7 +471,9 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
           
           {/* Mobile Bottom Tab Bar */}
           <div className="h-20 bg-white border-t flex items-center justify-around px-2 absolute bottom-0 w-full z-20 md:hidden shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
-            {appData?.app_config?.views?.slice(0, 5).map((v: any) => {
+            {(appData?.app_config?.views || [])
+              .filter((v: any) => !v.navPosition || v.navPosition === 'both' || v.navPosition === 'bottom')
+              .slice(0, 5).map((v: any) => {
               const IconComp = v.icon && IconMap[v.icon] ? IconMap[v.icon] : Layout;
               const isActive = currentViewId === v.id;
               return (

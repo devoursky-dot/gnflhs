@@ -13,6 +13,7 @@ export type View = {
   name: string;
   icon?: string | null;
   tableName: string | null;
+  navPosition?: 'both' | 'bottom' | 'menu' | 'hidden';
   
   filterColumn?: string | null;  
   filterOperator?: 'eq' | 'neq' | 'like' | 'gt' | 'lt'; 
