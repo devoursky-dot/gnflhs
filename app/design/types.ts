@@ -83,7 +83,6 @@ export type Action = {
   updateTableName?: string | null;
   updateMappings?: InsertMapping[];
   requireConfirmation?: boolean;
-  requireConfirmation?: boolean;
   confirmationMessage?: string | null;
   smsTableName?: string | null;
   smsPhoneColumn?: string | null;
