@@ -247,11 +247,16 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
         return val !== undefined && val !== null ? String(val) : '';
       });
 
-      const isIOS = navigator.userAgent.match(/iPad|iPhone|iPod/i) != null;
-      const separator = isIOS ? '&' : '?';
-      const smsUrl = `sms:${phone}${separator}body=${encodeURIComponent(message)}`;
+      const targetName = rowData.name || rowData.NAME || rowData.students || rowData.STUDENTS || "대상자";
+      const confirmMessage = `[${targetName}] 학생의 전화번호(${phone})로 문자를 보내시겠습니까?`;
       
-      window.location.href = smsUrl;
+      if (window.confirm(confirmMessage)) {
+        const isIOS = navigator.userAgent.match(/iPad|iPhone|iPod/i) != null;
+        const separator = isIOS ? '&' : '?';
+        const smsUrl = `sms:${phone}${separator}body=${encodeURIComponent(message)}`;
+        
+        window.location.href = smsUrl;
+      }
     }
   };
 
