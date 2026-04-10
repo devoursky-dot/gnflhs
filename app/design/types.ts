@@ -74,7 +74,7 @@ export type Action = {
   id: string;
   name: string;
   icon?: string | null;
-  type: 'navigate' | 'alert' | 'link' | 'insert_row' | 'delete_row' | 'update_row';
+  type: 'navigate' | 'alert' | 'link' | 'insert_row' | 'delete_row' | 'update_row' | 'send_sms';
   targetViewId: string | null;
   message: string | null;
   insertTableName?: string | null;
@@ -83,7 +83,11 @@ export type Action = {
   updateTableName?: string | null;
   updateMappings?: InsertMapping[];
   requireConfirmation?: boolean;
+  requireConfirmation?: boolean;
   confirmationMessage?: string | null;
+  smsTableName?: string | null;
+  smsPhoneColumn?: string | null;
+  smsMessageTemplate?: string | null;
 };
 
 export type SchemaData = Record<string, string[]>;

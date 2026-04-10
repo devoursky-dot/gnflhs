@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Action, View, SchemaData, InsertMapping } from './types';
-import { Settings2, Trash2, Plus, DatabaseZap, Star } from 'lucide-react';
+import { Settings2, Trash2, Plus, DatabaseZap, Star, MessageSquare } from 'lucide-react';
 import { IconMap } from './picker';
 
 interface ActionEditorProps {
@@ -79,6 +79,7 @@ export default function ActionEditor({
               <option value="insert_row">데이터 추가 (Insert)</option>
               <option value="update_row">데이터 수정 (Update Modal)</option>
               <option value="delete_row">선택한 데이터 삭제 (Delete)</option>
+              <option value="send_sms">📱 문자 발송 (SMS 단축)</option>
             </select>
           </div>
 
@@ -334,6 +335,63 @@ export default function ActionEditor({
                 * 사용자가 클릭한 카드의 고유 <strong>'id'</strong> 값을 기준으로 데이터가 즉시 삭제됩니다.<br/>
                 * 연결된 테이블에 반드시 'id' 컬럼이 존재해야 안전하게 작동합니다.
               </div>
+            </div>
+          )}
+
+          {/* 문자 발송 (SMS) UI */}
+          {action.type === 'send_sms' && (
+            <div className="space-y-5 border-t border-slate-200 pt-5 mt-5">
+              <div className="p-4 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-xl break-keep leading-relaxed border border-emerald-100 shadow-sm">
+                💡 대상자의 전화번호는 <strong>students</strong> 테이블의 <strong>PHONE</strong> 컬럼에서 자동으로 찾아서 발송합니다! <br/>
+                (이름, 학번, 또는 student_id 정보를 기준으로 자동 검색)
+              </div>
+              <label className="flex items-center gap-2 text-sm font-bold text-slate-700 whitespace-nowrap">
+                <MessageSquare size={16} className="text-emerald-500"/> 문자 내용 구성 테이블 선택
+              </label>
+              <select
+                value={action.smsTableName || ''}
+                onChange={(e) => onUpdate({ ...action, smsTableName: e.target.value })}
+                className="w-full p-3 rounded-xl border border-emerald-200 bg-white font-bold text-slate-800 outline-none min-w-[300px]"
+              >
+                <option value="">-- 컬럼 목록을 불러올 테이블 선택 --</option>
+                {Object.keys(schemaData).map(table => <option key={table} value={table}>{table}</option>)}
+              </select>
+
+              {action.smsTableName && (
+                <div className="space-y-5 mt-4 p-5 bg-white border-2 border-slate-100 rounded-2xl shadow-sm">
+                  <div>
+                    <label className="block text-sm font-black text-slate-700 mb-1">전송할 문자 메시지 (치환 템플릿)</label>
+                    <p className="text-[11px] font-bold text-slate-400 mb-3 block break-keep">
+                      아래 변수 버튼을 클릭하면 문구에 쏙 들어갑니다! 실제 발송 시 해당 데이터로 변경됩니다.
+                    </p>
+                    
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {(schemaData[action.smsTableName] || []).map(col => (
+                        <button 
+                          key={col} 
+                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-emerald-50 hover:border-emerald-200 border border-transparent text-slate-600 hover:text-emerald-600 text-[11px] font-black rounded-lg cursor-pointer transition-all shadow-sm active:scale-95"
+                          onClick={() => {
+                            const ta = document.getElementById('sms-textarea') as HTMLTextAreaElement;
+                            const newText = action.smsMessageTemplate ? action.smsMessageTemplate + `{{${col}}}` : `{{${col}}}`;
+                            onUpdate({ ...action, smsMessageTemplate: newText });
+                          }}
+                        >
+                          {`{{${col}}}`}
+                        </button>
+                      ))}
+                    </div>
+
+                    <textarea
+                      id="sms-textarea"
+                      value={action.smsMessageTemplate || ''}
+                      onChange={(e) => onUpdate({ ...action, smsMessageTemplate: e.target.value })}
+                      className="w-full p-4 rounded-xl border-2 border-slate-200 focus:border-emerald-500 font-mono text-sm leading-relaxed text-slate-900 outline-none transition-colors"
+                      rows={6}
+                      placeholder={`[공지]\n{{NAME}}님, 안녕하세요.\n{{BUN}}반 생활 기록 안내입니다.`}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

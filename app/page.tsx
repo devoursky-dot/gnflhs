@@ -10,7 +10,7 @@ import Cookies from 'js-cookie';
 import { IconMap } from './design/picker';
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
 
@@ -18,7 +18,7 @@ export default function MainAppLauncher() {
   const [apps, setApps] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  
+
   // --- 인증 상태 관리 ---
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -54,10 +54,10 @@ export default function MainAppLauncher() {
       .select('users, name, role, pass')
       .eq('users', email)
       .single();
-    
+
     if (data) {
       setProfile(data);
-      fetchApps(); 
+      fetchApps();
     } else {
       console.error("User not found in teachers table:", error);
     }
@@ -78,9 +78,9 @@ export default function MainAppLauncher() {
         .from('apps')
         .select('id, name, created_at, app_config')
         .order('id', { ascending: false });
-      
+
       if (error) throw error;
-      
+
       if (data) {
         setApps(data);
       }
@@ -92,7 +92,7 @@ export default function MainAppLauncher() {
   const openAccessModal = async (e: React.MouseEvent, app: any) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     setSelectedAppForAccess(app);
     const config = app.app_config || {};
     setAccessIsPublic(config.isPublic !== false);
@@ -110,22 +110,22 @@ export default function MainAppLauncher() {
     if (!selectedAppForAccess) return;
     setIsSavingAccess(true);
     try {
-      const updatedConfig = { 
-        ...selectedAppForAccess.app_config, 
-        isPublic: accessIsPublic, 
-        allowedUsers: accessIsPublic ? [] : accessAllowedUsers 
+      const updatedConfig = {
+        ...selectedAppForAccess.app_config,
+        isPublic: accessIsPublic,
+        allowedUsers: accessIsPublic ? [] : accessAllowedUsers
       };
-      
+
       const { error } = await supabase
         .from('apps')
         .update({ app_config: updatedConfig })
         .eq('id', selectedAppForAccess.id);
-        
+
       if (error) throw error;
-      
+
       alert('앱 접근 권한이 업데이트되었습니다.');
       setIsAccessModalOpen(false);
-      fetchApps(); 
+      fetchApps();
     } catch (err: any) {
       alert(`오류 발생: ${err.message}`);
     } finally {
@@ -134,7 +134,7 @@ export default function MainAppLauncher() {
   };
 
   const toggleTeacherAccess = (email: string) => {
-    setAccessAllowedUsers(prev => 
+    setAccessAllowedUsers(prev =>
       prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email]
     );
   };
@@ -157,12 +157,12 @@ export default function MainAppLauncher() {
       // 로그인 성공 처리
       const sessionInfo = { email: loginEmail };
       // 기존 localStorage 대신 쿠키에 저장 (7일 유지, 모든 경로 허용)
-      Cookies.set('gnflhs_session', JSON.stringify(sessionInfo), { 
-        expires: 7, 
+      Cookies.set('gnflhs_session', JSON.stringify(sessionInfo), {
+        expires: 7,
         path: '/',
         sameSite: 'lax'
       });
-      
+
       setUser(sessionInfo);
       setProfile(teacher);
       fetchApps();
@@ -181,14 +181,14 @@ export default function MainAppLauncher() {
   const filteredApps = apps.filter(app => {
     // 1. 키워드 필터
     if (!app.name?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    
+
     // 2. 권한 필터
     if (profile?.role === 'admin') return true;
-    
+
     const config = app.app_config || {};
     const isPublic = config.isPublic !== false;
     if (isPublic) return true;
-    
+
     return config.allowedUsers && config.allowedUsers.includes(user?.email);
   });
 
@@ -214,7 +214,7 @@ export default function MainAppLauncher() {
               <div className="p-4 bg-amber-50 border border-amber-100 text-amber-700 text-sm font-bold rounded-2xl">
                 '{profile.name}'님은 등록된 교사/관리자 계정이 아닙니다. 접근 권한이 없습니다.
               </div>
-              <button 
+              <button
                 onClick={handleLogout}
                 className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black flex items-center justify-center gap-2"
               >
@@ -228,11 +228,11 @@ export default function MainAppLauncher() {
               <form onSubmit={handlePasswordLogin} className="space-y-4">
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input type="email" placeholder="이메일 계정" value={loginEmail} onChange={(e)=>setLoginEmail(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-50 transition-all text-slate-900" style={{ color: '#0f172a' }} required />
+                  <input type="email" placeholder="이메일 계정" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-50 transition-all text-slate-900" style={{ color: '#0f172a' }} required />
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input type="password" placeholder="비밀번호" value={loginPass} onChange={(e)=>setLoginPass(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-50 transition-all text-slate-900" style={{ color: '#0f172a' }} required />
+                  <input type="password" placeholder="비밀번호" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-50 transition-all text-slate-900" style={{ color: '#0f172a' }} required />
                 </div>
                 <button type="submit" className="w-full py-4 bg-slate-900 hover:bg-indigo-600 text-white rounded-2xl font-black shadow-lg transition-all active:scale-95">로그인</button>
               </form>
@@ -246,7 +246,7 @@ export default function MainAppLauncher() {
   // --- 로그인 완료된 상태의 UI ---
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans overflow-hidden">
-      
+
       {/* --- 헤더 영역 (고정) --- */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shrink-0">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
@@ -255,7 +255,7 @@ export default function MainAppLauncher() {
               <LayoutGrid className="text-white" size={20} />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">App Launcher</h1>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">경남외고</h1>
               {/* 로그인 상태 표시 */}
               <div className="flex items-center gap-2 mt-0.5">
                 <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${profile?.role === 'admin' ? 'text-indigo-600 bg-indigo-50' : 'text-emerald-600 bg-emerald-50'}`}>
@@ -265,10 +265,10 @@ export default function MainAppLauncher() {
               </div>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             {/* 로그아웃 버튼 */}
-            <button 
+            <button
               onClick={handleLogout}
               className="flex items-center gap-2 px-4 py-2.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl text-sm font-black transition-all"
               title="로그아웃"
@@ -277,11 +277,11 @@ export default function MainAppLauncher() {
             </button>
 
             {/* 빌더 버튼 (Admin인 경우만 활성화) */}
-            <Link 
-              href="/design" 
+            <Link
+              href="/design"
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-md active:scale-95 
-                ${profile?.role === 'admin' 
-                  ? 'bg-slate-900 hover:bg-indigo-600 text-white opacity-100' 
+                ${profile?.role === 'admin'
+                  ? 'bg-slate-900 hover:bg-indigo-600 text-white opacity-100'
                   : 'bg-slate-100 text-slate-400 cursor-not-allowed grayscale'}`}
               onClick={(e) => profile?.role !== 'admin' && e.preventDefault()}
             >
@@ -293,7 +293,7 @@ export default function MainAppLauncher() {
 
       {/* --- 메인 컨텐츠 영역 --- */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-10 flex flex-col gap-8 h-[calc(100vh-80px)]">
-        
+
         {/* 상단 검색바 */}
         <div className="relative shrink-0 z-10">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={22} />
@@ -333,14 +333,14 @@ export default function MainAppLauncher() {
                 const AppIcon = iconName && IconMap && IconMap[iconName] ? IconMap[iconName] : Star;
 
                 return (
-                  <Link 
-                    key={app.id} 
+                  <Link
+                    key={app.id}
                     href={`/preview/${app.id}`}
                     className="group bg-white border border-slate-200 rounded-3xl p-6 hover:border-indigo-400 hover:shadow-xl hover:shadow-indigo-100 transition-all duration-300 flex flex-col cursor-pointer hover:-translate-y-1 relative overflow-hidden"
                   >
                     {/* 카드 호버 시 나타나는 배경 이펙트 */}
                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-[2] duration-500 ease-out z-0"></div>
-                    
+
                     {profile?.role === 'admin' && (
                       <button
                         onClick={(e) => openAccessModal(e, app)}
@@ -350,7 +350,7 @@ export default function MainAppLauncher() {
                         <Lock size={16} />
                       </button>
                     )}
-                    
+
                     <div className="relative z-10 flex items-start gap-4 mb-8">
                       <div className="w-14 h-14 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300 shadow-sm shrink-0">
                         <AppIcon size={28} strokeWidth={2.5} />
@@ -389,25 +389,25 @@ export default function MainAppLauncher() {
               <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
                 <Lock className="text-indigo-600" /> 접근 권한 설정
               </h3>
-              <button 
-                onClick={() => setIsAccessModalOpen(false)} 
+              <button
+                onClick={() => setIsAccessModalOpen(false)}
                 className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="p-6 overflow-y-auto max-h-[60vh] bg-slate-50 flex flex-col gap-6">
               <div>
                 <label className="text-sm font-black text-slate-700 mb-2 block">권한 범위</label>
                 <div className="flex bg-slate-200/50 p-1 rounded-2xl">
-                  <button 
+                  <button
                     onClick={() => setAccessIsPublic(true)}
                     className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all ${accessIsPublic ? 'bg-white shadow-md text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
                   >
                     🚀 전체 공개 (Public)
                   </button>
-                  <button 
+                  <button
                     onClick={() => setAccessIsPublic(false)}
                     className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all ${!accessIsPublic ? 'bg-white shadow-md text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
                   >
@@ -424,12 +424,12 @@ export default function MainAppLauncher() {
                   <label className="text-sm font-black text-slate-700 mb-2 block">접속을 허용할 선생님 ({accessAllowedUsers.length}명 선택됨)</label>
                   <div className="relative mb-3 shrink-0">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                    <input 
-                      type="text" 
-                      placeholder="이름 또는 이메일 검색..." 
-                      value={teacherSearchTerm} 
-                      onChange={(e) => setTeacherSearchTerm(e.target.value)} 
-                      className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-700" 
+                    <input
+                      type="text"
+                      placeholder="이름 또는 이메일 검색..."
+                      value={teacherSearchTerm}
+                      onChange={(e) => setTeacherSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-700"
                     />
                   </div>
                   <div className="flex-1 bg-white border border-slate-200 rounded-2xl overflow-y-auto max-h-[30vh]">
@@ -438,8 +438,8 @@ export default function MainAppLauncher() {
                       .map(t => {
                         const isSelected = accessAllowedUsers.includes(t.users);
                         return (
-                          <div 
-                            key={t.users} 
+                          <div
+                            key={t.users}
                             onClick={() => toggleTeacherAccess(t.users)}
                             className="flex items-center justify-between px-4 py-3 border-b border-slate-100 last:border-0 cursor-pointer hover:bg-slate-50 transition-colors"
                           >
@@ -452,7 +452,7 @@ export default function MainAppLauncher() {
                             </div>
                           </div>
                         );
-                    })}
+                      })}
                     {allTeachers.filter(t => t.name.includes(teacherSearchTerm) || t.users.includes(teacherSearchTerm)).length === 0 && (
                       <div className="p-8 text-center text-slate-400 font-bold text-sm">
                         검색된 선생님이 없습니다.
@@ -462,17 +462,17 @@ export default function MainAppLauncher() {
                 </div>
               )}
             </div>
-            
+
             <div className="px-6 py-5 bg-white border-t flex gap-3 shrink-0">
-              <button 
-                onClick={() => setIsAccessModalOpen(false)} 
+              <button
+                onClick={() => setIsAccessModalOpen(false)}
                 className="flex-1 py-4 text-slate-500 font-black rounded-2xl hover:bg-slate-100 transition-all border border-slate-100"
               >
                 취소
               </button>
-              <button 
-                onClick={handleSaveAccess} 
-                disabled={isSavingAccess} 
+              <button
+                onClick={handleSaveAccess}
+                disabled={isSavingAccess}
                 className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
               >
                 {isSavingAccess ? "저장 중..." : "권한 설정 저장"}

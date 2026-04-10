@@ -207,6 +207,51 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
         else if (m.mappingType === 'prompt') initialData[m.targetColumn] = rowData[m.targetColumn] !== undefined && rowData[m.targetColumn] !== null ? rowData[m.targetColumn] : '';
       });
       setUpdateFormData(initialData); setIsUpdateModalOpen(true);
+    } else if (action.type === 'send_sms') {
+      let phone = rowData.phone || rowData.PHONE;
+      
+      // 전화번호가 현재 테이블에 없을 경우 students 테이블에서 자동 검색
+      if (!phone) {
+        let findQuery = supabase.from('students').select('phone');
+        let canSearch = false;
+
+        const stu = rowData.students || rowData.STUDENTS;
+        const stuId = rowData.student_id || rowData.STUDENT_ID;
+        const stuName = rowData.name || rowData.NAME;
+
+        if (stu) {
+          findQuery = findQuery.eq('students', stu);
+          canSearch = true;
+        } else if (stuId) {
+          findQuery = findQuery.eq('id', stuId);
+          canSearch = true;
+        } else if (stuName) {
+          findQuery = findQuery.eq('name', stuName);
+          canSearch = true;
+        }
+
+        if (canSearch) {
+          const { data, error } = await findQuery.single();
+          if (!error && data && data.phone) {
+            phone = data.phone;
+          }
+        }
+      }
+
+      if (!phone) return alert("해당 학생과 연결된 전화번호를 자동으로 찾을 수 없습니다.");
+      
+      let message = action.smsMessageTemplate || '';
+      // {{컬럼명}} 템플릿 치환
+      message = message.replace(/\{\{\s*(.*?)\s*\}\}/g, (match, p1) => {
+        const val = rowData[p1.trim()];
+        return val !== undefined && val !== null ? String(val) : '';
+      });
+
+      const isIOS = navigator.userAgent.match(/iPad|iPhone|iPod/i) != null;
+      const separator = isIOS ? '&' : '?';
+      const smsUrl = `sms:${phone}${separator}body=${encodeURIComponent(message)}`;
+      
+      window.location.href = smsUrl;
     }
   };
 

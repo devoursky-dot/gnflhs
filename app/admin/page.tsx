@@ -4,9 +4,9 @@ import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from "
 import { createClient } from "@supabase/supabase-js";
 import { 
   Database, Table, Columns, Key, Settings, Search, Loader2, Save, 
-  RefreshCw, ClipboardPaste, Trash2, Plus, Image as ImageIcon, Copy, Check, X, FolderOpen, Undo 
+  RefreshCw, ClipboardPaste, Trash2, Plus, Image as ImageIcon, Copy, Check, X, FolderOpen, Undo, ArrowUpDown, ArrowUp, ArrowDown
 } from "lucide-react";
-import { flexRender, getCoreRowModel, useReactTable, ColumnDef } from "@tanstack/react-table";
+import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable, ColumnDef, SortingState } from "@tanstack/react-table";
 import Papa from "papaparse";
 
 const supabase = createClient(
@@ -242,6 +242,7 @@ export default function AdminDashboardPage() {
   const [themeKey, setThemeKey] = useState<string>("linear");
   const [styleKey, setStyleKey] = useState<string>("modern");
   const [isCreatingTable, setIsCreatingTable] = useState(false);
+  const [sorting, setSorting] = useState<SortingState>([]);
   
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [lastDeleted, setLastDeleted] = useState<{ index: number, record: any } | null>(null);
@@ -322,10 +323,82 @@ export default function AdminDashboardPage() {
   const handleSave = async () => {
     if (!selectedTable || isSaving) return;
     setIsSaving(true);
-    const { error } = await supabase.rpc("upsert_data", { table_name: selectedTable, json_data: records });
-    if (error) alert(`Save failed: ${error.message}`);
-    else { await fetchTableData(selectedTable); alert("성공적으로 저장되었습니다."); }
-    setIsSaving(false);
+    
+    try {
+      const pks = schemaData[selectedTable]?.filter(c => c.primary).map(c => c.name);
+      if (!pks || pks.length === 0) {
+        alert("기본 키(Primary Key)가 없는 테이블은 업데이트할 수 없습니다.");
+        setIsSaving(false);
+        return;
+      }
+
+      let hasError = false;
+      let errorMsg = "";
+
+      const updatePromises = [];
+      const insertRecords = [];
+
+      for (let i = 0; i < records.length; i++) {
+        const currentRecord = records[i];
+        
+        // 새로 추가된 행인지 확인 (originalRecords에 없음)
+        // PK 기반으로 원본 찾기
+        const isNewRow = !pks.every(pk => currentRecord[pk]); 
+        const originalRecord = originalRecords.find(r => pks.every(pk => r[pk] === currentRecord[pk]));
+
+        if (!originalRecord) {
+          // 새로 추가된 행
+          // 빈 객체가 아니면 insert 목록에 추가
+          if (Object.keys(currentRecord).length > 0) {
+            insertRecords.push(currentRecord);
+          }
+        } else {
+          // 기존 행 변경 사항 감지
+          const updates: any = {};
+          for (const key of Object.keys(currentRecord)) {
+            if (currentRecord[key] !== originalRecord[key]) {
+              updates[key] = currentRecord[key];
+            }
+          }
+          
+          if (Object.keys(updates).length > 0) {
+            let query = supabase.from(selectedTable).update(updates);
+            pks.forEach(pk => { query = query.eq(pk, originalRecord[pk]); });
+            updatePromises.push(query);
+          }
+        }
+      }
+
+      // 동시에 업데이트 실행
+      if (updatePromises.length > 0) {
+        const results = await Promise.all(updatePromises);
+        const failed = results.find(r => r.error);
+        if (failed) {
+          hasError = true;
+          errorMsg = failed.error!.message;
+        }
+      }
+
+      // 새로 추가된 행 삽입 실행
+      if (insertRecords.length > 0 && !hasError) {
+        const { error } = await supabase.from(selectedTable).insert(insertRecords);
+        if (error) {
+          hasError = true;
+          errorMsg = error.message;
+        }
+      }
+
+      if (hasError) {
+        alert(`저장 실패: ${errorMsg}`);
+      } else {
+        await fetchTableData(selectedTable);
+        alert("성공적으로 저장되었습니다.");
+      }
+    } catch (err: any) {
+      alert(`저장 중 오류 발생: ${err.message}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleAddRow = useCallback(() => {
@@ -367,11 +440,23 @@ export default function AdminDashboardPage() {
     if (!selectedTable || !schemaData[selectedTable]) return [];
     return schemaData[selectedTable].map((col) => ({
       accessorKey: col.name,
-      header: () => (
-        <div className="flex items-center gap-1.5 truncate">
+      header: ({ column }) => (
+        <div 
+          className="flex items-center gap-1.5 truncate group cursor-pointer hover:text-emerald-600 transition-colors select-none"
+          onClick={column.getToggleSortingHandler()}
+        >
           {col.primary ? <Key className="w-3.5 h-3.5 text-amber-500 shrink-0" /> : <Columns className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
           <span className="font-mono">{col.name}</span>
           <span className="text-[10px] opacity-50 ml-1">{col.type}</span>
+          
+          <div className="ml-auto flex items-center">
+            {{
+              asc: <ArrowUp className="w-3.5 h-3.5 text-emerald-500" />,
+              desc: <ArrowDown className="w-3.5 h-3.5 text-emerald-500" />,
+            }[column.getIsSorted() as string] ?? (
+              <ArrowUpDown className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 text-zinc-400 transition-opacity" />
+            )}
+          </div>
         </div>
       ),
       cell: EditableCell,
@@ -382,7 +467,12 @@ export default function AdminDashboardPage() {
   const table = useReactTable({
     data: records,
     columns,
+    state: {
+      sorting,
+    },
+    onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
     columnResizeMode: "onChange",
     meta: {
       updateData: (rowIndex: number, colId: string, val: any) => {
