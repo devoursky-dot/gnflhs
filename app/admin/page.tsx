@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { 
-  Database, Table, Columns, Key, Settings, Search, Loader2, Save, 
-  RefreshCw, ClipboardPaste, Trash2, Plus, Image as ImageIcon, Copy, Check, X, FolderOpen, Undo, ArrowUpDown, ArrowUp, ArrowDown, Menu
+  Database, Table, Columns, Key, Settings, Search, Loader2, Save, FilterX,
+  RefreshCw, ClipboardPaste, Trash2, Plus, Image as ImageIcon, Copy, Check, X, FolderOpen, Undo, ArrowUpDown, ArrowUp, ArrowDown, Menu, Link
 } from "lucide-react";
 import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable, ColumnDef, SortingState } from "@tanstack/react-table";
 import Papa from "papaparse";
@@ -230,6 +230,136 @@ const EditableCell = memo(({ getValue, row: { index }, column: { id }, table }: 
 });
 EditableCell.displayName = "EditableCell";
 
+const RelationSyncModal = ({ isOpen, onClose, schemaData, currentTable, onApplySync }: any) => {
+  const [targetColumn, setTargetColumn] = useState('');
+  const [refTable, setRefTable] = useState('');
+  const [refTargetColumn, setRefTargetColumn] = useState('');
+  const [matchCurrentColumn, setMatchCurrentColumn] = useState('');
+  const [matchRefColumn, setMatchRefColumn] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      const curCols = schemaData[currentTable] || [];
+      if (curCols.length > 0) {
+        setTargetColumn(curCols[0]?.name || '');
+        setMatchCurrentColumn(curCols[0]?.name || '');
+      }
+      const tables = Object.keys(schemaData).filter(t => t !== currentTable);
+      if (tables.length > 0) setRefTable(tables[0]);
+    }
+  }, [isOpen, currentTable, schemaData]);
+
+  useEffect(() => {
+    if (refTable && schemaData[refTable]) {
+       const refCols = schemaData[refTable] || [];
+       if (refCols.length > 0) {
+         setRefTargetColumn(refCols[0]?.name || '');
+         setMatchRefColumn(refCols[0]?.name || '');
+       }
+    }
+  }, [refTable, schemaData]);
+
+  const runSync = async () => {
+    if (!targetColumn || !refTable || !refTargetColumn || !matchCurrentColumn || !matchRefColumn) {
+      return alert('모든 항목을 선택해주세요.');
+    }
+    setIsProcessing(true);
+    try {
+      const { data, error } = await supabase.from(refTable).select(`${matchRefColumn}, ${refTargetColumn}`).not(matchRefColumn, 'is', null);
+      if (error) throw error;
+      
+      const map = new Map();
+      data.forEach(row => {
+         if (row[matchRefColumn] != null) {
+           map.set(String(row[matchRefColumn]), row[refTargetColumn]);
+         }
+      });
+      
+      onApplySync(targetColumn, matchCurrentColumn, map);
+      onClose();
+      alert(`총 ${data.length}개의 참조 데이터를 가져와 빈칸에 일치하는 값을 채웠습니다.\n(※ 아직 DB에 반영되지 않았으니 시각적으로 확인 후 우측 상단의 'Save Changes' 버튼을 눌러 확정 기록하세요.)`);
+    } catch (err: any) {
+      alert(`복사 중 오류 발생: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-white dark:bg-zinc-900 w-full max-w-[600px] rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col">
+        <div className="p-5 border-b dark:border-zinc-800 flex justify-between items-center bg-zinc-50 dark:bg-zinc-950/50 rounded-t-2xl">
+          <div className="flex flex-col">
+            <h3 className="font-bold text-lg flex items-center gap-2"><Link className="w-5 h-5 text-indigo-500" /> 다른 테이블 데이터 동기화 (VLOOKUP)</h3>
+            <p className="text-[11px] text-zinc-500 mt-1">기준값이 일치할 때 참조 테이블의 값을 현재 테이블로 일괄 복사해옵니다.</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors"><X className="w-5 h-5" /></button>
+        </div>
+        
+        <div className="p-6 space-y-5">
+           <div className="grid grid-cols-2 gap-4 bg-zinc-50 dark:bg-zinc-800/30 p-4 rounded-xl border dark:border-zinc-800 relative">
+             <div className="absolute left-1/2 top-1/2 -ml-[14px] -mt-[14px] w-[28px] h-[28px] bg-white dark:bg-black border border-zinc-200 dark:border-zinc-700 rounded-full flex items-center justify-center text-zinc-400 font-bold text-xs shadow-sm z-10">
+               =
+             </div>
+             
+             <div className="pr-2 space-y-4">
+               <div>
+                 <label className="text-[10.5px] font-bold text-zinc-400 mb-1 block uppercase tracking-wider">현재 테이블 ({currentTable})</label>
+                 <select value={matchCurrentColumn} onChange={e=>setMatchCurrentColumn(e.target.value)} className="w-full text-sm p-2 rounded-lg bg-white dark:bg-zinc-950 border dark:border-zinc-700 outline-none focus:border-indigo-500">
+                   {schemaData[currentTable]?.map((c:any) => <option key={`mc-${c.name}`} value={c.name}>{c.name}</option>)}
+                 </select>
+                 <p className="text-[9px] text-zinc-500 mt-1">기준 (이 값이 같을 때)</p>
+               </div>
+               
+               <div className="pt-2 border-t border-dashed border-zinc-200 dark:border-zinc-800">
+                 <label className="text-[10.5px] font-bold text-zinc-400 mb-1 block uppercase tracking-wider">데이터를 채울 칼럼 (도착지)</label>
+                 <select value={targetColumn} onChange={e=>setTargetColumn(e.target.value)} className="w-full text-sm p-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400 font-bold outline-none">
+                   {schemaData[currentTable]?.map((c:any) => <option key={`tc-${c.name}`} value={c.name}>{c.name}</option>)}
+                 </select>
+               </div>
+             </div>
+             
+             <div className="pl-2 space-y-4">
+               <div>
+                 <label className="text-[10.5px] font-bold text-zinc-400 mb-1 block uppercase tracking-wider flex items-center justify-between">
+                   <span>참조 테이블</span>
+                 </label>
+                 <select value={refTable} onChange={e=>{setRefTable(e.target.value);}} className="w-full text-[13px] font-semibold py-2 px-2 rounded-lg bg-zinc-200/50 dark:bg-zinc-900 border dark:border-zinc-700 outline-none">
+                   {Object.keys(schemaData).filter(t => t !== currentTable).map(t => <option key={`rt-${t}`} value={t}>{t}</option>)}
+                 </select>
+               </div>
+               
+               <div>
+                 <select value={matchRefColumn} onChange={e=>setMatchRefColumn(e.target.value)} className="w-full text-sm p-2 rounded-lg bg-white dark:bg-zinc-950 border dark:border-zinc-700 outline-none focus:border-indigo-500 mt-1">
+                   {schemaData[refTable]?.map((c:any) => <option key={`mr-${c.name}`} value={c.name}>{c.name}</option>)}
+                 </select>
+                 <p className="text-[9px] text-zinc-500 mt-1">기준 (이 값이 같을 때)</p>
+               </div>
+               
+               <div className="pt-2 border-t border-dashed border-zinc-200 dark:border-zinc-800">
+                 <label className="text-[10.5px] font-bold text-zinc-400 mb-1 block uppercase tracking-wider">복사해올 값 (출발지)</label>
+                 <select value={refTargetColumn} onChange={e=>setRefTargetColumn(e.target.value)} className="w-full text-sm p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 font-bold outline-none">
+                   {schemaData[refTable]?.map((c:any) => <option key={`rtc-${c.name}`} value={c.name}>{c.name}</option>)}
+                 </select>
+               </div>
+             </div>
+           </div>
+        </div>
+        
+        <div className="p-5 border-t dark:border-zinc-800 flex justify-end gap-3 bg-zinc-50 dark:bg-zinc-950/50 rounded-b-2xl">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-semibold text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">취소</button>
+          <button onClick={runSync} disabled={isProcessing} className="px-5 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-md">
+            {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link className="w-4 h-4" />} VLOOKUP 동기화 실행
+          </button>
+        </div>
+      </div>
+     </div>
+  );
+};
+
 export default function AdminDashboardPage() {
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [schemaData, setSchemaData] = useState<SchemaData>({});
@@ -246,7 +376,11 @@ export default function AdminDashboardPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [isRelationSyncOpen, setIsRelationSyncOpen] = useState(false);
   const [lastDeleted, setLastDeleted] = useState<{ index: number, record: any } | null>(null);
+
+  const [excludedColumns, setExcludedColumns] = useState<string[]>(['year', 'month', 'YEAR', 'MONTH', '_year', '_month']);
+  const [isExcludeSettingsOpen, setIsExcludeSettingsOpen] = useState(false);
 
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -262,6 +396,16 @@ export default function AdminDashboardPage() {
     }
     setIsCreatingTable(false);
   };
+
+  const handleApplyRelationSync = useCallback((targetCol: string, matchCol: string, map: Map<string, any>) => {
+    setRecords(old => old.map(row => {
+      const keyStr = String(row[matchCol]);
+      if (map.has(keyStr)) {
+        return { ...row, [targetCol]: map.get(keyStr) };
+      }
+      return row;
+    }));
+  }, []);
 
   const handleAddColumn = async () => {
     if (!selectedTable) return;
@@ -319,7 +463,37 @@ export default function AdminDashboardPage() {
     setIsLoadingData(false);
   }, []);
 
-  useEffect(() => { if (selectedTable) fetchTableData(selectedTable); }, [selectedTable, fetchTableData]);
+  useEffect(() => { 
+    if (selectedTable) {
+      const saved = localStorage.getItem(`excluded-cols-${selectedTable}`);
+      if (saved) setExcludedColumns(JSON.parse(saved));
+      else setExcludedColumns(['year', 'month', 'YEAR', 'MONTH', '_year', '_month']);
+      fetchTableData(selectedTable);
+    }
+  }, [selectedTable, fetchTableData]);
+
+  const toggleExcludedColumn = (colName: string) => {
+    setExcludedColumns(prev => {
+      const next = prev.includes(colName) ? prev.filter(c => c !== colName) : [...prev, colName];
+      if (selectedTable) localStorage.setItem(`excluded-cols-${selectedTable}`, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  // 한국 날짜 문자열 등을 Postgres 타임스탬프로 노멀라이즈
+  const normalizeForPostgres = (val: any) => {
+    if (typeof val !== 'string') return val;
+    // 예: "2026. 3. 3 오후 3:31:21" 또는 "2026. 3. 3. 오전 10:30"
+    const match = val.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?\s+(오전|오후)\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
+    if (match) {
+      let [, y, m, d, ampm, h, min, s] = match;
+      let hour = parseInt(h, 10);
+      if (ampm === "오후" && hour < 12) hour += 12;
+      if (ampm === "오전" && hour === 12) hour = 0;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')} ${hour.toString().padStart(2, '0')}:${min.padStart(2, '0')}:${(s || '00').padStart(2, '0')}`;
+    }
+    return val;
+  };
 
   const handleSave = async () => {
     if (!selectedTable || isSaving) return;
@@ -343,22 +517,33 @@ export default function AdminDashboardPage() {
         const currentRecord = records[i];
         
         // 새로 추가된 행인지 확인 (originalRecords에 없음)
-        // PK 기반으로 원본 찾기
+        // PK 기반으로 원본 찾기 (타입이 다를 수 있으므로 == 사용: 예 숫자가 문자열로 붙여넣기된 경우)
         const isNewRow = !pks.every(pk => currentRecord[pk]); 
-        const originalRecord = originalRecords.find(r => pks.every(pk => r[pk] === currentRecord[pk]));
+        const originalRecord = originalRecords.find(r => pks.every(pk => r[pk] == currentRecord[pk]));
+
+        // 자동으로 제외할 가상(생성) 칼럼 목록 (사용자 설정 연동)
+        const generatedCols = excludedColumns;
 
         if (!originalRecord) {
           // 새로 추가된 행
-          // 빈 객체가 아니면 insert 목록에 추가
           if (Object.keys(currentRecord).length > 0) {
-            insertRecords.push(currentRecord);
+            const cleanRecord: any = {};
+            for (const key of Object.keys(currentRecord)) {
+              if (generatedCols.includes(key)) continue;
+              cleanRecord[key] = normalizeForPostgres(currentRecord[key]);
+            }
+            if (Object.keys(cleanRecord).length > 0) {
+              insertRecords.push(cleanRecord);
+            }
           }
         } else {
           // 기존 행 변경 사항 감지
           const updates: any = {};
           for (const key of Object.keys(currentRecord)) {
-            if (currentRecord[key] !== originalRecord[key]) {
-              updates[key] = currentRecord[key];
+            if (generatedCols.includes(key)) continue; // 가상 칼럼은 업데이트 제외
+            const normVal = normalizeForPostgres(currentRecord[key]);
+            if (normVal != originalRecord[key] && currentRecord[key] != originalRecord[key]) {
+              updates[key] = normVal;
             }
           }
           
@@ -578,6 +763,14 @@ export default function AdminDashboardPage() {
       <main className="flex-1 overflow-hidden flex flex-col min-w-0 w-full">
         {selectedTable && (
           <>
+            <RelationSyncModal 
+              isOpen={isRelationSyncOpen} 
+              onClose={() => setIsRelationSyncOpen(false)} 
+              schemaData={schemaData} 
+              currentTable={selectedTable} 
+              onApplySync={handleApplyRelationSync} 
+            />
+            
             <header className="h-16 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black px-4 md:px-6 flex items-center justify-between shrink-0 shadow-sm z-10 gap-2 md:gap-4">
               <div className="flex items-center gap-2 md:gap-4 min-w-0">
                 <button 
@@ -593,6 +786,11 @@ export default function AdminDashboardPage() {
                 <button onClick={handleAddRow} className="flex flex-shrink-0 items-center gap-1.5 px-2 md:px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 rounded-lg text-xs font-bold transition-all border border-zinc-200 dark:border-zinc-700">
                   <Plus className="w-3 h-3" />
                   <span className="hidden sm:inline">행 추가</span>
+                </button>
+                <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-700 mx-1 hidden sm:block"></div>
+                <button onClick={() => setIsRelationSyncOpen(true)} title="다른 테이블에서 데이터 당겨오기 (VLOOKUP)" className="flex flex-shrink-0 items-center gap-1.5 px-2 md:px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-800/50 text-indigo-600 dark:text-indigo-400 rounded-lg text-xs font-bold transition-all border border-indigo-100 dark:border-indigo-800/50">
+                  <Link className="w-3 h-3" />
+                  <span className="hidden sm:inline">관계 연결</span>
                 </button>
               </div>
               <div className="flex items-center gap-2">
@@ -612,7 +810,41 @@ export default function AdminDashboardPage() {
                 <button onClick={() => fetchTableData(selectedTable)} className="p-2 md:p-2.5 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex-shrink-0">
                   <RefreshCw className={`w-4 h-4 ${isLoadingData ? 'animate-spin' : ''}`} />
                 </button>
-                <button onClick={handleSave} disabled={!isDirty || isSaving} className="px-3 md:px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex flex-shrink-0 items-center gap-1.5 md:gap-2">
+                
+                {/* 제외 칼럼 설정 버튼 */}
+                <div className="relative">
+                  <button onClick={() => setIsExcludeSettingsOpen(!isExcludeSettingsOpen)} className={`p-2 md:p-2.5 rounded-lg transition-colors flex-shrink-0 group relative ${isExcludeSettingsOpen ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/30' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>
+                    <FilterX className="w-4 h-4" />
+                    {excludedColumns.length > 0 && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">{excludedColumns.length}</span>}
+                  </button>
+                  {isExcludeSettingsOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsExcludeSettingsOpen(false)}></div>
+                      <div className="absolute top-full mt-2 right-0 w-64 md:w-72 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl z-50 p-4 animate-in fade-in cursor-default" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-2 pb-2 border-b dark:border-zinc-800">
+                          <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5"><FilterX className="w-3.5 h-3.5 text-amber-500" /> 데이터저장 제외 칼럼</h4>
+                          <button onClick={() => setIsExcludeSettingsOpen(false)} className="text-zinc-400 hover:text-zinc-600"><X className="w-3.5 h-3.5" /></button>
+                        </div>
+                        <p className="text-[10.5px] text-zinc-500 mb-3 leading-tight font-medium">체크된 칼럼은 데이터베이스 저장 시 값을 전송하지 않습니다. (자동 생성 가상칼럼 에러 방지용)</p>
+                        <div className="max-h-60 overflow-y-auto space-y-1">
+                          {schemaData[selectedTable]?.map(col => (
+                            <label key={col.name} className="flex items-center gap-2 p-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-900 rounded cursor-pointer transition-colors">
+                              <input 
+                                type="checkbox" 
+                                checked={excludedColumns.includes(col.name)}
+                                onChange={() => toggleExcludedColumn(col.name)}
+                                className="w-3.5 h-3.5 rounded text-amber-500 focus:ring-amber-500 cursor-pointer"
+                              />
+                              <span className={`text-xs font-mono ${excludedColumns.includes(col.name) ? 'text-amber-600 dark:text-amber-500 font-bold' : 'text-zinc-700 dark:text-zinc-300'}`}>{col.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <button onClick={handleSave} disabled={!isDirty || isSaving} className="px-3 md:px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex flex-shrink-0 items-center gap-1.5 md:gap-2 shadow-sm">
                   {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   <span className="hidden sm:inline">Save Changes</span>
                   <span className="sm:hidden">Save</span>
