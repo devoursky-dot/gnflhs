@@ -379,8 +379,8 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
 
         {/* Content Area */}
         <div className="flex-1 flex flex-col relative overflow-hidden bg-slate-50">
-          <div className="flex-1 flex flex-col overflow-hidden md:p-6 pb-24 md:pb-6">
-            <div className="w-full flex-1 md:bg-white md:rounded-[2rem] md:shadow-sm md:border md:border-slate-200 overflow-y-auto scrollbar-hide flex flex-col">
+          <div className="flex-1 flex flex-col overflow-hidden pb-24 md:pb-0">
+            <div className="w-full flex-1 overflow-y-auto scrollbar-hide flex flex-col">
               {currentView?.groupByColumn ? (
                 <div className="flex flex-col pt-0 flex-1">
                   {Object.entries(groupedData).map(([groupKey, rows]) => {
