@@ -266,11 +266,12 @@ const RelationSyncModal = ({ isOpen, onClose, schemaData, currentTable, onApplyS
     }
     setIsProcessing(true);
     try {
-      const { data, error } = await supabase.from(refTable).select(`${matchRefColumn}, ${refTargetColumn}`).not(matchRefColumn, 'is', null);
+      const { data, error } = await supabase.from(refTable).select(`"${matchRefColumn}", "${refTargetColumn}"`).not(matchRefColumn, 'is', null);
       if (error) throw error;
       
+      const safeData = data || [];
       const map = new Map();
-      data.forEach(row => {
+      safeData.forEach(row => {
          if (row[matchRefColumn] != null) {
            map.set(String(row[matchRefColumn]), row[refTargetColumn]);
          }
@@ -278,7 +279,7 @@ const RelationSyncModal = ({ isOpen, onClose, schemaData, currentTable, onApplyS
       
       onApplySync(targetColumn, matchCurrentColumn, map);
       onClose();
-      alert(`총 ${data.length}개의 참조 데이터를 가져와 빈칸에 일치하는 값을 채웠습니다.\n(※ 아직 DB에 반영되지 않았으니 시각적으로 확인 후 우측 상단의 'Save Changes' 버튼을 눌러 확정 기록하세요.)`);
+      alert(`총 ${safeData.length}개의 참조 데이터를 가져와 빈칸에 일치하는 값을 채웠습니다.\n(※ 아직 DB에 반영되지 않았으니 시각적으로 확인 후 우측 상단의 'Save Changes' 버튼을 눌러 확정 기록하세요.)`);
     } catch (err: any) {
       alert(`복사 중 오류 발생: ${err.message}`);
     } finally {
