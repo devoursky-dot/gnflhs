@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from "
 import { createClient } from "@supabase/supabase-js";
 import { 
   Database, Table, Columns, Key, Settings, Search, Loader2, Save, 
-  RefreshCw, ClipboardPaste, Trash2, Plus, Image as ImageIcon, Copy, Check, X, FolderOpen, Undo, ArrowUpDown, ArrowUp, ArrowDown
+  RefreshCw, ClipboardPaste, Trash2, Plus, Image as ImageIcon, Copy, Check, X, FolderOpen, Undo, ArrowUpDown, ArrowUp, ArrowDown, Menu
 } from "lucide-react";
 import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable, ColumnDef, SortingState } from "@tanstack/react-table";
 import Papa from "papaparse";
@@ -243,6 +243,7 @@ export default function AdminDashboardPage() {
   const [styleKey, setStyleKey] = useState<string>("modern");
   const [isCreatingTable, setIsCreatingTable] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [lastDeleted, setLastDeleted] = useState<{ index: number, record: any } | null>(null);
@@ -539,7 +540,16 @@ export default function AdminDashboardPage() {
     <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden relative">
       <ImageUploadModal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} />
 
-      <aside className="w-64 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black flex flex-col shrink-0 z-10">
+      {/* 모바일 오버레이 */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* 사이드바 */}
+      <aside className={`fixed md:relative inset-y-0 left-0 w-64 transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 transition-transform duration-300 ease-in-out border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black flex flex-col shrink-0 z-40 shadow-2xl md:shadow-none`}>
         <div className="p-5 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800">
           <div className="flex items-center gap-2">
             <Database className="w-5 h-5 text-emerald-500" />
@@ -557,7 +567,7 @@ export default function AdminDashboardPage() {
           </div>
           <nav className="space-y-1">
             {Object.keys(schemaData).filter(t => t.includes(searchTerm)).map(t => (
-              <button key={t} onClick={() => setSelectedTable(t)} className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium truncate ${selectedTable === t ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400"}`}>
+              <button key={t} onClick={() => { setSelectedTable(t); setIsSidebarOpen(false); }} className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium truncate ${selectedTable === t ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400"}`}>
                 {t}
               </button>
             ))}
@@ -565,22 +575,28 @@ export default function AdminDashboardPage() {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-hidden flex flex-col">
+      <main className="flex-1 overflow-hidden flex flex-col min-w-0 w-full">
         {selectedTable && (
           <>
-            <header className="h-16 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black px-6 flex items-center justify-between shrink-0 shadow-sm z-10">
-              <div className="flex items-center gap-4">
-                <h2 className="text-xl font-semibold">{selectedTable}</h2>
-                <button onClick={handleCreateTable} disabled={isCreatingTable} className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500">
+            <header className="h-16 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black px-4 md:px-6 flex items-center justify-between shrink-0 shadow-sm z-10 gap-2 md:gap-4">
+              <div className="flex items-center gap-2 md:gap-4 min-w-0">
+                <button 
+                  className="md:hidden p-2 -ml-2 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg flex-shrink-0"
+                  onClick={() => setIsSidebarOpen(true)}
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
+                <h2 className="text-lg md:text-xl font-semibold truncate max-w-[120px] sm:max-w-[200px] md:max-w-none">{selectedTable}</h2>
+                <button onClick={handleCreateTable} disabled={isCreatingTable} className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hidden sm:block flex-shrink-0">
                   {isCreatingTable ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 </button>
-                <button onClick={handleAddRow} className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 rounded-lg text-xs font-bold transition-all border border-zinc-200 dark:border-zinc-700">
+                <button onClick={handleAddRow} className="flex flex-shrink-0 items-center gap-1.5 px-2 md:px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 rounded-lg text-xs font-bold transition-all border border-zinc-200 dark:border-zinc-700">
                   <Plus className="w-3 h-3" />
-                  행 추가
+                  <span className="hidden sm:inline">행 추가</span>
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl items-center gap-1 border border-zinc-200 dark:border-zinc-700">
+                <div className="hidden lg:flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl items-center gap-1 border border-zinc-200 dark:border-zinc-700">
                   <select value={themeKey} onChange={(e) => setThemeKey(e.target.value)} className="px-2 py-1.5 text-[11px] rounded-lg bg-transparent border-none outline-none cursor-pointer font-bold text-zinc-600 dark:text-zinc-300">
                     {Object.entries(COLOR_THEMES).map(([key, t]: any) => (
                       <option key={key} value={key}>🎨 {t.name}</option>
@@ -593,19 +609,20 @@ export default function AdminDashboardPage() {
                     ))}
                   </select>
                 </div>
-                <button onClick={() => fetchTableData(selectedTable)} className="p-2.5 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                <button onClick={() => fetchTableData(selectedTable)} className="p-2 md:p-2.5 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex-shrink-0">
                   <RefreshCw className={`w-4 h-4 ${isLoadingData ? 'animate-spin' : ''}`} />
                 </button>
-                <button onClick={handleSave} disabled={!isDirty || isSaving} className="px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2">
+                <button onClick={handleSave} disabled={!isDirty || isSaving} className="px-3 md:px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex flex-shrink-0 items-center gap-1.5 md:gap-2">
                   {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  Save Changes
+                  <span className="hidden sm:inline">Save Changes</span>
+                  <span className="sm:hidden">Save</span>
                 </button>
               </div>
             </header>
 
-            <div className="flex-1 p-6 overflow-hidden flex flex-col" ref={gridRef}>
-              <div className="flex-1 bg-white dark:bg-black rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-auto">
-                <table className="w-full text-left text-xs border-separate border-spacing-0">
+            <div className="flex-1 p-2 sm:p-4 md:p-6 overflow-hidden flex flex-col" ref={gridRef}>
+              <div className="flex-1 bg-white dark:bg-black rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-auto scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800">
+                <table className="w-full min-w-max text-left text-xs border-separate border-spacing-0">
                   <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-950 z-20 shadow-sm">
                     {table.getHeaderGroups().map(hg => (
                       <tr key={hg.id}>
