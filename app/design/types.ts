@@ -33,6 +33,12 @@ export type View = {
   columnCount: number;
   layoutRows: LayoutRow[];
   onClickActionId?: string | null;
+  onInitActionId?: string | null; // 🔥 [신규] 뷰 시작 시 자동 실행 액션
+  
+  // 🔥 [신규] 어댑티브 메뉴 제어 (노출 조건 및 상태)
+  visibilityExpr?: string;        // 노출/활성화 조건 (JS Expression)
+  visibilityBehavior?: 'hide' | 'disable'; // 조건 만족 시 동작 (숨김 또는 비활성화)
+  disabledLabel?: string;         // 비활성화 시 표시할 문구
 };
 
 export type LayoutRow = {
@@ -105,6 +111,7 @@ export type Action = {
   smsPhoneColumn?: string | null;
   smsMessageTemplate?: string | null;
   tableName?: string | null; // 🔥 [신규] 소스 데이터 테이블 (카드 데이터 출처)
+  batchMode?: boolean; // 🔥 [신규] 다중 데이터 일괄 처리 모드
 };
 
 export type SchemaData = Record<string, string[]>;

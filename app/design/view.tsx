@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { View, SchemaData, LayoutRow, Action, LayoutCell } from './types';
 import { 
   Database, LayoutTemplate, Plus, Columns, Rows, ChevronLeft, 
-  ChevronRight, X, MousePointerClick, Star, Filter, Search, Smartphone, Eye, Loader2, TableProperties, ArrowUpDown, FolderTree, Trash2, Minus, Wand2, Image as ImageIcon, Type, Sparkles, AlignLeft, AlignCenter, AlignRight, Lock
+  ChevronRight, X, MousePointerClick, Star, Filter, Search, Smartphone, Eye, Loader2, TableProperties, ArrowUpDown, FolderTree, Trash2, Minus, Wand2, Image as ImageIcon, Type, Sparkles, AlignLeft, AlignCenter, AlignRight, Lock, Zap, Settings2
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js'; 
 import IconPicker, { IconMap } from './picker';
@@ -498,7 +498,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
                  선택된 <span className="text-indigo-600 text-lg border-b-2 border-indigo-200 px-1">{view.lockedRecordKeys?.length}</span> 개의 데이터만 화면에 표시됩니다.<br/>
                  기준 스키마: <span className="text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md font-mono">[{view.lockedKeyColumn}]</span>
                </p>
-               <button onClick={() => onUpdate({...view, isLocked: false, lockedRecordKeys: [], lockedKeyColumn: null})} className="mt-4 px-6 py-3 bg-white border-2 border-slate-200 hover:border-slate-800 hover:bg-slate-800 hover:text-white rounded-2xl text-slate-700 font-black transition-all shadow-sm">잠금 해제 및 쿼리 복원</button>
+               <button onClick={() => onUpdate({...view, isLocked: false})} className="mt-4 px-6 py-3 bg-white border-2 border-slate-200 hover:border-slate-800 hover:bg-slate-800 hover:text-white rounded-2xl text-slate-700 font-black transition-all shadow-sm">잠금 해제 (수동 픽 유지)</button>
              </div>
           </div>
         )}
@@ -521,8 +521,89 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           </div>
           <div className="space-y-4">
             <div><label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 whitespace-nowrap">카드 가로 배치 (열 개수)</label><select className="w-full p-3 rounded-xl bg-white border-2 border-slate-100 font-black text-slate-800 cursor-pointer outline-none" value={view.columnCount || 1} onChange={e => onUpdate({...view, columnCount: Number(e.target.value)})}>{[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}열 {n === 1 ? '(리스트 형태)' : `(${n}단 격자 형태)`}</option>)}</select></div>
-            <div><label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5 whitespace-nowrap"><MousePointerClick size={14} className="text-indigo-500"/> 카드 클릭 액션</label><select className="w-full p-3 rounded-xl bg-white border-2 border-slate-100 font-black text-slate-800 cursor-pointer outline-none" value={view.onClickActionId || ''} onChange={e => onUpdate({...view, onClickActionId: e.target.value || null})}><option value="">(클릭 동작 없음)</option>{actions.map(act => <option key={act.id} value={act.id}>⚡ {act.name}</option>)}</select></div>
+            <div>
+              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5 whitespace-nowrap"><MousePointerClick size={14} className="text-indigo-500"/> 카드 클릭 액션</label>
+              <select className="w-full p-3 rounded-xl bg-white border-2 border-slate-100 font-black text-slate-800 cursor-pointer outline-none" value={view.onClickActionId || ''} onChange={e => onUpdate({...view, onClickActionId: e.target.value || null})}>
+                <option value="">(클릭 동작 없음)</option>
+                {actions.map(act => <option key={act.id} value={act.id}>⚡ {act.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-rose-500 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5 whitespace-nowrap animate-pulse"><Zap size={14} /> 뷰 시작 시 자동 실행(Automation)</label>
+              <select className="w-full p-3 rounded-xl bg-rose-50 border-2 border-rose-100 font-black text-rose-700 cursor-pointer outline-none focus:border-rose-300" value={view.onInitActionId || ''} onChange={e => onUpdate({...view, onInitActionId: e.target.value || null})}>
+                <option value="">(자동 실행 없음 - 일반 모드)</option>
+                {actions.map(act => <option key={act.id} value={act.id}>🚀 {act.name}</option>)}
+              </select>
+              <p className="text-[9px] font-bold text-rose-400 mt-1 px-1">* 뷰가 열리자마자 필터링된 데이터에 대해 위 액션을 수행합니다.</p>
+            </div>
           </div>
+        </div>
+        
+        {/* 🔥 [신규] 어댑티브 UI (조건부 노출/비활성화) 설정 섹션 */}
+        <div className="mt-8 pt-8 border-t border-slate-100 min-w-max w-full">
+           <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-md"><Settings2 size={20}/></div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800">🚦 메뉴 노출 및 가용성 필터 (Adaptive UI)</h3>
+                <p className="text-xs text-slate-500 font-bold">특정 조건에 따라 메뉴를 숨기거나 비활성화(잠금)합니다.</p>
+              </div>
+           </div>
+           
+           <div className="grid grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5"><Sparkles size={14} className="text-amber-500"/> 제어 조건 (JavaScript Expression)</label>
+                  <textarea 
+                    className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-mono text-xs font-bold text-slate-700 outline-none focus:border-amber-400 transition-all"
+                    rows={3}
+                    value={view.visibilityExpr || ''}
+                    onChange={e => onUpdate({...view, visibilityExpr: e.target.value})}
+                    placeholder="예: count('attendance_log', {date: 'today'}) > 0"
+                  />
+                  <div className="mt-2 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                    <p className="text-[10px] font-bold text-amber-700 leading-relaxed">
+                      💡 **도움말**: 결과가 **true**(참)이면 아래 설정을 적용합니다.<br/>
+                      - `count('테이블', {'{필터}'}) &gt; 0`: 기록이 있으면<br/>
+                      - `currentUser().role === 'admin'`: 관리자면
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-6">
+                <div className="bg-slate-50 p-5 rounded-2xl border-2 border-dashed border-slate-200">
+                  <label className="text-[10px] font-black text-slate-500 block mb-4 uppercase tracking-wider px-1">조건 만족 시 처리 방식 (Behavior)</label>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => onUpdate({ ...view, visibilityBehavior: 'hide' })}
+                      className={`flex-1 py-3 rounded-xl text-xs font-black border-2 transition-all ${view.visibilityBehavior === 'hide' ? 'bg-slate-800 border-slate-800 text-white shadow-lg scale-105' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}
+                    >
+                      🚫 메뉴에서 숨김
+                    </button>
+                    <button 
+                      onClick={() => onUpdate({ ...view, visibilityBehavior: 'disable' })}
+                      className={`flex-1 py-3 rounded-xl text-xs font-black border-2 transition-all ${view.visibilityBehavior === 'disable' ? 'bg-amber-600 border-amber-600 text-white shadow-lg scale-105' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}
+                    >
+                      🔒 비활성화 (보이지만 못 누름)
+                    </button>
+                  </div>
+                </div>
+
+                {view.visibilityBehavior === 'disable' && (
+                  <div className="animate-in slide-in-from-top-2 duration-300">
+                    <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1">비활성화 시 상태 문구</label>
+                    <input 
+                      type="text"
+                      className="w-full p-4 rounded-2xl bg-white border-2 border-amber-100 font-black text-amber-700 outline-none focus:border-amber-400 shadow-sm"
+                      value={view.disabledLabel || ''}
+                      onChange={e => onUpdate({...view, disabledLabel: e.target.value})}
+                      placeholder="예: 오늘 감독 완료"
+                    />
+                    <p className="text-[9px] font-bold text-amber-400 mt-2 px-1">* 메뉴 아이콘 대신 이 텍스트가 표시되어 상태를 알려줍니다.</p>
+                  </div>
+                )}
+              </div>
+           </div>
         </div>
       </section>
 

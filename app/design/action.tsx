@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { Action, View, SchemaData, InsertMapping } from './types';
-import { Trash2, Plus, DatabaseZap, HelpCircle, X, Code2, Layers, Settings2, Star, MessageSquare } from 'lucide-react';
+import { Trash2, Plus, DatabaseZap, HelpCircle, X, Code2, Layers, Settings2, Star, MessageSquare, Zap } from 'lucide-react';
 import { IconMap } from './picker';
 import { FORMULA_EXAMPLES } from './formulaExamples';
 
@@ -210,6 +210,20 @@ export default function ActionEditor({
                 <label htmlFor="quick-save-toggle" className="text-sm font-black text-amber-900 cursor-pointer flex items-center gap-2">
                   ⚡ 초고속 모드 (확인창 없이 즉시 저장) 
                   <span className="text-[10px] font-bold text-amber-600/70 ml-2">* 입력 항목이 하나뿐인 버튼형 폼은 클릭 즉시 저장됩니다.</span>
+                </label>
+              </div>
+
+              <div className="flex items-center gap-3 p-4 bg-rose-50 rounded-2xl border border-rose-100">
+                <input
+                  type="checkbox"
+                  id="batch-mode-toggle"
+                  checked={!!action.batchMode}
+                  onChange={(e) => onUpdate({ ...action, batchMode: e.target.checked })}
+                  className="w-5 h-5 accent-rose-600"
+                />
+                <label htmlFor="batch-mode-toggle" className="text-sm font-black text-rose-900 cursor-pointer flex flex-col">
+                  <span className="flex items-center gap-2"><Zap size={16} className="text-rose-600 animate-pulse"/> 🚀 다중 데이터 자동 처리 (Batch Mode)</span>
+                  <span className="text-[10px] font-bold text-rose-500 mt-1">* '뷰 시작 액션'으로 사용 시 필터링된 모든 데이터를 순회하며 자동 저장합니다.</span>
                 </label>
               </div>
 
