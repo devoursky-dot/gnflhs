@@ -269,7 +269,7 @@ export default function ActionEditor({
                             >
                               <option value="prompt">💬 폼에서 직접 입력받기</option>
                               <option value="card_data">📄 현재 카드 데이터 재사용</option>
-                              <option value="static">✍️ 고정 값 입력</option>
+                              <option value="static">✍️ 직접 값 입력 (Static)</option>
                               <option value="user_name">👤 계정 사용자 이름</option>
                               <option value="user_email">📧 계정 사용자 이메일</option>
                             </select>
@@ -289,93 +289,90 @@ export default function ActionEditor({
                           </div>
                         </div>
                         <div className="col-span-2">
-                           {mapping.mappingType === 'card_data' && mapping.isExpression ? (
+                           {(mapping.mappingType === 'card_data' || mapping.mappingType === 'static' || mapping.mappingType === 'prompt') && (
                              <div className="space-y-2">
                                <div className="flex items-center justify-between">
-                                  <span className="text-[10px] font-black text-indigo-500 uppercase tracking-wider">4. 스마트 수식 편집</span>
-                                  <button onClick={() => setIsHelpModalOpen(true)} className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-indigo-600 transition-colors"><HelpCircle size={12}/> [가이드 및 예시보기]</button>
+                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                    {mapping.mappingType === 'prompt' ? '3+4. 입력 폼 레이블' : 
+                                     mapping.mappingType === 'card_data' ? (mapping.isExpression ? '4. 스마트 수식 편집' : '3+4. 데이터 매핑 (컬럼명 또는 URL)') : 
+                                     '3+4. 직접 입력값'}
+                                  </span>
+                                  {mapping.mappingType === 'card_data' && mapping.isExpression && (
+                                    <button onClick={() => setIsHelpModalOpen(true)} className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-indigo-600 transition-colors"><HelpCircle size={12}/> [가이드 및 예시보기]</button>
+                                  )}
                                </div>
-                               <div className="bg-slate-50 p-3 rounded-xl border-2 border-indigo-100 space-y-3">
-                                  <div className="flex flex-wrap gap-1.5 p-1">
-                                    <span className="text-[9px] font-black text-slate-400 w-full mb-1">삽입할 변수 클릭:</span>
-                                    {(schemaData[action.tableName || ''] || []).map(col => (
-                                      <button key={col} onClick={() => {
-                                         const newArr = [...action.insertMappings!];
-                                         newArr[idx].sourceValue = (newArr[idx].sourceValue || '') + `{{${col}}}`;
-                                         onUpdate({ ...action, insertMappings: newArr });
-                                      }} className="px-2 py-1 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-600 hover:bg-indigo-50 hover:border-indigo-300 transition-all">
-                                        {col}
-                                      </button>
-                                    ))}
-                                  </div>
-                                  <textarea
-                                    value={mapping.sourceValue || ''}
-                                    onFocus={(e) => handleInputInteraction(mapping.id, e, 'insert')}
-                                    onClick={(e) => handleInputInteraction(mapping.id, e, 'insert')}
-                                    onKeyUp={(e) => handleInputInteraction(mapping.id, e, 'insert')}
-                                    onChange={(e) => {
-                                      const newArr = [...action.insertMappings!];
-                                      newArr[idx].sourceValue = e.target.value;
-                                      onUpdate({ ...action, insertMappings: newArr });
-                                      handleInputInteraction(mapping.id, e, 'insert');
-                                    }}
-                                    placeholder="{{컬럼1}} + {{컬럼2}}"
-                                    rows={2}
-                                    className="w-full p-3 text-sm font-mono font-bold bg-white border border-slate-200 rounded-lg outline-none focus:border-indigo-400"
-                                  />
+                               <div className={`${mapping.mappingType === 'card_data' ? 'bg-indigo-50/50 border-indigo-100' : 'bg-slate-50 border-slate-100'} p-3 rounded-xl border-2 space-y-3`}>
+                                  {mapping.mappingType === 'card_data' && (
+                                    <div className="flex flex-wrap gap-1.5 p-1 border-b border-indigo-100/50 pb-2 mb-1">
+                                      <span className="text-[9px] font-black text-indigo-400 w-full mb-1">클릭하여 컬럼 삽입:</span>
+                                      {(schemaData[action.tableName || ''] || []).length === 0 && (
+                                        <div className="text-[10px] text-rose-500 font-bold py-1">⚠️ 상단에서 '소스 데이터 테이블'을 먼저 선택해야 컬럼 목록이 나타납니다.</div>
+                                      )}
+                                      {(schemaData[action.tableName || ''] || []).map(col => (
+                                        <button key={col} onClick={() => {
+                                           const newArr = [...action.insertMappings!];
+                                           // Basic 모드여도 조합 가능한 {{}} 형태로 삽입
+                                           newArr[idx].sourceValue = (newArr[idx].sourceValue || '') + (mapping.isExpression ? `{{${col}}}` : `{{${col}}}`);
+                                           onUpdate({ ...action, insertMappings: newArr });
+                                        }} className="px-2 py-1 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-indigo-600 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all shadow-sm">
+                                          {col}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                  
+                                  {mapping.mappingType === 'card_data' && mapping.isExpression ? (
+                                    <textarea
+                                      value={mapping.sourceValue || ''}
+                                      onFocus={(e) => handleInputInteraction(mapping.id, e, 'insert')}
+                                      onClick={(e) => handleInputInteraction(mapping.id, e, 'insert')}
+                                      onKeyUp={(e) => handleInputInteraction(mapping.id, e, 'insert')}
+                                      onChange={(e) => {
+                                        const newArr = [...action.insertMappings!];
+                                        newArr[idx].sourceValue = e.target.value;
+                                        onUpdate({ ...action, insertMappings: newArr });
+                                        handleInputInteraction(mapping.id, e, 'insert');
+                                      }}
+                                      placeholder="{{컬럼1}} + {{컬럼2}}"
+                                      rows={2}
+                                      className="w-full p-3 text-sm font-mono font-bold bg-white border border-slate-200 rounded-lg outline-none focus:border-indigo-400"
+                                    />
+                                  ) : (
+                                    <div className="flex gap-3 items-center">
+                                      <input
+                                        type="text"
+                                        value={mapping.sourceValue || ''}
+                                        onChange={(e) => {
+                                          const newArr = [...action.insertMappings!];
+                                          newArr[idx].sourceValue = e.target.value;
+                                          onUpdate({ ...action, insertMappings: newArr });
+                                        }}
+                                        placeholder={mapping.mappingType === 'card_data' ? "예: 학번 또는 https://.../{{학번}}.jpg" : "값을 입력하세요"}
+                                        className="flex-1 p-2.5 text-sm font-bold border border-slate-200 rounded-lg focus:border-indigo-500 outline-none text-slate-900 bg-white"
+                                        style={{ color: 'var(--text-primary)' }}
+                                      />
+                                      {mapping.mappingType !== 'card_data' && (
+                                        <select
+                                          value={mapping.valueType || 'string'}
+                                          onChange={(e) => {
+                                            const newArr = [...action.insertMappings!];
+                                            newArr[idx].valueType = e.target.value as 'string' | 'number';
+                                            onUpdate({ ...action, insertMappings: newArr });
+                                          }}
+                                          className="p-2.5 text-xs font-bold border border-slate-200 rounded-lg text-slate-600 bg-white min-w-[100px]"
+                                        >
+                                          <option value="string">Text</option>
+                                          <option value="number">Number</option>
+                                        </select>
+                                      )}
+                                    </div>
+                                  )}
                                </div>
                              </div>
-                           ) : (
-                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider whitespace-nowrap">3. 데이터 형식</span>
-                                  <select
-                                    value={mapping.valueType || 'string'}
-                                    onChange={(e) => {
-                                      const newArr = [...action.insertMappings!];
-                                      newArr[idx].valueType = e.target.value as 'string' | 'number';
-                                      onUpdate({ ...action, insertMappings: newArr });
-                                    }}
-                                    className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg text-slate-900 min-w-[160px]"
-                                    style={{ color: 'var(--text-primary)' }}
-                                  >
-                                    <option value="string">Text (문자열)</option>
-                                    <option value="number">Number (숫자)</option>
-                                  </select>
-                                </div>
-                                <div>
-                                  <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider whitespace-nowrap">
-                                    4. {mapping.mappingType === 'prompt' ? '입력 폼 레이블' : mapping.mappingType === 'card_data' ? '원본 컬럼명' : mapping.mappingType === 'static' ? '고정값' : '설정 불필요'}
-                                  </span>
-                                  {mapping.mappingType === 'card_data' ? (
-                                    <select
-                                      value={mapping.sourceValue}
-                                      onChange={(e) => {
-                                        const newArr = [...action.insertMappings!];
-                                        newArr[idx].sourceValue = e.target.value;
-                                        onUpdate({ ...action, insertMappings: newArr });
-                                      }}
-                                      className="w-full p-2.5 text-sm font-bold border border-rose-200 rounded-lg bg-rose-50 text-rose-900 min-w-[200px]"
-                                    >
-                                      <option value="">-- 원본 컬럼 선택 --</option>
-                                      {(schemaData[action.tableName || ''] || []).map(col => <option key={col} value={col}>{col}</option>)}
-                                    </select>
-                                  ) : (
-                                    <input
-                                      type="text"
-                                      value={mapping.mappingType === 'user_name' || mapping.mappingType === 'user_email' ? '(자동 적용)' : mapping.sourceValue}
-                                      disabled={mapping.mappingType === 'user_name' || mapping.mappingType === 'user_email'}
-                                      onChange={(e) => {
-                                        const newArr = [...action.insertMappings!];
-                                        newArr[idx].sourceValue = e.target.value;
-                                        onUpdate({ ...action, insertMappings: newArr });
-                                      }}
-                                      placeholder="설정값을 입력하세요"
-                                      className="w-full p-2.5 text-sm font-bold border border-rose-200 rounded-lg focus:border-rose-500 outline-none text-slate-900 min-w-[200px] disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed"
-                                      style={{ color: 'var(--text-primary)' }}
-                                    />
-                                  )}
-                                </div>
+                           )}
+                           {(mapping.mappingType === 'user_name' || mapping.mappingType === 'user_email') && (
+                             <div className="h-full flex items-center p-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-xs font-bold text-slate-400 italic">
+                               로그인한 사용자의 {mapping.mappingType === 'user_name' ? '이름' : '이메일'}이 자동으로 저장됩니다.
                              </div>
                            )}
                         </div>
@@ -503,7 +500,7 @@ export default function ActionEditor({
                             >
                               <option value="prompt">💬 모달폼 띄워서 입력받기</option>
                               <option value="card_data">📄 현재 카드의 다른 데이터 사용</option>
-                              <option value="static">✍️ 백그라운 고정 값 일괄수정</option>
+                              <option value="static">✍️ 백그라운드 직접 값 수정 (Static)</option>
                               <option value="user_name">👤 계정 사용자 이름</option>
                               <option value="user_email">📧 계정 사용자 이메일</option>
                             </select>
@@ -523,93 +520,90 @@ export default function ActionEditor({
                           </div>
                         </div>
                         <div className="col-span-2">
-                           {mapping.mappingType === 'card_data' && mapping.isExpression ? (
+                           {(mapping.mappingType === 'card_data' || mapping.mappingType === 'static' || mapping.mappingType === 'prompt') && (
                              <div className="space-y-2">
                                <div className="flex items-center justify-between">
-                                  <span className="text-[10px] font-black text-indigo-500 uppercase tracking-wider">4. 스마트 수식 편집</span>
-                                  <button onClick={() => setIsHelpModalOpen(true)} className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-indigo-600 transition-colors"><HelpCircle size={12}/> [가이드 및 예시보기]</button>
+                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                    {mapping.mappingType === 'prompt' ? '3+4. 수정 폼 레이블' : 
+                                     mapping.mappingType === 'card_data' ? (mapping.isExpression ? '4. 스마트 수식 편집' : '3+4. 데이터 매핑 (컬럼명 또는 URL)') : 
+                                     '3+4. 백그라운드 수정값'}
+                                  </span>
+                                  {mapping.mappingType === 'card_data' && mapping.isExpression && (
+                                    <button onClick={() => setIsHelpModalOpen(true)} className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-indigo-600 transition-colors"><HelpCircle size={12}/> [가이드 및 예시보기]</button>
+                                  )}
                                </div>
-                               <div className="bg-slate-50 p-3 rounded-xl border-2 border-indigo-100 space-y-3">
-                                  <div className="flex flex-wrap gap-1.5 p-1">
-                                    <span className="text-[9px] font-black text-slate-400 w-full mb-1">삽입할 변수 클릭:</span>
-                                    {(schemaData[action.tableName || ''] || []).map(col => (
-                                      <button key={col} onClick={() => {
-                                         const newArr = [...action.updateMappings!];
-                                         newArr[idx].sourceValue = (newArr[idx].sourceValue || '') + `{{${col}}}`;
-                                         onUpdate({ ...action, updateMappings: newArr });
-                                      }} className="px-2 py-1 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-600 hover:bg-indigo-50 hover:border-indigo-300 transition-all">
-                                        {col}
-                                      </button>
-                                    ))}
-                                  </div>
-                                  <textarea
-                                    value={mapping.sourceValue || ''}
-                                    onFocus={(e) => handleInputInteraction(mapping.id, e, 'update')}
-                                    onClick={(e) => handleInputInteraction(mapping.id, e, 'update')}
-                                    onKeyUp={(e) => handleInputInteraction(mapping.id, e, 'update')}
-                                    onChange={(e) => {
-                                      const newArr = [...action.updateMappings!];
-                                      newArr[idx].sourceValue = e.target.value;
-                                      onUpdate({ ...action, updateMappings: newArr });
-                                      handleInputInteraction(mapping.id, e, 'update');
-                                    }}
-                                    placeholder="{{컬럼1}} + {{컬럼2}}"
-                                    rows={2}
-                                    className="w-full p-3 text-sm font-mono font-bold bg-white border border-slate-200 rounded-lg outline-none focus:border-indigo-400"
-                                  />
+                               <div className={`${mapping.mappingType === 'card_data' ? 'bg-indigo-50/50 border-indigo-100' : 'bg-slate-50 border-slate-100'} p-3 rounded-xl border-2 space-y-3`}>
+                                  {mapping.mappingType === 'card_data' && (
+                                    <div className="flex flex-wrap gap-1.5 p-1 border-b border-indigo-100/50 pb-2 mb-1">
+                                      <span className="text-[9px] font-black text-indigo-400 w-full mb-1">클릭하여 컬럼 삽입:</span>
+                                      {(schemaData[action.tableName || ''] || []).length === 0 && (
+                                        <div className="text-[10px] text-rose-500 font-bold py-1">⚠️ 상단에서 '소스 데이터 테이블'을 먼저 선택해야 컬럼 목록이 나타납니다.</div>
+                                      )}
+                                      {(schemaData[action.tableName || ''] || []).map(col => (
+                                        <button key={col} onClick={() => {
+                                           const newArr = [...action.updateMappings!];
+                                           // Basic 모드여도 조합 가능한 {{}} 형태로 삽입
+                                           newArr[idx].sourceValue = (newArr[idx].sourceValue || '') + (mapping.isExpression ? `{{${col}}}` : `{{${col}}}`);
+                                           onUpdate({ ...action, updateMappings: newArr });
+                                        }} className="px-2 py-1 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-indigo-600 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all shadow-sm">
+                                          {col}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                  
+                                  {mapping.mappingType === 'card_data' && mapping.isExpression ? (
+                                    <textarea
+                                      value={mapping.sourceValue || ''}
+                                      onFocus={(e) => handleInputInteraction(mapping.id, e, 'update')}
+                                      onClick={(e) => handleInputInteraction(mapping.id, e, 'update')}
+                                      onKeyUp={(e) => handleInputInteraction(mapping.id, e, 'update')}
+                                      onChange={(e) => {
+                                        const newArr = [...action.updateMappings!];
+                                        newArr[idx].sourceValue = e.target.value;
+                                        onUpdate({ ...action, updateMappings: newArr });
+                                        handleInputInteraction(mapping.id, e, 'update');
+                                      }}
+                                      placeholder="{{컬럼1}} + {{컬럼2}}"
+                                      rows={2}
+                                      className="w-full p-3 text-sm font-mono font-bold bg-white border border-slate-200 rounded-lg outline-none focus:border-indigo-400"
+                                    />
+                                  ) : (
+                                    <div className="flex gap-3 items-center">
+                                      <input
+                                        type="text"
+                                        value={mapping.sourceValue || ''}
+                                        onChange={(e) => {
+                                          const newArr = [...action.updateMappings!];
+                                          newArr[idx].sourceValue = e.target.value;
+                                          onUpdate({ ...action, updateMappings: newArr });
+                                        }}
+                                        placeholder={mapping.mappingType === 'card_data' ? "예: 학번 또는 https://.../{{학번}}.jpg" : "값을 입력하세요"}
+                                        className="flex-1 p-2.5 text-sm font-bold border border-slate-200 rounded-lg focus:border-indigo-500 outline-none text-slate-900 bg-white"
+                                        style={{ color: 'var(--text-primary)' }}
+                                      />
+                                      {mapping.mappingType !== 'card_data' && (
+                                        <select
+                                          value={mapping.valueType || 'string'}
+                                          onChange={(e) => {
+                                            const newArr = [...action.updateMappings!];
+                                            newArr[idx].valueType = e.target.value as 'string' | 'number';
+                                            onUpdate({ ...action, updateMappings: newArr });
+                                          }}
+                                          className="p-2.5 text-xs font-bold border border-slate-200 rounded-lg text-slate-600 bg-white min-w-[100px]"
+                                        >
+                                          <option value="string">Text</option>
+                                          <option value="number">Number</option>
+                                        </select>
+                                      )}
+                                    </div>
+                                  )}
                                </div>
                              </div>
-                           ) : (
-                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider whitespace-nowrap">3. 데이터 형식</span>
-                                  <select
-                                    value={mapping.valueType || 'string'}
-                                    onChange={(e) => {
-                                      const newArr = [...action.updateMappings!];
-                                      newArr[idx].valueType = e.target.value as 'string' | 'number';
-                                      onUpdate({ ...action, updateMappings: newArr });
-                                    }}
-                                    className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg text-slate-900 min-w-[160px]"
-                                    style={{ color: 'var(--text-primary)' }}
-                                  >
-                                    <option value="string">Text (문자열)</option>
-                                    <option value="number">Number (숫자)</option>
-                                  </select>
-                                </div>
-                                <div>
-                                  <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider whitespace-nowrap">
-                                    4. {mapping.mappingType === 'prompt' ? '수정 폼 레이블' : mapping.mappingType === 'card_data' ? '원본 컬럼명' : mapping.mappingType === 'static' ? '고정값' : '설정 불필요'}
-                                  </span>
-                                  {mapping.mappingType === 'card_data' ? (
-                                    <select
-                                      value={mapping.sourceValue}
-                                      onChange={(e) => {
-                                        const newArr = [...action.updateMappings!];
-                                        newArr[idx].sourceValue = e.target.value;
-                                        onUpdate({ ...action, updateMappings: newArr });
-                                      }}
-                                      className="w-full p-2.5 text-sm font-bold border border-rose-200 rounded-lg bg-rose-50 text-rose-900 min-w-[200px]"
-                                    >
-                                      <option value="">-- 원본 컬럼 선택 --</option>
-                                      {(schemaData[action.tableName || ''] || []).map(col => <option key={col} value={col}>{col}</option>)}
-                                    </select>
-                                  ) : (
-                                    <input
-                                      type="text"
-                                      value={mapping.mappingType === 'user_name' || mapping.mappingType === 'user_email' ? '(자동 적용)' : mapping.sourceValue}
-                                      disabled={mapping.mappingType === 'user_name' || mapping.mappingType === 'user_email'}
-                                      onChange={(e) => {
-                                        const newArr = [...action.updateMappings!];
-                                        newArr[idx].sourceValue = e.target.value;
-                                        onUpdate({ ...action, updateMappings: newArr });
-                                      }}
-                                      placeholder="설정값을 입력하세요"
-                                      className="w-full p-2.5 text-sm font-bold border border-rose-200 rounded-lg focus:border-rose-500 outline-none text-slate-900 min-w-[200px] disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed"
-                                      style={{ color: 'var(--text-primary)' }}
-                                    />
-                                  )}
-                                </div>
+                           )}
+                           {(mapping.mappingType === 'user_name' || mapping.mappingType === 'user_email') && (
+                             <div className="h-full flex items-center p-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-xs font-bold text-slate-400 italic">
+                               로그인한 사용자의 {mapping.mappingType === 'user_name' ? '이름' : '이메일'}이 자동으로 저장됩니다.
                              </div>
                            )}
                         </div>

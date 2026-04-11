@@ -59,14 +59,95 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
         <div className="p-8 space-y-8 overflow-y-auto max-h-[75vh] bg-slate-50/50">
           {data.contentType === 'action' ? (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-              <div className="bg-white p-6 rounded-2xl border-2 border-indigo-100 shadow-sm space-y-6">
-                <div className="flex items-center gap-2 text-indigo-700 mb-2"><MousePointerClick size={18}/><h4 className="font-black">액션 버튼 스타일링</h4></div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2"><label className="text-[10px] font-black text-slate-500 pl-1">버튼 모양 (Shape)</label><select value={data.buttonShape || 'square'} onChange={e => setData({...data, buttonShape: e.target.value as any})} className="w-full p-3 text-sm rounded-xl border-2 border-indigo-50 font-bold text-indigo-900 bg-indigo-50/50 focus:border-indigo-500 outline-none cursor-pointer"><option value="square">사각형</option><option value="rounded">둥근 사각형</option><option value="pill">완전 라운드 (Pill)</option></select></div>
-                  <div className="space-y-2"><label className="text-[10px] font-black text-slate-500 pl-1">버튼 정렬 (Align)</label><select value={data.buttonAlign || 'full'} onChange={e => setData({...data, buttonAlign: e.target.value as any})} className="w-full p-3 text-sm rounded-xl border-2 border-indigo-50 font-bold text-indigo-900 bg-indigo-50/50 focus:border-indigo-500 outline-none cursor-pointer"><option value="full">꽉 채우기 (Full)</option><option value="left">왼쪽 정렬</option><option value="center">가운데 정렬</option><option value="right">오른쪽 정렬</option></select></div>
-                  <div className="space-y-2"><label className="text-[10px] font-black text-slate-500 pl-1">버튼 내용 (Content)</label><select value={data.buttonStyle || 'both'} onChange={e => setData({...data, buttonStyle: e.target.value as any})} className="w-full p-3 text-sm rounded-xl border-2 border-indigo-50 font-bold text-indigo-900 bg-indigo-50/50 focus:border-indigo-500 outline-none cursor-pointer"><option value="both">아이콘 + 글자</option><option value="icon">아이콘만</option><option value="text">글자만</option></select></div>
+              <div className="bg-white p-6 rounded-3xl border-2 border-indigo-100 shadow-sm space-y-8">
+                <div className="flex items-center gap-2 text-indigo-700 mb-2">
+                  <MousePointerClick size={20}/><h4 className="text-lg font-black tracking-tight">액션 버튼 프리미엄 스타일링</h4>
                 </div>
-                <p className="text-[10px] font-bold text-slate-400 px-1">* '꽉 채우기'를 선택하면 버튼이 셀 가로 폭을 모두 채웁니다.</p>
+
+                {/* 1. 버튼 모양 및 정렬 */}
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <label className="text-[11px] font-black text-slate-500 pl-1 uppercase tracking-wider">버튼 모양 (Shape)</label>
+                    <div className="flex bg-slate-50 p-1 rounded-2xl border border-slate-100">
+                      {[
+                        { id: 'square', label: '사각형' },
+                        { id: 'rounded', label: '둥근 사각' },
+                        { id: 'pill', label: '알약형' },
+                        { id: 'none', label: '모양없음' }
+                      ].map(s => (
+                        <button 
+                          key={s.id} 
+                          onClick={() => setData({...data, buttonShape: s.id as any})}
+                          className={`flex-1 py-2 text-[10px] font-black rounded-xl transition-all ${data.buttonShape === s.id || (!data.buttonShape && s.id === 'square') ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[11px] font-black text-slate-500 pl-1 uppercase tracking-wider">버튼 정렬 (Align) & 구성</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <select value={data.buttonAlign || 'full'} onChange={e => setData({...data, buttonAlign: e.target.value as any})} className="w-full p-2.5 text-xs rounded-xl border-2 border-slate-100 font-bold text-slate-700 outline-none focus:border-indigo-500">
+                        <option value="full">꽉 채우기 (Full)</option><option value="left">왼쪽</option><option value="center">가운데</option><option value="right">오른쪽</option>
+                      </select>
+                      <select value={data.buttonStyle || 'both'} onChange={e => setData({...data, buttonStyle: e.target.value as any})} className="w-full p-2.5 text-xs rounded-xl border-2 border-slate-100 font-bold text-slate-700 outline-none focus:border-indigo-500">
+                        <option value="both">아이콘+글자</option><option value="icon">아이콘만</option><option value="text">글자만</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. 최신 트렌드 스타일 (Variant) */}
+                <div className="space-y-3">
+                  <label className="text-[11px] font-black text-slate-500 pl-1 uppercase tracking-wider">최신 트렌드 스타일 (Variant)</label>
+                  <div className="grid grid-cols-4 gap-3">
+                    {[
+                      { id: 'default', name: '기본형', icon: '✨' },
+                      { id: 'raised', name: '돌출형', icon: '🔼' },
+                      { id: 'inset', name: '움푹패인형', icon: '🔽' },
+                      { id: 'outline', name: '테두리형', icon: '⬜' },
+                      { id: '3d', name: '입체형(3D)', icon: '🧊' },
+                      { id: 'shadow', name: '그림자형', icon: '🌫️' },
+                      { id: 'glass', name: '유리광택(Glass)', icon: '💎' }
+                    ].map(v => (
+                      <button 
+                        key={v.id}
+                        onClick={() => setData({...data, buttonVariant: v.id as any})}
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border-2 transition-all ${data.buttonVariant === v.id || (!data.buttonVariant && v.id === 'default') ? 'border-indigo-600 bg-indigo-50 shadow-sm' : 'border-slate-100 bg-white hover:border-indigo-200'}`}
+                      >
+                        <span className="text-lg">{v.icon}</span>
+                        <span className="text-[9px] font-black text-slate-600 whitespace-nowrap">{v.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3. 버튼 컬러 (Color) */}
+                <div className="space-y-3">
+                  <label className="text-[11px] font-black text-slate-500 pl-1 uppercase tracking-wider">버튼 컬러 팔레트 (Color)</label>
+                  <div className="flex flex-wrap gap-3">
+                    {[
+                      { id: 'slate', color: 'bg-slate-900' },
+                      { id: 'indigo', color: 'bg-indigo-600' },
+                      { id: 'blue', color: 'bg-blue-600' },
+                      { id: 'emerald', color: 'bg-emerald-600' },
+                      { id: 'rose', color: 'bg-rose-500' },
+                      { id: 'amber', color: 'bg-amber-500' },
+                      { id: 'violet', color: 'bg-violet-600' },
+                      { id: 'cyan', color: 'bg-cyan-500' }
+                    ].map(c => (
+                      <button 
+                        key={c.id}
+                        onClick={() => setData({...data, buttonColor: c.id})}
+                        className={`w-10 h-10 rounded-full ${c.color} transition-all relative ${data.buttonColor === c.id || (!data.buttonColor && c.id === 'slate') ? 'ring-4 ring-indigo-200 scale-110' : 'hover:scale-110'}`}
+                      >
+                        {(data.buttonColor === c.id || (!data.buttonColor && c.id === 'slate')) && <div className="absolute inset-0 flex items-center justify-center text-white text-[10px]">✓</div>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-[10px] font-bold text-slate-400 px-1 italic">※ '배경 없음' 모양 선택 시 선택한 색상이 글자/아이콘 색상이 됩니다.</p>
               </div>
             </div>
           ) : (
@@ -96,7 +177,7 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
                 </div>
               ) : (
                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-                  <div className="grid grid-cols-2 gap-4 pb-2 border-b border-slate-200">
+                  <div className="grid grid-cols-2 gap-4 pb-4">
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-500 pl-1">글자 크기 (Size)</label>
                       <select value={data.textSize || ''} onChange={e => setData({...data, textSize: e.target.value})} className="w-full p-3 text-sm rounded-xl border-2 border-slate-100 font-bold text-slate-900 focus:border-indigo-500 outline-none cursor-pointer" style={{ color: 'var(--text-primary)' }}>
@@ -111,22 +192,77 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 pb-4 border-b border-slate-200">
+                  <div className="grid grid-cols-2 gap-4 pb-4">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 pl-1">데이터 앞글자 추가 (Prefix)</label>
-                      <input value={data.textPrefix || ''} onChange={e => setData({...data, textPrefix: e.target.value})} className="w-full p-4 rounded-xl border-2 border-slate-100 font-bold text-slate-900 focus:border-indigo-500 outline-none" style={{ color: 'var(--text-primary)' }} placeholder="예: [ " />
+                      <label className="text-[10px] font-black text-slate-500 pl-1">글자 정렬 (Align)</label>
+                      <div className="flex bg-white rounded-xl border-2 border-slate-100 p-1">
+                        <button onClick={() => setData({...data, textAlign: 'left'})} className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all ${(!data.textAlign || data.textAlign === 'left') ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:bg-slate-50'}`}><AlignLeft size={18}/></button>
+                        <button onClick={() => setData({...data, textAlign: 'center'})} className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all ${data.textAlign === 'center' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:bg-slate-50'}`}><AlignCenter size={18}/></button>
+                        <button onClick={() => setData({...data, textAlign: 'right'})} className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all ${data.textAlign === 'right' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:bg-slate-50'}`}><AlignRight size={18}/></button>
+                      </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 pl-1">데이터 뒷글자 추가 (Suffix)</label>
-                      <input value={data.textSuffix || ''} onChange={e => setData({...data, textSuffix: e.target.value})} className="w-full p-4 rounded-xl border-2 border-slate-100 font-bold text-slate-900 focus:border-indigo-500 outline-none" style={{ color: 'var(--text-primary)' }} placeholder="예: ] 원" />
+                      <label className="text-[10px] font-black text-slate-500 pl-1">글자 색상 (Color)</label>
+                      <select value={data.textColor || ''} onChange={e => setData({...data, textColor: e.target.value})} className="w-full p-3 text-sm rounded-xl border-2 border-slate-100 font-bold text-slate-900 focus:border-indigo-500 outline-none cursor-pointer" style={{ color: 'var(--text-primary)' }}>
+                        <option value="">기본 색상</option>
+                        <option value="text-slate-500">회색 (Slate)</option>
+                        <option value="text-indigo-600">청보라 (Indigo)</option>
+                        <option value="text-blue-600">파랑 (Blue)</option>
+                        <option value="text-emerald-600">초록 (Emerald)</option>
+                        <option value="text-rose-600">빨강 (Rose)</option>
+                        <option value="text-amber-600">주황 (Amber)</option>
+                        <option value="text-white">흰색 (White - 어두운 배경용)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* ⚡ 데이터 가공 파이프라인 가이드 UI */}
+                  <div className="py-6 flex flex-col items-center">
+                    <div className="w-full h-px bg-slate-200 relative mb-8">
+                       <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-4 text-[11px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Data Transformation Pipeline</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between w-full max-w-sm relative">
+                      {/* 파이프라인 선 */}
+                      <div className="absolute top-1/2 left-0 w-full h-0.5 bg-indigo-100 -translate-y-1/2 -z-10"></div>
+                      
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-black shadow-lg">1</div>
+                        <span className="text-[10px] font-black text-indigo-600">수식 계산</span>
+                      </div>
+                      
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-black shadow-lg">2</div>
+                        <span className="text-[10px] font-black text-blue-500">정규식 패턴</span>
+                      </div>
+                      
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-black shadow-lg">3</div>
+                        <span className="text-[10px] font-black text-emerald-500">앞/뒷말 추가</span>
+                      </div>
+                    </div>
+                    <p className="mt-6 text-[11px] font-bold text-slate-400 bg-slate-50 px-4 py-2 rounded-full border border-slate-100 italic">
+                      💡 위 순서대로 데이터가 차례대로 가공됩니다. (조합 가능!)
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pb-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-emerald-600 pl-1 uppercase tracking-tighter flex items-center gap-1"><span className="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center">3</span> 데이터 앞글자 추가 (Prefix)</label>
+                      <input value={data.textPrefix || ''} onChange={e => setData({...data, textPrefix: e.target.value})} className="w-full p-4 rounded-xl border-2 border-slate-100 font-bold text-slate-900 focus:border-emerald-500 outline-none transition-colors" style={{ color: 'var(--text-primary)' }} placeholder="예: [ " />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-emerald-600 pl-1 uppercase tracking-tighter flex items-center gap-1"><span className="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center">3</span> 데이터 뒷글자 추가 (Suffix)</label>
+                      <input value={data.textSuffix || ''} onChange={e => setData({...data, textSuffix: e.target.value})} className="w-full p-4 rounded-xl border-2 border-slate-100 font-bold text-slate-900 focus:border-emerald-500 outline-none transition-colors" style={{ color: 'var(--text-primary)' }} placeholder="예: ] 원" />
                     </div>
                   </div>
                   
-                  {/* 🔥 [보강] 통합된 마법의 수식 엔진 (Magic Expression) */}
+                  {/* 1단계: 마법의 수식 엔진 */}
                   <div className="p-6 bg-indigo-50/50 rounded-[2.5rem] border-2 border-indigo-100 space-y-6">
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-black text-indigo-700 uppercase tracking-widest flex items-center gap-1.5">
-                        <Sparkles size={16}/> 마법의 수식 라이브러리
+                        <span className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-black">1</span> 
+                        <Sparkles size={16}/> 마법의 수식 라이브러리 (Formula)
                       </label>
                       <button onClick={() => setData({...data, textExpression: ''})} className="text-[10px] font-black text-rose-500 bg-rose-50 px-2 py-1 rounded-lg hover:bg-rose-100 transition-colors">초기화</button>
                     </div>
@@ -167,14 +303,16 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
                     </div>
                   </div>
 
-                  <div className="p-6 bg-blue-50/50 rounded-2xl border-2 border-blue-100 space-y-6 opacity-60">
+                  {/* 2단계: 마법의 정규식 */}
+                  <div className="p-6 bg-blue-50/50 rounded-2xl border-2 border-blue-100 space-y-6">
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-black text-blue-700 uppercase tracking-widest flex items-center gap-1.5">
-                        <Sparkles size={16}/> 마법의 정규식 (Regex - 레거시)
+                        <span className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] font-black">2</span>
+                        <Sparkles size={16}/> 마법의 정규식 (Regex)
                       </label>
                       <button 
                         onClick={() => setData({...data, textRegexPattern: '', textRegexReplace: ''})} 
-                        className="text-[10px] font-black text-rose-500 bg-rose-50 px-2 py-1 rounded-lg"
+                        className="text-[10px] font-black text-rose-500 bg-rose-50 px-2 py-1 rounded-lg hover:bg-rose-100 transition-colors"
                       >
                         초기화
                       </button>
@@ -211,21 +349,21 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
                           placeholder="예: $1..." 
                         />
                       </div>
-                    </div>
                   </div>
                 </div>
-              )}
-            </>
-          )}
-        </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
-        <div className="p-6 bg-white border-t flex gap-3">
-          <button onClick={onClose} className="flex-1 py-4 text-slate-500 font-black rounded-2xl hover:bg-slate-100 transition-all">취소</button>
-          <button onClick={() => onSave(data)} className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all">설정 완료</button>
-        </div>
+      <div className="p-6 bg-white border-t flex gap-3">
+        <button onClick={onClose} className="flex-1 py-4 text-slate-500 font-black rounded-2xl hover:bg-slate-100 transition-all">취소</button>
+        <button onClick={() => onSave(data)} className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all">설정 완료</button>
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 interface ViewEditorProps {

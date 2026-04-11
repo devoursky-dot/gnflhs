@@ -62,9 +62,12 @@ export type LayoutCell = {
   textExpression?: string; // 🔥 [신규] 마법의 수식 (JS 방식)
   
   // 🔥 [신규] 액션 버튼 스타일링 속성
-  buttonShape?: 'square' | 'rounded' | 'pill';
+  buttonShape?: 'square' | 'rounded' | 'pill' | 'none';
   buttonAlign?: 'full' | 'left' | 'center' | 'right';
   buttonStyle?: 'text' | 'icon' | 'both';
+  buttonVariant?: 'default' | 'raised' | 'inset' | 'outline' | '3d' | 'shadow' | 'glass';
+  buttonColor?: string;
+  textColor?: string;
   
   nestedRows?: LayoutRow[]; 
 };
