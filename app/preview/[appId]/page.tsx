@@ -246,14 +246,8 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     if (view.isLocked && view.lockedKeyColumn && view.lockedRecordKeys?.length > 0) {
       // 🔥 수동 픽 데이터 모드 (고정된 식별자 키 목록으로 조회)
       query = query.in(view.lockedKeyColumn, view.lockedRecordKeys);
-    } else if (view.filterColumn && view.filterValue) {
-      const op = view.filterOperator || 'eq';
-      const col = view.filterColumn as string;
-      const val = view.filterValue;
-      if (op === 'like') query = query.ilike(col, `%${val}%`);
-      else if (op === 'gt') query = query.gt(col, val);
-      else if (op === 'lt') query = query.lt(col, val);
-      else query = query.eq(col, val); 
+    } else if (view.filterColumn && (view.filterValue || view.filterOperator?.includes('null'))) {
+      query = applyAdvancedFilter(query, view.filterColumn, view.filterOperator || 'eq', view.filterValue || '');
     }
     
     if (view.sortColumn) query = query.order(view.sortColumn as string, { ascending: view.sortDirection === 'asc' });
@@ -292,12 +286,8 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       if (view.isLocked && view.lockedKeyColumn && (view.lockedRecordKeys || []).length > 0) {
         // 🔥 [추가] 수동 픽 데이터 모드인 경우 해당 데이터만 처리 대상으로 선정
         query = query.in(view.lockedKeyColumn, view.lockedRecordKeys);
-      } else if (view.filterColumn && view.filterValue) {
-        const op = view.filterOperator || 'eq';
-        if (op === 'like') query = query.ilike(view.filterColumn, `%${view.filterValue}%`);
-        else if (op === 'gt') query = query.gt(view.filterColumn, view.filterValue);
-        else if (op === 'lt') query = query.lt(view.filterColumn, view.filterValue);
-        else query = query.eq(view.filterColumn, view.filterValue);
+      } else if (view.filterColumn && (view.filterValue || view.filterOperator?.includes('null'))) {
+        query = applyAdvancedFilter(query, view.filterColumn, view.filterOperator || 'eq', view.filterValue || '');
       }
       
       const { data: filterRows, error: fetchErr } = await query.limit(500); // 일괄 처리 제한
@@ -378,13 +368,15 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     const newStates: Record<string, any> = {};
     
     // 헬퍼 함수 정의
+    const now = new Date();
+    const isoToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
     const helpers = {
       rowCount: async (table: string, filter: Record<string, any> = {}) => {
         let q = supabase.from(table).select("*", { count: "exact", head: true });
         Object.entries(filter).forEach(([k, v]) => {
           if (v === 'today') {
-            const today = new Date().toISOString().split('T')[0];
-            q = q.gte('created_at', `${today}T00:00:00`).lte('created_at', `${today}T23:59:59`);
+            q = q.gte(k, isoToday).lte(k, `${isoToday}T23:59:59`);
           } else {
             q = q.eq(k, v);
           }
@@ -396,22 +388,34 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       isToday: (dateStr: string) => new Date(dateStr).toDateString() === new Date().toDateString()
     };
 
+    // 별칭 추가 (count 사용 가능하게)
+    (helpers as any).count = helpers.rowCount;
+
     for (const v of appData.app_config.views) {
       if (v.visibilityExpr) {
         try {
-          // 비동기 함수 내에서 실행
-          const asyncEval = new Function('helpers', 'context', `
-            return (async () => {
-              try {
-                const { rowCount, currentUser, isToday } = helpers;
-                return await (${v.visibilityExpr});
-              } catch (e) {
-                console.error("View Condition Error:", e);
-                return false;
-              }
-            })();
-          `);
-          const isMet = await asyncEval(helpers, {});
+          // 🧠 비동기 함수 전용 생성기를 사용하여 await가 포함된 수식을 안전하게 실행
+          const isMet = await (async () => {
+            try {
+              const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+              
+              // 노코딩 사용자를 위해 count/rowCount 앞에 자동으로 await 추가
+              const processedExpr = `${v.visibilityExpr}`.replace(/(?<!await\s+)(count|rowCount)\s*\(/g, 'await $1(');
+              
+              const fn = new AsyncFunction('helpers', `
+                const { rowCount, count, currentUser, isToday } = helpers;
+                try {
+                  return ${processedExpr};
+                } catch {
+                  return false;
+                }
+              `);
+              return await fn(helpers);
+            } catch (e) {
+              console.error(`Visibility Eval Error [${v.id}]:`, e);
+              return false;
+            }
+          })();
           
           if (isMet) {
             newStates[v.id] = {
@@ -664,6 +668,64 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     setTimeout(() => {
       fetchTableData({ ...currentView, isLocked: isNowLocked });
     }, 100);
+  };
+
+  // 🧠 [신규] 노코딩 스타일 지능형 필터 적용 엔진
+  const applyAdvancedFilter = (query: any, column: string, operator: string, value: string) => {
+    if (!column || !operator) return query;
+    const op = operator;
+    const val = String(value || '').trim();
+    
+    // 1단계: 매직 키워드(Semantic Keywords) 처리 - 사용자의 로컬 타임존 반영
+    let finalVal: any = val;
+    const now = new Date();
+    const isoToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    
+    // 날짜 키워드 처리
+    if (val === 'today' || val === '오늘') {
+      return query.gte(column, isoToday).lte(column, `${isoToday}T23:59:59`);
+    }
+    if (val === 'yesterday' || val === '어제') {
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(now.getDate() - 1);
+      const isoYesterday = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getDate()).padStart(2, '0')}`;
+      return query.gte(column, isoYesterday).lte(column, `${isoYesterday}T23:59:59`);
+    }
+    if (val === 'this_month' || val === '이번 달') {
+      const firstDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+      const lastDayDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const lastDay = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`;
+      return query.gte(column, firstDay).lte(column, `${lastDay}T23:59:59`);
+    }
+    if (val === 'me' || val === '나') {
+      finalVal = userProfile?.email || userProfile?.name || '';
+    }
+
+    // 2단계: 연산자별 쿼리 변환
+    switch (op) {
+      case 'eq': return query.eq(column, finalVal);
+      case 'neq': return query.neq(column, finalVal);
+      case 'like': 
+      case 'contains': return query.ilike(column, `%${finalVal}%`);
+      case 'starts': return query.ilike(column, `${finalVal}%`);
+      case 'ends': return query.ilike(column, `%${finalVal}`);
+      case 'gt': return query.gt(column, finalVal);
+      case 'lt': return query.lt(column, finalVal);
+      case 'gte': return query.gte(column, finalVal);
+      case 'lte': return query.lte(column, finalVal);
+      case 'is_null': return query.is(column, null);
+      case 'is_not_null': return query.not(column, 'is', null);
+      case 'in': 
+        const list = finalVal.split(',').map((s: string) => s.trim()).filter((s: string) => s !== '');
+        return query.in(column, list);
+      case 'between':
+        if (finalVal.includes('..')) {
+          const [start, end] = finalVal.split('..').map((s: string) => s.trim());
+          return query.gte(column, start).lte(column, end);
+        }
+        return query;
+      default: return query.eq(column, finalVal);
+    }
   };
 
   const handleSubmitInsert = async (forcedData?: any) => {

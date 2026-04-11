@@ -389,12 +389,57 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
     setIsPreviewModalOpen(true); setIsLoadingPreview(true);
     try {
       let query = supabase.from(view.tableName).select('*').limit(30000); 
-      if (view.filterColumn && view.filterValue) {
-        if (view.filterOperator === 'like') query = query.ilike(view.filterColumn, `%${view.filterValue}%`);
-        else if (view.filterOperator === 'gt') query = query.gt(view.filterColumn, view.filterValue);
-        else if (view.filterOperator === 'lt') query = query.lt(view.filterColumn, view.filterValue);
-        else query = query.eq(view.filterColumn, view.filterValue);
+      
+      // 🧠 [신규] 노코딩 스타일 지능형 필터 동기화
+      if (view.filterColumn && (view.filterValue || view.filterOperator?.includes('null'))) {
+        const op = view.filterOperator || 'eq';
+        const val = String(view.filterValue || '').trim();
+        const col = view.filterColumn;
+
+        // 로컬 타임존 기반 날짜 계산
+        const now = new Date();
+        const isoToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+        // 매직 키워드 분기
+        if (val === 'today' || val === '오늘') {
+          query = query.gte(col, isoToday).lte(col, `${isoToday}T23:59:59`);
+        } else if (val === 'yesterday' || val === '어제') {
+          const yestDate = new Date();
+          yestDate.setDate(now.getDate() - 1);
+          const isoYesterday = `${yestDate.getFullYear()}-${String(yestDate.getMonth() + 1).padStart(2, '0')}-${String(yestDate.getDate()).padStart(2, '0')}`;
+          query = query.gte(col, isoYesterday).lte(col, `${isoYesterday}T23:59:59`);
+        } else if (val === 'this_month' || val === '이번 달') {
+          const firstDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+          const lastDayDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+          const lastDay = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`;
+          query = query.gte(col, firstDay).lte(col, `${lastDay}T23:59:59`);
+        } else {
+          // 일반 연산자 처리
+          switch (op) {
+            case 'eq': query = query.eq(col, val); break;
+            case 'neq': query = query.neq(col, val); break;
+            case 'contains':
+            case 'like': query = query.ilike(col, `%${val}%`); break;
+            case 'starts': query = query.ilike(col, `${val}%`); break;
+            case 'ends': query = query.ilike(col, `%${val}`); break;
+            case 'gt': query = query.gt(col, val); break;
+            case 'lt': query = query.lt(col, val); break;
+            case 'gte': query = query.gte(col, val); break;
+            case 'lte': query = query.lte(col, val); break;
+            case 'is_null': query = query.is(col, null); break;
+            case 'is_not_null': query = query.not(col, 'is', null); break;
+            case 'in': query = query.in(col, val.split(',').map(s => s.trim()).filter(s => s !== '')); break;
+            case 'between':
+              if (val.includes('..')) {
+                const [start, end] = val.split('..').map(s => s.trim());
+                query = query.gte(col, start).lte(col, end);
+              }
+              break;
+            default: query = query.eq(col, val);
+          }
+        }
       }
+
       if (view.sortColumn) query = query.order(view.sortColumn, { ascending: view.sortDirection === 'asc' });
       const { data, error } = await query;
       if (error) throw error;
@@ -510,8 +555,65 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
           </div>
           <div className="bg-slate-50/50 rounded-3xl p-6 border-2 border-dashed border-slate-200 flex flex-col justify-center">
             {view.filterColumn ? (
-              <div className="space-y-4 animate-in zoom-in-95 duration-300"><div className="flex gap-2 items-center text-indigo-600 font-black mb-2 text-sm whitespace-nowrap"><Filter size={16}/> 상세 필터 조건</div><div className="flex gap-3"><select className="flex-1 p-3 rounded-xl border-2 border-indigo-100 font-bold text-sm text-slate-900 outline-none bg-white cursor-pointer min-w-[150px]" style={{ color: 'var(--text-primary)' }} value={view.filterOperator || 'eq'} onChange={e => onUpdate({...view, filterOperator: e.target.value as any})}><option value="eq">일치 (=)</option><option value="like">포함 (Contains)</option><option value="gt">큼 (&gt;)</option><option value="lt">작음 (&lt;)</option></select><input className="flex-[2] p-3 rounded-xl border-2 border-indigo-100 font-bold text-sm text-slate-900 outline-none bg-white focus:border-indigo-500 min-w-[200px]" style={{ color: 'var(--text-primary)' }} value={view.filterValue || ''} onChange={e => onUpdate({...view, filterValue: e.target.value})} placeholder="예: 1, 완료" /></div></div>
-            ) : (<div className="text-center space-y-3"><Smartphone className="mx-auto text-slate-300" size={40}/><p className="text-xs text-slate-400 font-bold leading-relaxed whitespace-nowrap">필요한 경우 좌측에서 칼럼을<br/>선택해 데이터를 필터링하세요.</p></div>)}
+              <div className="space-y-5 animate-in zoom-in-95 duration-300">
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-2 items-center text-indigo-600 font-black text-sm whitespace-nowrap">
+                    <Sparkles size={16} className="text-amber-500 animate-pulse"/> 스마트 조건 빌더
+                  </div>
+                </div>
+                
+                <div className="flex flex-col gap-3">
+                  <select 
+                    className="w-full p-3.5 rounded-xl border-2 border-indigo-100 font-bold text-sm text-slate-900 outline-none bg-white cursor-pointer transition-all focus:border-indigo-500" 
+                    value={view.filterOperator || 'eq'} 
+                    onChange={e => onUpdate({...view, filterOperator: e.target.value as any})}
+                  >
+                    <option value="eq">일치함 (=)</option>
+                    <option value="neq">일치하지 않음 (!=)</option>
+                    <option value="contains">포함함 (Contains)</option>
+                    <option value="starts">로 시작함</option>
+                    <option value="ends">로 끝남</option>
+                    <option value="gt">보다 이후/큼 (&gt;)</option>
+                    <option value="lt">보다 이전/작음 (&lt;)</option>
+                    <option value="gte">이후/크거나 같음 (&gt;=)</option>
+                    <option value="lte">이전/작거나 같음 (&lt;=)</option>
+                    <option value="in">목록에 포함 (A, B, C)</option>
+                    <option value="between">범위 내 (A..B)</option>
+                    <option value="is_null">비어 있음</option>
+                    <option value="is_not_null">값이 있음</option>
+                  </select>
+
+                  {!view.filterOperator?.includes('null') && (
+                    <div className="space-y-3">
+                      <input 
+                        className="w-full p-3.5 rounded-xl border-2 border-indigo-100 font-bold text-sm text-slate-900 outline-none bg-white focus:border-indigo-500 transition-all shadow-sm" 
+                        value={view.filterValue || ''} 
+                        onChange={e => onUpdate({...view, filterValue: e.target.value})} 
+                        placeholder={view.filterOperator === 'between' ? "예: 10..50 또는 2024-01-01..2024-01-31" : "비교할 값을 입력하세요..."} 
+                      />
+                      
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {[
+                          { id: 'today', label: '오늘', color: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+                          { id: 'yesterday', label: '어제', color: 'bg-slate-50 text-slate-600 border-slate-200' },
+                          { id: 'this_month', label: '이번 달', color: 'bg-blue-50 text-blue-600 border-blue-100' },
+                          { id: 'me', label: '나(본인)', color: 'bg-indigo-50 text-indigo-600 border-indigo-100' }
+                        ].map(chip => (
+                          <button 
+                            key={chip.id} type="button"
+                            onClick={() => onUpdate({ ...view, filterValue: chip.id })}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black border transition-all hover:scale-105 active:scale-95 ${view.filterValue === chip.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : chip.color}`}
+                          >
+                            + {chip.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+<div className="text-center space-y-3"><Smartphone className="mx-auto text-slate-300" size={40}/><p className="text-xs text-slate-400 font-bold leading-relaxed whitespace-nowrap">필요한 경우 좌측에서 칼럼을<br/>선택해 데이터를 필터링하세요.</p></div>)}
           </div>
         </div>
         <div className="grid grid-cols-2 gap-8 mt-8 pt-8 border-t border-slate-50 min-w-max w-full">

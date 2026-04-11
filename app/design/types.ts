@@ -16,7 +16,7 @@ export type View = {
   navPosition?: 'both' | 'bottom' | 'menu' | 'hidden';
   
   filterColumn?: string | null;  
-  filterOperator?: 'eq' | 'neq' | 'like' | 'gt' | 'lt'; 
+  filterOperator?: 'eq' | 'neq' | 'like' | 'contains' | 'starts' | 'ends' | 'gt' | 'lt' | 'gte' | 'lte' | 'in' | 'between' | 'is_null' | 'is_not_null'; 
   filterValue?: string | null;   
   
   sortColumn?: string | null;    
