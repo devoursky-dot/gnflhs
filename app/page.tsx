@@ -22,7 +22,7 @@ export default function MainAppLauncher() {
   // --- 인증 상태 관리 ---
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
-  const [loginEmail, setLoginEmail] = useState('');
+  const [loginId, setLoginId] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [authError, setAuthError] = useState('');
 
@@ -31,8 +31,9 @@ export default function MainAppLauncher() {
     const savedSession = Cookies.get('gnflhs_session');
     if (savedSession) {
       const sessionData = JSON.parse(savedSession);
-      setUser({ email: sessionData.email });
-      fetchUserProfile(sessionData.email).then(() => {
+      const sid = sessionData.id || sessionData.email;
+      setUser(sessionData);
+      fetchUserProfile(sid, sessionData.type || 'teacher').then(() => {
         setLoading(false);
       });
     } else {
@@ -46,31 +47,53 @@ export default function MainAppLauncher() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // teachers 테이블에서 사용자 정보(이름, 역할) 가져오기
-  const fetchUserProfile = async (email: string | undefined) => {
-    if (!email) return;
-    const { data, error } = await supabase
-      .from('teachers')
-      .select('users, name, role, pass')
-      .eq('users', email)
-      .single();
-
-    if (data) {
-      setProfile(data);
-      fetchApps();
+  // 사용자 정보 가져오기
+  const fetchUserProfile = async (id: string | undefined, type: string) => {
+    if (!id) return;
+    if (type === 'student') {
+      const { data, error } = await supabase
+        .from('students')
+        .select('students, name, pass')
+        .eq('students', id)
+        .single();
+      if (data) {
+        setProfile({ ...data, users: data.students, role: 'student' });
+        fetchApps();
+      } else {
+        console.error("User not found in students table:", error);
+      }
     } else {
-      console.error("User not found in teachers table:", error);
+      const { data, error } = await supabase
+        .from('teachers')
+        .select('users, name, role, pass')
+        .eq('users', id)
+        .single();
+      if (data) {
+        setProfile(data);
+        fetchApps();
+      } else {
+        console.error("User not found in teachers table:", error);
+      }
     }
   };
 
   // 권한 모달 관련 상태
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
   const [selectedAppForAccess, setSelectedAppForAccess] = useState<any>(null);
-  const [allTeachers, setAllTeachers] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
   const [accessIsPublic, setAccessIsPublic] = useState(true);
   const [accessAllowedUsers, setAccessAllowedUsers] = useState<string[]>([]);
   const [isSavingAccess, setIsSavingAccess] = useState(false);
-  const [teacherSearchTerm, setTeacherSearchTerm] = useState('');
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+
+  // 비밀번호 변경 모달 상태
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [pwdCurrent, setPwdCurrent] = useState('');
+  const [pwdNew, setPwdNew] = useState('');
+  const [pwdConfirm, setPwdConfirm] = useState('');
+  const [pwdError, setPwdError] = useState('');
+  const [pwdSuccess, setPwdSuccess] = useState('');
+  const [isSavingPwd, setIsSavingPwd] = useState(false);
 
   async function fetchApps() {
     try {
@@ -98,11 +121,16 @@ export default function MainAppLauncher() {
     setAccessIsPublic(config.isPublic !== false);
     setAccessAllowedUsers(config.allowedUsers || []);
     setIsAccessModalOpen(true);
-    setTeacherSearchTerm('');
+    setUserSearchTerm('');
 
-    if (allTeachers.length === 0) {
-      const { data } = await supabase.from('teachers').select('users, name');
-      if (data) setAllTeachers(data);
+    if (allUsers.length === 0) {
+      const { data: tData } = await supabase.from('teachers').select('users, name');
+      const { data: sData } = await supabase.from('students').select('students, name');
+      const combined = [
+        ...(tData || []).map((t: any) => ({ users: t.users, name: t.name, type: 'teacher' })),
+        ...(sData || []).map((s: any) => ({ users: s.students, name: s.name, type: 'student' }))
+      ];
+      setAllUsers(combined);
     }
   };
 
@@ -139,24 +167,84 @@ export default function MainAppLauncher() {
     );
   };
 
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwdError('');
+    setPwdSuccess('');
+    
+    if (pwdNew !== pwdConfirm) {
+      setPwdError('새 비밀번호가 일치하지 않습니다.');
+      return;
+    }
+    if (pwdCurrent !== profile?.pass) {
+      setPwdError('현재 비밀번호가 올바르지 않습니다.');
+      return;
+    }
+
+    setIsSavingPwd(true);
+    try {
+      const table = user?.type === 'student' ? 'students' : 'teachers';
+      const column = user?.type === 'student' ? 'students' : 'users';
+      const sid = user?.id || user?.email;
+
+      const { error } = await supabase
+        .from(table)
+        .update({ pass: pwdNew })
+        .eq(column, sid);
+
+      if (error) throw error;
+      
+      setProfile({ ...profile, pass: pwdNew });
+      setPwdSuccess('비밀번호가 성공적으로 변경되었습니다.');
+      setTimeout(() => {
+        setIsPasswordModalOpen(false);
+        setPwdCurrent('');
+        setPwdNew('');
+        setPwdConfirm('');
+        setPwdSuccess('');
+      }, 1500);
+    } catch (err: any) {
+      setPwdError(`오류 발생: ${err.message}`);
+    } finally {
+      setIsSavingPwd(false);
+    }
+  };
+
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
     try {
-      // teachers 테이블에서 직접 유저와 비밀번호 확인
-      const { data: teacher, error } = await supabase
+      // 1. 교사 테이블 찾기
+      const { data: teacher } = await supabase
         .from('teachers')
         .select('*')
-        .eq('users', loginEmail)
+        .eq('users', loginId)
         .single();
 
-      if (!teacher || teacher.pass !== loginPass) {
-        throw new Error('이메일 또는 비밀번호가 올바르지 않습니다.');
+      let loginUser = null;
+      let loginType = '';
+
+      if (teacher && teacher.pass === loginPass) {
+        loginUser = teacher;
+        loginType = 'teacher';
+      } else {
+        // 2. 학생 테이블 찾기
+        const { data: student } = await supabase
+          .from('students')
+          .select('*')
+          .eq('students', loginId)
+          .single();
+
+        if (student && student.pass === loginPass) {
+          loginUser = student;
+          loginType = 'student';
+        } else {
+          throw new Error('아이디 또는 비밀번호가 올바르지 않습니다.');
+        }
       }
 
       // 로그인 성공 처리
-      const sessionInfo = { email: loginEmail };
-      // 기존 localStorage 대신 쿠키에 저장 (7일 유지, 모든 경로 허용)
+      const sessionInfo = { id: loginId, email: loginId, type: loginType };
       Cookies.set('gnflhs_session', JSON.stringify(sessionInfo), {
         expires: 7,
         path: '/',
@@ -164,7 +252,7 @@ export default function MainAppLauncher() {
       });
 
       setUser(sessionInfo);
-      setProfile(teacher);
+      setProfile(loginType === 'student' ? { ...loginUser, users: loginUser.students, role: 'student' } : loginUser);
       fetchApps();
     } catch (error: any) {
       setAuthError(error.message);
@@ -189,11 +277,11 @@ export default function MainAppLauncher() {
     const isPublic = config.isPublic !== false;
     if (isPublic) return true;
 
-    return config.allowedUsers && config.allowedUsers.includes(user?.email);
+    return config.allowedUsers && config.allowedUsers.includes(user?.id || user?.email);
   });
 
   // --- 권한 확인 로직 ---
-  const isAuthorized = profile?.role === 'admin' || profile?.role === 'tch';
+  const isAuthorized = profile?.role === 'admin' || profile?.role === 'tch' || profile?.role === 'student';
 
   // 1. 세션이 없거나 프로필이 없는 경우 (로그인 폼)
   if (!user || !profile || !isAuthorized) {
@@ -228,7 +316,7 @@ export default function MainAppLauncher() {
               <form onSubmit={handlePasswordLogin} className="space-y-4">
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input type="email" placeholder="이메일 계정" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-50 transition-all text-slate-900" style={{ color: '#0f172a' }} required />
+                  <input type="text" placeholder="아이디 (이메일 혹은 학번+이름)" value={loginId} onChange={(e) => setLoginId(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-50 transition-all text-slate-900" style={{ color: '#0f172a' }} required />
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -258,15 +346,23 @@ export default function MainAppLauncher() {
               <h1 className="text-2xl font-black text-slate-900 tracking-tight">경남외고</h1>
               {/* 로그인 상태 표시 */}
               <div className="flex items-center gap-2 mt-0.5">
-                <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${profile?.role === 'admin' ? 'text-indigo-600 bg-indigo-50' : 'text-emerald-600 bg-emerald-50'}`}>
-                  <UserIcon size={10} /> {profile?.role === 'admin' ? 'Super Admin' : 'Teacher'}
+                <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${profile?.role === 'admin' ? 'text-indigo-600 bg-indigo-50' : profile?.role === 'student' ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'}`}>
+                  <UserIcon size={10} /> {profile?.role === 'admin' ? 'Super Admin' : profile?.role === 'student' ? 'Student' : 'Teacher'}
                 </span>
-                <span className="text-[11px] font-bold text-slate-400">{profile?.name} ({user?.email})</span>
+                <span className="text-[11px] font-bold text-slate-400">{profile?.name} ({user?.id || user?.email})</span>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
+            {/* 비밀번호 변경 버튼 */}
+            <button
+              onClick={() => setIsPasswordModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl text-sm font-black transition-all"
+              title="비밀번호 변경"
+            >
+              <Lock size={18} /> <span className="hidden sm:inline">비밀번호 변경</span>
+            </button>
             {/* 로그아웃 버튼 */}
             <button
               onClick={handleLogout}
@@ -421,31 +517,36 @@ export default function MainAppLauncher() {
 
               {!accessIsPublic && (
                 <div className="animate-in fade-in slide-in-from-top-2 duration-300 flex-1 flex flex-col min-h-0">
-                  <label className="text-sm font-black text-slate-700 mb-2 block">접속을 허용할 선생님 ({accessAllowedUsers.length}명 선택됨)</label>
+                  <label className="text-sm font-black text-slate-700 mb-2 block">접속을 허용할 사용자 ({accessAllowedUsers.length}명 선택됨)</label>
                   <div className="relative mb-3 shrink-0">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                     <input
                       type="text"
-                      placeholder="이름 또는 이메일 검색..."
-                      value={teacherSearchTerm}
-                      onChange={(e) => setTeacherSearchTerm(e.target.value)}
+                      placeholder="이름 또는 아이디 검색..."
+                      value={userSearchTerm}
+                      onChange={(e) => setUserSearchTerm(e.target.value)}
                       className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-slate-700"
                     />
                   </div>
                   <div className="flex-1 bg-white border border-slate-200 rounded-2xl overflow-y-auto max-h-[30vh]">
-                    {allTeachers
-                      .filter(t => t.name.includes(teacherSearchTerm) || t.users.includes(teacherSearchTerm))
-                      .map(t => {
-                        const isSelected = accessAllowedUsers.includes(t.users);
+                    {allUsers
+                      .filter((u: any) => u.name.includes(userSearchTerm) || u.users.includes(userSearchTerm))
+                      .map((u: any) => {
+                        const isSelected = accessAllowedUsers.includes(u.users);
                         return (
                           <div
-                            key={t.users}
-                            onClick={() => toggleTeacherAccess(t.users)}
+                            key={u.users}
+                            onClick={() => toggleTeacherAccess(u.users)}
                             className="flex items-center justify-between px-4 py-3 border-b border-slate-100 last:border-0 cursor-pointer hover:bg-slate-50 transition-colors"
                           >
                             <div className="flex flex-col">
-                              <span className="font-bold text-slate-800 text-sm">{t.name}</span>
-                              <span className="font-bold text-slate-400 text-xs">{t.users}</span>
+                              <span className="font-bold text-slate-800 text-sm flex gap-2 items-center">
+                                {u.name} 
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${u.type === 'student' ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                                  {u.type === 'student' ? 'Student' : 'Teacher'}
+                                </span>
+                              </span>
+                              <span className="font-bold text-slate-400 text-xs">{u.users}</span>
                             </div>
                             <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all border-2 ${isSelected ? 'bg-indigo-600 border-indigo-600 shadow-sm text-white' : 'border-slate-200 text-transparent'}`}>
                               <CheckCircle2 size={14} strokeWidth={4} />
@@ -453,9 +554,9 @@ export default function MainAppLauncher() {
                           </div>
                         );
                       })}
-                    {allTeachers.filter(t => t.name.includes(teacherSearchTerm) || t.users.includes(teacherSearchTerm)).length === 0 && (
+                    {allUsers.filter((u: any) => u.name.includes(userSearchTerm) || u.users.includes(userSearchTerm)).length === 0 && (
                       <div className="p-8 text-center text-slate-400 font-bold text-sm">
-                        검색된 선생님이 없습니다.
+                        검색된 사용자가 없습니다.
                       </div>
                     )}
                   </div>
@@ -477,6 +578,48 @@ export default function MainAppLauncher() {
               >
                 {isSavingAccess ? "저장 중..." : "권한 설정 저장"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 비밀번호 변경 모달 */}
+      {isPasswordModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-100">
+            <div className="px-6 py-5 border-b flex justify-between items-center bg-white shrink-0">
+              <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                <Lock size={18} className="text-indigo-600" /> 비밀번호 변경
+              </h3>
+              <button onClick={() => setIsPasswordModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 bg-slate-50">
+              {pwdError && <div className="mb-4 p-3 bg-rose-50 border border-rose-100 text-rose-600 text-xs font-bold rounded-xl">{pwdError}</div>}
+              {pwdSuccess && <div className="mb-4 p-3 bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-bold rounded-xl">{pwdSuccess}</div>}
+              
+              <form onSubmit={handlePasswordChange} className="space-y-4">
+                <div>
+                  <label className="text-xs font-black text-slate-500 mb-1.5 block">현재 비밀번호</label>
+                  <input type="password" value={pwdCurrent} onChange={(e) => setPwdCurrent(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all" required />
+                </div>
+                <div>
+                  <label className="text-xs font-black text-slate-500 mb-1.5 block">새 비밀번호</label>
+                  <input type="password" value={pwdNew} onChange={(e) => setPwdNew(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all" required minLength={4} />
+                </div>
+                <div>
+                  <label className="text-xs font-black text-slate-500 mb-1.5 block">새 비밀번호 확인</label>
+                  <input type="password" value={pwdConfirm} onChange={(e) => setPwdConfirm(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all" required minLength={4} />
+                </div>
+                
+                <div className="pt-2 flex gap-2">
+                  <button type="button" onClick={() => setIsPasswordModalOpen(false)} className="flex-1 py-3 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all text-sm bg-slate-100">취소</button>
+                  <button type="submit" disabled={isSavingPwd} className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 active:scale-95 transition-all shadow-md shadow-indigo-200 text-sm disabled:opacity-50">
+                    {isSavingPwd ? '저장 중...' : '변경 완료'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

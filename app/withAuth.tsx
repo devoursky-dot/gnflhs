@@ -37,14 +37,29 @@ export default function withAuth<P extends object>(
             return;
           }
 
-          const { email } = JSON.parse(session);
-          const { data: profile, error } = await supabase
-            .from('teachers')
-            .select('role, name')
-            .eq('users', email)
-            .single();
+          const sessionData = JSON.parse(session);
+          const type = sessionData.type || 'teacher';
+          const loginId = sessionData.id || sessionData.email;
 
-          if (error || !profile) throw new Error('Unauthorized');
+          let profile;
+
+          if (type === 'student') {
+            const { data, error } = await supabase
+              .from('students')
+              .select('name')
+              .eq('students', loginId)
+              .single();
+            if (error || !data) throw new Error('Unauthorized');
+            profile = { name: data.name, role: 'student' };
+          } else {
+            const { data, error } = await supabase
+              .from('teachers')
+              .select('role, name')
+              .eq('users', loginId)
+              .single();
+            if (error || !data) throw new Error('Unauthorized');
+            profile = data;
+          }
 
           // 관리자 전용 페이지 체크
           if (options.adminOnly && profile.role !== 'admin') {
@@ -52,13 +67,13 @@ export default function withAuth<P extends object>(
             return;
           }
 
-          // 전체 허용(admin, tch) 체크
-          if (profile.role !== 'admin' && profile.role !== 'tch') {
+          // 전체 허용(admin, tch, student) 체크
+          if (profile.role !== 'admin' && profile.role !== 'tch' && profile.role !== 'student') {
             router.replace('/');
             return;
           }
 
-          setUserProfile({ email, name: profile.name, role: profile.role });
+          setUserProfile({ email: loginId, id: loginId, name: profile.name, role: profile.role, type });
           setIsChecking(false);
         } catch (e) {
           router.replace('/');
