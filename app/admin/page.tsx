@@ -193,7 +193,7 @@ const ImageUploadModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
 };
 
 // --- 기존 타입 및 스타일 유지 ---
-type ColumnInfo = { name: string; type: string; nullable: string; default: string; primary: boolean; };
+type ColumnInfo = { name: string; type: string; nullable: string; default: string; primary: boolean; isGenerated?: boolean; };
 type SchemaData = { [tableName: string]: ColumnInfo[]; };
 
 const COLOR_THEMES: Record<string, any> = {
@@ -213,11 +213,25 @@ const DESIGN_STYLES: Record<string, any> = {
   bold: { name: "Bold & 3D", radius: "12px", shadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2)", borderWidth: "2px" }
 };
 
-const EditableCell = memo(({ getValue, row: { index }, column: { id }, table }: any) => {
+const EditableCell = memo(({ getValue, row: { index }, column: { id, columnDef }, table }: any) => {
   const initialValue = getValue();
   const [value, setValue] = useState(initialValue);
+  const isGenerated = (columnDef.meta as any)?.isGenerated;
+
   useEffect(() => { setValue(initialValue); }, [initialValue]);
-  const onBlur = () => { table.options.meta?.updateData(index, id, value); };
+  const onBlur = () => { if (!isGenerated) table.options.meta?.updateData(index, id, value); };
+
+  if (isGenerated) {
+    return (
+      <div 
+        className="w-full h-full px-3 py-2 bg-zinc-100 dark:bg-zinc-900/50 text-zinc-400 dark:text-zinc-600 font-mono text-xs italic cursor-not-allowed flex items-center"
+        title="가상 칼럼(Generated)은 수정할 수 없습니다."
+      >
+        {value === null || value === undefined ? "NULL" : String(value)}
+      </div>
+    );
+  }
+
   return (
     <input
       value={value as string || ""}
@@ -445,7 +459,12 @@ export default function AdminDashboardPage() {
       if (data) {
         const grouped = data.reduce((acc: any, row: any) => {
           if (!acc[row.table_name]) acc[row.table_name] = [];
-          acc[row.table_name].push({ name: row.column_name, type: row.data_type, primary: row.is_primary });
+          acc[row.table_name].push({ 
+            name: row.column_name, 
+            type: row.data_type, 
+            primary: row.is_primary,
+            isGenerated: row.is_generated 
+          });
           return acc;
         }, {});
         setSchemaData(grouped);
@@ -522,8 +541,9 @@ export default function AdminDashboardPage() {
         const isNewRow = !pks.every(pk => currentRecord[pk]); 
         const originalRecord = originalRecords.find(r => pks.every(pk => r[pk] == currentRecord[pk]));
 
-        // 자동으로 제외할 가상(생성) 칼럼 목록 (사용자 설정 연동)
-        const generatedCols = excludedColumns;
+        // 자동으로 제외할 칼럼 목록 (사용자 설정 + DB 가상 칼럼)
+        const dbGeneratedCols = schemaData[selectedTable]?.filter(c => c.isGenerated).map(c => c.name) || [];
+        const generatedCols = [...new Set([...excludedColumns, ...dbGeneratedCols])];
 
         if (!originalRecord) {
           // 새로 추가된 행
@@ -625,15 +645,26 @@ export default function AdminDashboardPage() {
 
   const columns = useMemo<ColumnDef<any>[]>(() => {
     if (!selectedTable || !schemaData[selectedTable]) return [];
-    return schemaData[selectedTable].map((col) => ({
+    const sortedColumns = [...schemaData[selectedTable]].sort((a, b) => {
+      // 1. Primary Key가 항상 최상단(좌측)
+      if (a.primary && !b.primary) return -1;
+      if (!a.primary && b.primary) return 1;
+      // 2. IsGenerated(가상 칼럼)가 항상 최하단(우측)
+      if (a.isGenerated && !b.isGenerated) return 1;
+      if (!a.isGenerated && b.isGenerated) return -1;
+      return 0;
+    });
+
+    return sortedColumns.map((col) => ({
       accessorKey: col.name,
+      meta: { isGenerated: col.isGenerated },
       header: ({ column }) => (
         <div 
-          className="flex items-center gap-1.5 truncate group cursor-pointer hover:text-emerald-600 transition-colors select-none"
+          className={`flex items-center gap-1.5 truncate group cursor-pointer hover:text-emerald-600 transition-colors select-none ${col.isGenerated ? 'opacity-60' : ''}`}
           onClick={column.getToggleSortingHandler()}
         >
-          {col.primary ? <Key className="w-3.5 h-3.5 text-amber-500 shrink-0" /> : <Columns className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
-          <span className="font-mono">{col.name}</span>
+          {col.primary ? <Key className="w-3.5 h-3.5 text-amber-500 shrink-0" /> : col.isGenerated ? <Settings className="w-3.5 h-3.5 text-zinc-400 shrink-0" /> : <Columns className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
+          <span className={`font-mono ${col.isGenerated ? 'italic' : ''}`}>{col.name}</span>
           <span className="text-[10px] opacity-50 ml-1">{col.type}</span>
           
           <div className="ml-auto flex items-center">
@@ -721,6 +752,12 @@ export default function AdminDashboardPage() {
 
   const currentTheme = COLOR_THEMES[themeKey] || COLOR_THEMES.linear;
   const currentStyle = DESIGN_STYLES[styleKey] || DESIGN_STYLES.modern;
+
+  // 🔥 [수정] 현재 테이블에 실제로 존재하는 칼럼 중에서만 제외 숫자 계산
+  const currentTableCols = selectedTable ? (schemaData[selectedTable]?.map(c => c.name) || []) : [];
+  const dbGeneratedCols = selectedTable ? (schemaData[selectedTable]?.filter(c => c.isGenerated).map(c => c.name) || []) : [];
+  const totalExcludedCount = [...new Set([...excludedColumns, ...dbGeneratedCols])]
+    .filter(name => currentTableCols.includes(name)).length;
 
   return (
     <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden relative">
@@ -814,9 +851,9 @@ export default function AdminDashboardPage() {
                 
                 {/* 제외 칼럼 설정 버튼 */}
                 <div className="relative">
-                  <button onClick={() => setIsExcludeSettingsOpen(!isExcludeSettingsOpen)} className={`p-2 md:p-2.5 rounded-lg transition-colors flex-shrink-0 group relative ${isExcludeSettingsOpen ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/30' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>
+                  <button onClick={() => setIsExcludeSettingsOpen(!isExcludeSettingsOpen)} className={`p-2 md:p-2.5 rounded-lg transition-colors flex-shrink-0 group relative ${(excludedColumns.length > 0 || dbGeneratedCols.length > 0) ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/30' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>
                     <FilterX className="w-4 h-4" />
-                    {excludedColumns.length > 0 && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">{excludedColumns.length}</span>}
+                    {totalExcludedCount > 0 && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">{totalExcludedCount}</span>}
                   </button>
                   {isExcludeSettingsOpen && (
                     <>
@@ -828,17 +865,28 @@ export default function AdminDashboardPage() {
                         </div>
                         <p className="text-[10.5px] text-zinc-500 mb-3 leading-tight font-medium">체크된 칼럼은 데이터베이스 저장 시 값을 전송하지 않습니다. (자동 생성 가상칼럼 에러 방지용)</p>
                         <div className="max-h-60 overflow-y-auto space-y-1">
-                          {schemaData[selectedTable]?.map(col => (
-                            <label key={col.name} className="flex items-center gap-2 p-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-900 rounded cursor-pointer transition-colors">
-                              <input 
-                                type="checkbox" 
-                                checked={excludedColumns.includes(col.name)}
-                                onChange={() => toggleExcludedColumn(col.name)}
-                                className="w-3.5 h-3.5 rounded text-amber-500 focus:ring-amber-500 cursor-pointer"
-                              />
-                              <span className={`text-xs font-mono ${excludedColumns.includes(col.name) ? 'text-amber-600 dark:text-amber-500 font-bold' : 'text-zinc-700 dark:text-zinc-300'}`}>{col.name}</span>
-                            </label>
-                          ))}
+                          {schemaData[selectedTable]?.map(col => {
+                            const isAutoGenerated = col.isGenerated;
+                            const isChecked = isAutoGenerated || excludedColumns.includes(col.name);
+                            
+                            return (
+                              <label key={col.name} className={`flex items-center gap-2 p-1.5 rounded transition-all ${isAutoGenerated ? 'opacity-50 cursor-not-allowed bg-zinc-100/50 dark:bg-zinc-900/30' : 'hover:bg-zinc-50 dark:hover:bg-zinc-900 cursor-pointer'}`}>
+                                <input 
+                                  type="checkbox" 
+                                  checked={isChecked}
+                                  onChange={() => !isAutoGenerated && toggleExcludedColumn(col.name)}
+                                  disabled={isAutoGenerated}
+                                  className={`w-3.5 h-3.5 rounded ${isAutoGenerated ? 'text-zinc-400 opacity-50' : 'text-amber-500 focus:ring-amber-500 cursor-pointer'}`}
+                                />
+                                <div className="flex flex-col">
+                                  <span className={`text-xs font-mono ${isChecked ? 'text-amber-600 dark:text-amber-500 font-bold' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                                    {col.name}
+                                  </span>
+                                  {isAutoGenerated && <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-tighter">System Auto-Excluded</span>}
+                                </div>
+                              </label>
+                            );
+                          })}
                         </div>
                       </div>
                     </>

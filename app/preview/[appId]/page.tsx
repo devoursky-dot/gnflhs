@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation'; // useRouter 추가
 import { createClient } from '@supabase/supabase-js';
-import { X, CheckCircle2, ChevronLeft, Menu, Home, Layout, Search, ChevronDown, Folder, ChevronsUpDown, ChevronsUp, MousePointerClick } from 'lucide-react';
+import { X, CheckCircle2, ChevronLeft, Menu, Home, Layout, Search, ChevronDown, Folder, ChevronsUpDown, ChevronsUp, MousePointerClick, Plus, Minus, AlertCircle } from 'lucide-react';
 import { IconMap } from '@/app/design/picker'; 
 import withAuth from '@/app/withAuth'; // 🔥 인증 HOC 임포트 (경로 확인 필요)
 
@@ -40,10 +40,26 @@ const RenderPreviewLayout = ({ rows, rowData, actions, onExecuteAction }: any) =
 
             if (cell.contentType === 'field' && !shouldShowImage) {
               let displayText = cellValue !== null && cellValue !== undefined && cellValue !== '' ? String(cellValue) : '-';
-              if (displayText !== '-' && cell.textRegexPattern) {
+              
+              // 🔥 [신규] 마법의 수식 엔진 적용 (우선순위 1)
+              if (cell.textExpression) {
+                try {
+                  const evaluator = new Function('val', 'row', `try { return ${cell.textExpression}; } catch(e) { return val; }`);
+                  const result = evaluator(cellValue, rowData);
+                  displayText = result !== null && result !== undefined ? String(result) : '-';
+                } catch (err) {
+                  console.error("Formula Error:", err);
+                }
+              } 
+              // 기존 레거시 정규식 적용 (수식이 없을 때만 동작하거나 추가 동작)
+              else if (displayText !== '-' && cell.textRegexPattern) {
                 try { const regex = new RegExp(cell.textRegexPattern, 'g'); displayText = displayText.replace(regex, cell.textRegexReplace || ''); } catch (err) { }
               }
-              if (displayText !== '-') displayText = `${cell.textPrefix || ''}${displayText}${cell.textSuffix || ''}`;
+
+              // 접두사/접미사 적용 (수식 결과가 '-'가 아닐 때만)
+              if (displayText !== '-' && !cell.textExpression) {
+                displayText = `${cell.textPrefix || ''}${displayText}${cell.textSuffix || ''}`;
+              }
 
               const alignItemClass = cell.textAlign === 'center' ? 'items-center text-center' : cell.textAlign === 'right' ? 'items-end text-right' : 'items-start text-left';
               const textSizeClass = cell.textSize || 'text-[14px]';
@@ -113,6 +129,14 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   useEffect(() => {
     if (!appId) return;
@@ -152,7 +176,11 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   const fetchTableData = async (view: any) => {
     if (!view || !view.tableName) return;
     let query: any = supabase.from(view.tableName).select("*");
-    if (view.filterColumn && view.filterValue) {
+    
+    if (view.isLocked && view.lockedKeyColumn && view.lockedRecordKeys?.length > 0) {
+      // 🔥 수동 픽 데이터 모드 (고정된 식별자 키 목록으로 조회)
+      query = query.in(view.lockedKeyColumn, view.lockedRecordKeys);
+    } else if (view.filterColumn && view.filterValue) {
       const op = view.filterOperator || 'eq';
       const col = view.filterColumn as string;
       const val = view.filterValue;
@@ -161,6 +189,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       else if (op === 'lt') query = query.lt(col, val);
       else query = query.eq(col, val); 
     }
+    
     if (view.sortColumn) query = query.order(view.sortColumn as string, { ascending: view.sortDirection === 'asc' });
     const { data } = await query.limit(3000); 
     if (data) setTableData(prev => ({ ...prev, [view.tableName]: data }));
@@ -169,6 +198,36 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   useEffect(() => {
     if (currentView) { fetchTableData(currentView); setExpandedGroups({}); }
   }, [currentViewId, currentView]);
+
+  // 🧠 스마트 수식 평가 엔진
+  const evaluateExpression = (expr: string, rowData: any) => {
+    if (!expr) return '';
+    try {
+      // 1. {{컬럼명}} 패턴을 context['컬럼명'] 형식으로 변환
+      const jsExpr = expr.replace(/{{(.*?)}}/g, (match, col) => {
+        const val = rowData[col.trim()];
+        // 문자열인 경우 따옴표 처리가 필요할 수 있지만, context 참조 방식으로 넘기면 안전함
+        return `context['${col.trim()}']`;
+      });
+
+      // 2. Function 생성자를 이용해 샌드박스 실행 (context 주입)
+      // rowData에 없는 컬럼 참조 시 undefined 처리되도록 함
+      const func = new Function('context', `
+        try {
+          return ${jsExpr};
+        } catch (e) {
+          console.error('Expression Eval Error:', e);
+          return 'Error: ' + e.message;
+        }
+      `);
+      
+      const result = func(rowData || {});
+      return result === undefined || result === null ? '' : result;
+    } catch (err) {
+      console.error('Expression Parse Error:', err);
+      return expr; // 파싱 실패 시 원본 반환
+    }
+  };
 
   const handleAction = async (action: any, rowData: any) => {
     if (action.type === 'alert') {
@@ -180,10 +239,17 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       setActiveInsertAction(action);
       const initialData: Record<string, any> = {};
       action.insertMappings?.forEach((m: any) => {
-        if (m.mappingType === 'card_data') initialData[m.targetColumn] = rowData[m.sourceValue];
+        if (m.mappingType === 'card_data') {
+          if (m.isExpression) {
+            initialData[m.targetColumn] = evaluateExpression(m.sourceValue, rowData);
+          } else {
+            initialData[m.targetColumn] = rowData[m.sourceValue];
+          }
+        }
         else if (m.mappingType === 'static') initialData[m.targetColumn] = m.sourceValue;
         else if (m.mappingType === 'user_name') initialData[m.targetColumn] = userProfile?.name || '';
         else if (m.mappingType === 'user_email') initialData[m.targetColumn] = userProfile?.email || '';
+        else if (m.mappingType === 'prompt' && m.valueType === 'number') initialData[m.targetColumn] = m.defaultNumberValue ?? 0;
         else initialData[m.targetColumn] = '';
       });
       setFormData(initialData); setIsInputModalOpen(true);
@@ -193,18 +259,27 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       try {
         const { error } = await supabase.from(action.deleteTableName).delete().eq('id', rowData.id);
         if (error) throw error;
-        alert("성공적으로 삭제되었습니다.");
+        setToast({ message: "성공적으로 삭제되었습니다.", type: 'success' });
         if (currentView?.tableName === action.deleteTableName) fetchTableData(currentView);
-      } catch (err: any) { alert(`삭제 실패: ${err.message}`); }
+      } catch (err: any) { 
+        setToast({ message: `삭제 실패: ${err.message}`, type: 'error' });
+      }
     } else if (action.type === 'update_row') {
       if (!action.updateTableName || !rowData.id) return alert("테이블 설정 또는 대상의 고유 ID가 누락되었습니다.");
       setActiveUpdateAction(action); setActiveRowData(rowData);
       const initialData: Record<string, any> = {};
       action.updateMappings?.forEach((m: any) => {
-        if (m.mappingType === 'card_data') initialData[m.targetColumn] = rowData[m.sourceValue];
+        if (m.mappingType === 'card_data') {
+          if (m.isExpression) {
+            initialData[m.targetColumn] = evaluateExpression(m.sourceValue, rowData);
+          } else {
+            initialData[m.targetColumn] = rowData[m.sourceValue];
+          }
+        }
         else if (m.mappingType === 'static') initialData[m.targetColumn] = m.sourceValue;
         else if (m.mappingType === 'user_name') initialData[m.targetColumn] = userProfile?.name || '';
         else if (m.mappingType === 'user_email') initialData[m.targetColumn] = userProfile?.email || '';
+        else if (m.mappingType === 'prompt' && m.valueType === 'number') initialData[m.targetColumn] = m.defaultNumberValue ?? 0;
         else if (m.mappingType === 'prompt') initialData[m.targetColumn] = rowData[m.targetColumn] !== undefined && rowData[m.targetColumn] !== null ? rowData[m.targetColumn] : '';
       });
       setUpdateFormData(initialData); setIsUpdateModalOpen(true);
@@ -276,35 +351,49 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     }
   };
 
-  const handleSubmitInsert = async () => {
+  const handleSubmitInsert = async (forcedData?: any) => {
     if (!activeInsertAction || isSubmitting) return;
-    if (!window.confirm("입력하신 내용을 저장하시겠습니까?")) return;
+    
+    // 🔥 [신규] 초고속 모드(requireConfirmation === false)인 경우 확인창을 건너뜁니다.
+    const needsConfirm = activeInsertAction.requireConfirmation !== false;
+    if (needsConfirm && !window.confirm("입력하신 내용을 저장하시겠습니까?")) return;
+    
     setIsSubmitting(true);
     try {
-      const finalPayload = { ...formData };
-      activeInsertAction.insertMappings?.forEach((m: any) => { if (m.valueType === 'number') finalPayload[m.targetColumn] = Number(finalPayload[m.targetColumn]) || 0; });
+      const dataToSave = forcedData || formData;
+      const finalPayload = { ...dataToSave };
+      activeInsertAction.insertMappings?.forEach((m: any) => { 
+        if (m.valueType === 'number') finalPayload[m.targetColumn] = Number(finalPayload[m.targetColumn]) || 0; 
+      });
       const { error } = await supabase.from(activeInsertAction.insertTableName).insert([finalPayload]);
       if (error) throw error;
-      alert("성공적으로 저장되었습니다.");
+      setToast({ message: "성공적으로 저장되었습니다.", type: 'success' });
       setIsInputModalOpen(false);
       if (currentView?.tableName === activeInsertAction.insertTableName) fetchTableData(currentView);
-    } catch (err: any) { alert(`저장 실패: ${err.message}`); } 
+    } catch (err: any) { 
+      setToast({ message: `저장 실패: ${err.message}`, type: 'error' });
+    } 
     finally { setIsSubmitting(false); }
   };
 
-  const handleSubmitUpdate = async () => {
+  const handleSubmitUpdate = async (forcedData?: any) => {
     if (!activeUpdateAction || isUpdating || !activeRowData) return;
     if (!window.confirm("수정하신 내용을 최종 반영하시겠습니까?")) return;
     setIsUpdating(true);
     try {
-      const finalPayload = { ...updateFormData };
-      activeUpdateAction.updateMappings?.forEach((m: any) => { if (m.valueType === 'number') finalPayload[m.targetColumn] = Number(finalPayload[m.targetColumn]) || 0; });
+      const dataToSave = forcedData || updateFormData;
+      const finalPayload = { ...dataToSave };
+      activeUpdateAction.updateMappings?.forEach((m: any) => { 
+        if (m.valueType === 'number') finalPayload[m.targetColumn] = Number(finalPayload[m.targetColumn]) || 0; 
+      });
       const { error } = await supabase.from(activeUpdateAction.updateTableName).update(finalPayload).eq('id', activeRowData.id);
       if (error) throw error;
-      alert("성공적으로 데이터가 수정되었습니다.");
+      setToast({ message: "성공적으로 데이터가 수정되었습니다.", type: 'success' });
       setIsUpdateModalOpen(false);
       if (currentView?.tableName === activeUpdateAction.updateTableName) fetchTableData(currentView);
-    } catch (err: any) { alert(`수정 처리 실패: ${err.message}`); } 
+    } catch (err: any) { 
+      setToast({ message: `수정 처리 실패: ${err.message}`, type: 'error' });
+    } 
     finally { setIsUpdating(false); }
   };
 
@@ -346,6 +435,18 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   return (
     <div className="min-h-screen bg-slate-100 flex justify-center font-sans">
       <div className="w-full bg-slate-50 flex flex-col md:flex-row relative h-screen overflow-hidden">
+        
+        {/* Toast 메시지 레이어 */}
+        {toast && (
+          <div className="fixed top-10 left-1/2 -translate-x-1/2 z-[2000] animate-in fade-in slide-in-from-top-4 duration-300">
+            <div className={`px-6 py-4 rounded-[1.5rem] shadow-2xl flex items-center gap-3 border backdrop-blur-md ${
+              toast.type === 'success' ? 'bg-emerald-500/90 border-emerald-400 text-white' : 'bg-rose-500/90 border-rose-400 text-white'
+            }`}>
+              {toast.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
+              <span className="font-black text-sm tracking-tight">{toast.message}</span>
+            </div>
+          </div>
+        )}
         
         {/* Header / Sidebar Area */}
         <div className="pt-6 pb-4 px-5 border-b md:border-r md:border-b-0 bg-white relative z-10 shadow-[0_2px_15px_rgba(0,0,0,0.03)] flex flex-col shrink-0 md:w-80 lg:w-96 md:h-screen">
@@ -495,14 +596,107 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
               <button onClick={() => setIsInputModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"><X /></button>
             </div>
             <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto bg-slate-50">
-              {activeInsertAction?.insertMappings?.filter((m: any) => m.mappingType === 'prompt').map((mapping: any) => (
-                <div key={mapping.id} className="space-y-2"><label className="block text-xs font-black text-slate-400 uppercase tracking-wider pl-1">{mapping.sourceValue}</label><input type={mapping.valueType === 'number' ? 'number' : 'text'} step={mapping.valueType === 'number' ? 'any' : undefined} value={formData[mapping.targetColumn] ?? ''} onChange={(e) => setFormData({ ...formData, [mapping.targetColumn]: e.target.value })} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-white focus:border-indigo-500 outline-none font-bold text-slate-900 transition-all shadow-sm" placeholder="내용을 입력하세요..." /></div>
-              ))}
+              {activeInsertAction?.insertMappings?.filter((m: any) => m.mappingType === 'prompt').map((mapping: any) => {
+                const val = formData[mapping.targetColumn] ?? (mapping.valueType === 'number' ? (mapping.defaultNumberValue ?? 0) : '');
+                const isNumber = mapping.valueType === 'number';
+                const hasOptions = mapping.promptOptions && mapping.promptOptions.trim() !== '';
+                const options = hasOptions ? mapping.promptOptions.split(',').map((o: string) => o.trim()) : [];
+                
+                return (
+                  <div key={mapping.id} className="space-y-3 p-4 bg-white rounded-[1.5rem] border border-slate-100 shadow-sm">
+                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">{mapping.sourceValue || mapping.targetColumn}</label>
+                    
+                    {isNumber ? (
+                      <div className="flex items-center gap-4 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                        <button 
+                          onClick={() => setFormData({ ...formData, [mapping.targetColumn]: Number(val) - (mapping.numberStep || 1) })}
+                          className="w-12 h-12 flex items-center justify-center bg-white rounded-xl shadow-sm text-slate-600 hover:text-indigo-600 active:scale-90 transition-all border border-slate-100"
+                        >
+                          <Minus size={20} />
+                        </button>
+                        <div className="flex-1 text-center">
+                          <input 
+                            type="number" 
+                            value={val} 
+                            onChange={(e) => setFormData({ ...formData, [mapping.targetColumn]: Number(e.target.value) })}
+                            className="w-full bg-transparent text-center text-2xl font-black text-slate-900 outline-none"
+                          />
+                        </div>
+                        <button 
+                          onClick={() => setFormData({ ...formData, [mapping.targetColumn]: Number(val) + (mapping.numberStep || 1) })}
+                          className="w-12 h-12 flex items-center justify-center bg-indigo-600 rounded-xl shadow-md text-white hover:bg-indigo-700 active:scale-90 transition-all"
+                        >
+                          <Plus size={20} />
+                        </button>
+                      </div>
+                    ) : hasOptions ? (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                          {options.map((opt: string) => (
+                            <button 
+                              key={opt}
+                              onClick={() => {
+                                const updatedData = { ...formData, [mapping.targetColumn]: opt };
+                                setFormData(updatedData);
+                                
+                                // 🔥 [복구] 초고속 모드: 조건 충족 시 즉시 저장
+                                const promptMappings = activeInsertAction?.insertMappings?.filter((m: any) => m.mappingType === 'prompt') || [];
+                                const isOnlyPrompt = promptMappings.length === 1;
+                                const noCustom = !mapping.allowCustomPrompt;
+                                if (activeInsertAction?.requireConfirmation === false && isOnlyPrompt && noCustom) {
+                                  handleSubmitInsert(updatedData);
+                                }
+                              }}
+                              className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all border-2 ${val === opt ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                          {mapping.allowCustomPrompt && (
+                            <button 
+                              onClick={() => setFormData({ ...formData, [mapping.targetColumn]: options.includes(val) ? '' : val })}
+                              className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all border-2 ${!options.includes(val) && val !== '' ? 'bg-rose-500 border-rose-500 text-white shadow-md' : 'bg-white border-slate-100 text-slate-600 hover:border-rose-200'}`}
+                            >
+                              기타(직접)
+                            </button>
+                          )}
+                        </div>
+                        {(mapping.allowCustomPrompt && (!options.includes(val) || val === '')) && (
+                          <input 
+                            type="text" 
+                            value={options.includes(val) ? '' : val} 
+                            onChange={(e) => setFormData({ ...formData, [mapping.targetColumn]: e.target.value })}
+                            className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-white focus:border-indigo-500 outline-none font-bold text-slate-900 transition-all shadow-sm animate-in slide-in-from-top-1" 
+                            placeholder="내용을 직접 입력하세요..." 
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <input 
+                        type="text" 
+                        value={val} 
+                        onChange={(e) => setFormData({ ...formData, [mapping.targetColumn]: e.target.value })} 
+                        className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-white focus:border-indigo-500 outline-none font-bold text-slate-900 transition-all shadow-sm" 
+                        placeholder="내용을 입력하세요..." 
+                      />
+                    )}
+                  </div>
+                );
+              })}
               {activeInsertAction?.insertMappings?.filter((m: any) => m.mappingType !== 'prompt').length > 0 && <div className="pt-4 border-t border-slate-200"><p className="text-[10px] font-bold text-slate-400 uppercase italic">* 나머지 설정된 데이터는 백그라운드에서 함께 저장됩니다.</p></div>}
             </div>
             <div className="p-6 bg-white border-t flex gap-3">
               <button onClick={() => setIsInputModalOpen(false)} className="flex-1 py-4 text-slate-500 font-black rounded-2xl hover:bg-slate-100 transition-all border border-slate-100">취소</button>
-              <button onClick={handleSubmitInsert} disabled={isSubmitting} className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50">{isSubmitting ? "저장 중..." : "최종 저장"}</button>
+              
+              {/* 🔥 [개선] 초고속 모드(단일 버튼 즉시 저장)인 경우에는 하단 저장 버튼을 숨겨 중복 방지 */}
+              {!(activeInsertAction?.requireConfirmation === false && 
+                 activeInsertAction.insertMappings?.filter((m: any) => m.mappingType === 'prompt').length === 1 &&
+                 !activeInsertAction.insertMappings?.find((m: any) => m.mappingType === 'prompt')?.allowCustomPrompt
+                ) && (
+                <button onClick={() => handleSubmitInsert()} disabled={isSubmitting} className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50">
+                  {isSubmitting ? "저장 중..." : "최종 저장"}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -516,14 +710,89 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
               <button onClick={() => setIsUpdateModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"><X /></button>
             </div>
             <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto bg-slate-50">
-              {activeUpdateAction?.updateMappings?.filter((m: any) => m.mappingType === 'prompt').map((mapping: any) => (
-                <div key={mapping.id} className="space-y-2"><label className="block text-xs font-black text-slate-400 uppercase tracking-wider pl-1">{mapping.sourceValue}</label><input type={mapping.valueType === 'number' ? 'number' : 'text'} step={mapping.valueType === 'number' ? 'any' : undefined} value={updateFormData[mapping.targetColumn] ?? ''} onChange={(e) => setUpdateFormData({ ...updateFormData, [mapping.targetColumn]: e.target.value })} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-white focus:border-indigo-500 outline-none font-bold text-slate-900 transition-all shadow-sm" placeholder="수정할 내용을 입력하세요..." /></div>
-              ))}
+               {activeUpdateAction?.updateMappings?.filter((m: any) => m.mappingType === 'prompt').map((mapping: any) => {
+                const val = updateFormData[mapping.targetColumn] ?? (mapping.valueType === 'number' ? (mapping.defaultNumberValue ?? 0) : '');
+                const isNumber = mapping.valueType === 'number';
+                const hasOptions = mapping.promptOptions && mapping.promptOptions.trim() !== '';
+                const options = hasOptions ? mapping.promptOptions.split(',').map((o: string) => o.trim()) : [];
+
+                return (
+                  <div key={mapping.id} className="space-y-3 p-4 bg-white rounded-[1.5rem] border border-slate-100 shadow-sm">
+                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">{mapping.sourceValue || mapping.targetColumn}</label>
+                    
+                    {isNumber ? (
+                      <div className="flex items-center gap-4 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                        <button 
+                          onClick={() => setUpdateFormData({ ...updateFormData, [mapping.targetColumn]: Number(val) - (mapping.numberStep || 1) })}
+                          className="w-12 h-12 flex items-center justify-center bg-white rounded-xl shadow-sm text-slate-600 hover:text-indigo-600 active:scale-90 transition-all border border-slate-100"
+                        >
+                          <Minus size={20} />
+                        </button>
+                        <div className="flex-1 text-center">
+                          <input 
+                            type="number" 
+                            value={val} 
+                            onChange={(e) => setUpdateFormData({ ...updateFormData, [mapping.targetColumn]: Number(e.target.value) })}
+                            className="w-full bg-transparent text-center text-2xl font-black text-slate-900 outline-none"
+                          />
+                        </div>
+                        <button 
+                          onClick={() => setUpdateFormData({ ...updateFormData, [mapping.targetColumn]: Number(val) + (mapping.numberStep || 1) })}
+                          className="w-12 h-12 flex items-center justify-center bg-indigo-600 rounded-xl shadow-md text-white hover:bg-indigo-700 active:scale-90 transition-all"
+                        >
+                          <Plus size={20} />
+                        </button>
+                      </div>
+                    ) : hasOptions ? (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                          {options.map((opt: string) => (
+                            <button 
+                              key={opt}
+                              onClick={() => setUpdateFormData({ ...updateFormData, [mapping.targetColumn]: opt })}
+                              className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all border-2 ${val === opt ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                          {mapping.allowCustomPrompt && (
+                            <button 
+                              onClick={() => setUpdateFormData({ ...updateFormData, [mapping.targetColumn]: options.includes(val) ? '' : val })}
+                              className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all border-2 ${!options.includes(val) && val !== '' ? 'bg-rose-500 border-rose-500 text-white shadow-md' : 'bg-white border-slate-100 text-slate-600 hover:border-rose-200'}`}
+                            >
+                              기타(직접)
+                            </button>
+                          )}
+                        </div>
+                        {(mapping.allowCustomPrompt && (!options.includes(val) || val === '')) && (
+                          <input 
+                            type="text" 
+                            value={options.includes(val) ? '' : val} 
+                            onChange={(e) => setUpdateFormData({ ...updateFormData, [mapping.targetColumn]: e.target.value })}
+                            className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-white focus:border-indigo-500 outline-none font-bold text-slate-900 transition-all shadow-sm animate-in slide-in-from-top-1" 
+                            placeholder="내용을 직접 입력하세요..." 
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <input 
+                        type="text" 
+                        value={val} 
+                        onChange={(e) => setUpdateFormData({ ...updateFormData, [mapping.targetColumn]: e.target.value })} 
+                        className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-white focus:border-indigo-500 outline-none font-bold text-slate-900 transition-all shadow-sm" 
+                        placeholder="수정할 내용을 입력하세요..." 
+                      />
+                    )}
+                  </div>
+                );
+              })}
               {activeUpdateAction?.updateMappings?.filter((m: any) => m.mappingType !== 'prompt').length > 0 && <div className="pt-4 border-t border-slate-200"><p className="text-[10px] font-bold text-slate-400 uppercase italic">* 나머지 설정된 데이터는 백그라운드에서 함께 수정됩니다.</p></div>}
             </div>
             <div className="p-6 bg-white border-t flex gap-3">
               <button onClick={() => setIsUpdateModalOpen(false)} className="flex-1 py-4 text-slate-500 font-black rounded-2xl hover:bg-slate-100 transition-all border border-slate-100">취소</button>
-              <button onClick={handleSubmitUpdate} disabled={isUpdating} className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50">{isUpdating ? "수정 중..." : "수정 완료"}</button>
+              <button onClick={() => handleSubmitUpdate()} disabled={isUpdating} className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50">
+                {isUpdating ? "수정 중..." : "수정 완료"}
+              </button>
             </div>
           </div>
         </div>

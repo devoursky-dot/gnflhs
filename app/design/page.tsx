@@ -445,7 +445,6 @@ function AppBuilder() {
             {activeItem.type==='action' && activeAction && (
                <ActionEditor 
                 action={activeAction} 
-                views={appState.views} 
                 schemaData={schemaData} 
                 onUpdate={(upd) => setAppState({...appState, actions: appState.actions.map(a => a.id===upd.id ? upd : a)})} 
                 onDelete={deleteAction}
