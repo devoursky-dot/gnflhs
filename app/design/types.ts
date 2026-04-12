@@ -7,6 +7,7 @@ export type GroupAggregation = {
   conditionValue?: string;
   label: string;
   color?: string;
+  displayStyle?: 'button' | 'text'; // 🔥 [신규] 표시 스타일 (버튼형 vs 글자만)
 };
 
 export type AppState = {
@@ -40,16 +41,31 @@ export type View = {
   groupAggregations?: GroupAggregation[]; // 🔥 [신규] 통계 정보
   groupAggregationPosition?: 'beside_label' | 'right_end'; // 🔥 [신규] 통계 표시 위치
   
+  // 🔥 [신규] 2차 그룹화 관련 필드
+  groupByColumn2?: string | null; 
+  groupHeaderIcon2?: string | null;
+  groupHeaderAlign2?: 'left' | 'center' | 'right';
+  groupHeaderColor2?: string | null;
+  groupHeaderTextSize2?: string;
+  groupHeaderExpression2?: string; 
+  groupAggregations2?: GroupAggregation[]; 
+  groupAggregationPosition2?: 'beside_label' | 'right_end';
+  
   // 🔥 [출석부 다중선택 잠금 기능]
   isLocked?: boolean;
   lockedKeyColumn?: string | null;
   lockedRecordKeys?: string[];
   
   cardHeight: number;
+  cardHeightMode?: 'fixed' | 'auto'; // 🔥 [신규] 카드 높이 모드
   columnCount: number;
   layoutRows: LayoutRow[];
   onClickActionId?: string | null;
   onInitActionId?: string | null; // 🔥 [신규] 뷰 시작 시 자동 실행 액션
+  
+  groupSortDirection?: 'asc' | 'desc'; // 🔥 [신규] 1차 그룹 정렬
+  groupSortDirection2?: 'asc' | 'desc'; // 🔥 [신규] 2차 그룹 정렬
+  groupAccordionMode?: 'single' | 'multiple'; // 🔥 [신규] 아코디언 열림 방식
   
   // 🔥 [신규] 어댑티브 메뉴 제어 (노출 조건 및 상태)
   visibilityExpr?: string;        // 노출/활성화 조건 (JS Expression)

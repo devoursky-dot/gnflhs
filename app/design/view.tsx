@@ -640,18 +640,32 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
         </div>
         <div className="grid grid-cols-2 gap-8 mt-8 pt-8 border-t border-slate-50 min-w-max w-full">
           <div className="space-y-6">
-            <div className="bg-blue-50/50 p-6 rounded-[2.5rem] border-2 border-blue-100 space-y-6">
-              <label className="text-[11px] font-black text-blue-600 block uppercase tracking-widest flex items-center gap-2 px-1">
-                <FolderTree size={16}/> 데이터 묶어주기 (Grouping)
-              </label>
-              <select 
-                className="w-full p-4 rounded-2xl bg-white border-2 border-blue-200 font-black text-slate-800 cursor-pointer outline-none focus:border-blue-500 transition-all shadow-sm" 
-                value={view.groupByColumn || ''} 
-                onChange={e => onUpdate({...view, groupByColumn: e.target.value || null})}
-              >
-                <option value="">묶지 않음 (일반 리스트 형태)</option>
-                {availableColumns.map(col => <option key={col} value={col}>{col} 칼럼 기준으로 묶기</option>)}
-              </select>
+            <div className={`bg-blue-50/50 p-6 rounded-[2.5rem] border-2 border-blue-100 space-y-6 transition-all duration-500 ${!view.groupByColumn ? 'opacity-100' : 'bg-white shadow-xl border-blue-200 scale-105'}`}>
+              <div className="flex items-center justify-between mb-2 px-1">
+                <label className="text-[11px] font-black text-blue-600 block uppercase tracking-widest flex items-center gap-2">
+                  <FolderTree size={16}/> 1차 데이터 묶어주기 (Primary Grouping)
+                </label>
+                <div className="flex bg-slate-100 p-0.5 rounded-xl border border-blue-100 scale-90 origin-right">
+                  <button onClick={() => onUpdate({...view, groupAccordionMode: 'multiple'})} className={`px-3 py-1 rounded-lg text-[9px] font-black transition-all ${view.groupAccordionMode === 'multiple' || !view.groupAccordionMode ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>다중 열림</button>
+                  <button onClick={() => onUpdate({...view, groupAccordionMode: 'single'})} className={`px-3 py-1 rounded-lg text-[9px] font-black transition-all ${view.groupAccordionMode === 'single' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>하나만 열림</button>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <select 
+                  className="flex-1 p-4 rounded-2xl bg-white border-2 border-blue-200 font-black text-slate-800 cursor-pointer outline-none focus:border-blue-500 transition-all shadow-sm" 
+                  value={view.groupByColumn || ''} 
+                  onChange={e => onUpdate({...view, groupByColumn: e.target.value || null})}
+                >
+                  <option value="">묶지 않음 (일반 리스트 형태)</option>
+                  {availableColumns.map(col => <option key={col} value={col}>{col} 칼럼 기준으로 묶기</option>)}
+                </select>
+                {view.groupByColumn && (
+                  <div className="flex bg-slate-100 p-1 rounded-2xl border-2 border-blue-200">
+                    <button onClick={() => onUpdate({...view, groupSortDirection: 'asc'})} className={`px-3 rounded-xl text-[10px] font-black transition-all ${view.groupSortDirection === 'asc' || !view.groupSortDirection ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>ASC</button>
+                    <button onClick={() => onUpdate({...view, groupSortDirection: 'desc'})} className={`px-3 rounded-xl text-[10px] font-black transition-all ${view.groupSortDirection === 'desc' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>DESC</button>
+                  </div>
+                )}
+              </div>
 
               {view.groupByColumn && (
                 <div className="space-y-6 pt-4 border-t border-blue-200 animate-in fade-in slide-in-from-top-4 duration-500">
@@ -751,7 +765,7 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
                             <button onClick={() => onUpdate({ ...view, groupAggregations: view.groupAggregations?.filter(a => a.id !== agg.id) })} className="text-rose-300 hover:text-rose-500 transition-colors"><Trash2 size={14}/></button>
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-3 gap-3">
                             <div className="space-y-1.5">
                               <label className="text-[9px] font-black text-slate-400 pl-1">계산 방식</label>
                               <select 
@@ -773,6 +787,17 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
                                 className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-white outline-none"
                                 placeholder="예: 참여인원"
                               />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[9px] font-black text-slate-400 pl-1">표시 형태</label>
+                              <select 
+                                value={agg.displayStyle || 'button'} 
+                                onChange={e => onUpdate({ ...view, groupAggregations: view.groupAggregations?.map(a => a.id === agg.id ? { ...a, displayStyle: e.target.value as any } : a) })}
+                                className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-white outline-none"
+                              >
+                                <option value="button">알약형 (Button)</option>
+                                <option value="text">글자만 (Text)</option>
+                              </select>
                             </div>
                           </div>
 
@@ -818,10 +843,202 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
                 </div>
               )}
             </div>
+
+            <div className={`bg-indigo-50/50 p-6 rounded-[2.5rem] border-2 border-indigo-100 space-y-6 transition-all duration-500 ${!view.groupByColumn ? 'opacity-30 pointer-events-none grayscale' : !view.groupByColumn2 ? 'opacity-100' : 'bg-white shadow-xl border-indigo-200 scale-105'}`}>
+              <label className="text-[11px] font-black text-indigo-600 block uppercase tracking-widest flex items-center gap-2 px-1">
+                <FolderTree size={16}/> 2차 데이터 묶어주기 (Sub Grouping)
+              </label>
+              <div className="flex gap-2">
+                <select 
+                  className="flex-1 p-4 rounded-2xl bg-white border-2 border-indigo-200 font-black text-slate-800 cursor-pointer outline-none focus:border-indigo-500 transition-all shadow-sm" 
+                  value={view.groupByColumn2 || ''} 
+                  onChange={e => onUpdate({...view, groupByColumn2: e.target.value || null})}
+                >
+                  <option value="">(2차 그룹 없음)</option>
+                  {availableColumns.filter(c => c !== view.groupByColumn).map(col => <option key={col} value={col}>{col} 칼럼 기준으로 한 번 더 묶기</option>)}
+                </select>
+                {view.groupByColumn2 && (
+                  <div className="flex bg-slate-100 p-1 rounded-2xl border-2 border-indigo-200">
+                    <button onClick={() => onUpdate({...view, groupSortDirection2: 'asc'})} className={`px-3 rounded-xl text-[10px] font-black transition-all ${view.groupSortDirection2 === 'asc' || !view.groupSortDirection2 ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>ASC</button>
+                    <button onClick={() => onUpdate({...view, groupSortDirection2: 'desc'})} className={`px-3 rounded-xl text-[10px] font-black transition-all ${view.groupSortDirection2 === 'desc' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>DESC</button>
+                  </div>
+                )}
+              </div>
+
+              {view.groupByColumn2 && (
+                <div className="space-y-6 pt-4 border-t border-indigo-200 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between px-1">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">2차 헤더 디자인 및 가공</label>
+                      <button 
+                        onClick={() => onUpdate({ ...view, groupHeaderIcon2: 'Folder', groupHeaderAlign2: 'left', groupHeaderColor2: 'text-violet-700', groupHeaderTextSize2: 'text-[14px]', groupHeaderExpression2: '' })}
+                        className="text-[9px] font-black text-indigo-500 hover:text-indigo-700 transition-colors"
+                      >
+                        디자인 초기화
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 pl-1">헤더 아이콘</label>
+                        <select value={view.groupHeaderIcon2 || 'Folder'} onChange={e => onUpdate({...view, groupHeaderIcon2: e.target.value})} className="w-full p-3 text-xs rounded-xl border border-slate-200 font-bold bg-white text-slate-700 outline-none">
+                          <option value="Folder">폴더</option><option value="Star">별</option><option value="Tag">태그</option><option value="User">사용자</option><option value="Circle">원형</option><option value="Hash">해시(#)</option><option value="Info">정보</option><option value="AlertCircle">경고</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 pl-1">헤더 색상</label>
+                        <select value={view.groupHeaderColor2 || 'text-violet-700'} onChange={e => onUpdate({...view, groupHeaderColor2: e.target.value})} className="w-full p-3 text-xs rounded-xl border border-slate-200 font-bold bg-white text-slate-700 outline-none">
+                          <option value="text-violet-700">보라색 (기본)</option><option value="text-indigo-900">남색</option><option value="text-slate-700">진회색</option><option value="text-emerald-700">초록색</option><option value="text-blue-700">파랑색</option><option value="text-rose-700">빨강색</option><option value="text-amber-700">주황색</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 pl-1">글자 크기 및 정렬</label>
+                        <div className="flex gap-1.5">
+                          <select value={view.groupHeaderTextSize2 || 'text-[14px]'} onChange={e => onUpdate({...view, groupHeaderTextSize2: e.target.value})} className="flex-1 p-3 text-xs rounded-xl border border-slate-200 font-bold bg-white text-slate-700 outline-none">
+                            <option value="text-xs">작게</option><option value="text-[14px]">보통</option><option value="text-[15px]">조금 크게</option><option value="text-lg">크게</option>
+                          </select>
+                          <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+                            {[
+                              { id: 'left', icon: <AlignLeft size={14}/> },
+                              { id: 'center', icon: <AlignCenter size={14}/> },
+                              { id: 'right', icon: <AlignRight size={14}/> }
+                            ].map(a => (
+                              <button key={a.id} onClick={() => onUpdate({...view, groupHeaderAlign2: a.id as any})} className={`p-2 rounded-lg transition-all ${view.groupHeaderAlign2 === a.id || (!view.groupHeaderAlign2 && a.id === 'left') ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>{a.icon}</button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 pl-1">통계 표시 위치</label>
+                        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 h-[44px]">
+                          <button 
+                            onClick={() => onUpdate({...view, groupAggregationPosition2: 'beside_label'})}
+                            className={`flex-1 text-[9px] font-black rounded-lg transition-all ${view.groupAggregationPosition2 === 'beside_label' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
+                          >
+                            이름 바로 옆
+                          </button>
+                          <button 
+                            onClick={() => onUpdate({...view, groupAggregationPosition2: 'right_end'})}
+                            className={`flex-1 text-[9px] font-black rounded-lg transition-all ${view.groupAggregationPosition2 === 'right_end' || !view.groupAggregationPosition2 ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
+                          >
+                            오른쪽 끝
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black text-indigo-500 pl-1 flex items-center gap-1"><Sparkles size={12}/> 2차 헤더 가공 수식 (Expression)</label>
+                      <input 
+                        className="w-full p-4 rounded-2xl bg-white border border-indigo-100 font-mono text-[11px] font-bold text-slate-800 outline-none focus:border-indigo-400 transition-all shadow-inner"
+                        value={view.groupHeaderExpression2 || ''}
+                        onChange={e => onUpdate({...view, groupHeaderExpression2: e.target.value})}
+                        placeholder="예: val + ' (' + rowCount + '명)'"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t border-indigo-200">
+                    <div className="flex items-center justify-between px-1">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">2차 그룹 요약 통계</label>
+                      <button 
+                        onClick={() => onUpdate({ ...view, groupAggregations2: [...(view.groupAggregations2 || []), { id: `agg2_${Date.now()}`, type: 'count', label: '소계', color: 'bg-violet-50 text-violet-600', displayStyle: 'button' }] })}
+                        className="flex items-center gap-1 px-3 py-1 bg-violet-50 text-violet-600 rounded-lg text-[10px] font-black hover:bg-violet-100 transition-all border border-violet-100"
+                      >
+                        <Plus size={12}/> 통계 추가
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {(view.groupAggregations2 || []).map((agg, idx) => (
+                        <div key={agg.id} className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3 animate-in slide-in-from-right-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black py-1 px-2.5 rounded-full bg-slate-100 text-slate-500 uppercase tracking-widest">Sub-Summary #{idx+1}</span>
+                            <button onClick={() => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.filter(a => a.id !== agg.id) })} className="text-rose-300 hover:text-rose-500 transition-colors"><Trash2 size={14}/></button>
+                          </div>
+                          
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="space-y-1.5">
+                              <label className="text-[9px] font-black text-slate-400 pl-1">계산 방식</label>
+                              <select 
+                                value={agg.type} 
+                                onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map(a => a.id === agg.id ? { ...a, type: e.target.value as any } : a) })}
+                                className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-slate-50 outline-none"
+                              >
+                                <option value="count">총 개수 (Count)</option>
+                                <option value="sum">합계 (Sum)</option>
+                                <option value="avg">평균 (Avg)</option>
+                                <option value="count_if">조건부 개수 (Count If)</option>
+                              </select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[9px] font-black text-slate-400 pl-1">표시 라벨</label>
+                              <input 
+                                value={agg.label} 
+                                onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map(a => a.id === agg.id ? { ...a, label: e.target.value } : a) })}
+                                className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-white outline-none"
+                                placeholder="예: 소계"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[9px] font-black text-slate-400 pl-1">표시 형태</label>
+                              <select 
+                                value={agg.displayStyle || 'button'} 
+                                onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map(a => a.id === agg.id ? { ...a, displayStyle: e.target.value as any } : a) })}
+                                className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-white outline-none"
+                              >
+                                <option value="button">알약형 (Button)</option>
+                                <option value="text">글자만 (Text)</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <label className="text-[9px] font-black text-slate-400 pl-1">대상 컬럼</label>
+                              <select 
+                                value={agg.column || ''} 
+                                onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map(a => a.id === agg.id ? { ...a, column: e.target.value } : a) })}
+                                className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-white outline-none"
+                              >
+                                <option value="">컬럼 선택</option>
+                                {availableColumns.map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                            </div>
+                            {(agg.type === 'sum' || agg.type === 'avg' || agg.type === 'count_if') && (
+                              <div className="space-y-1.5 animate-in fade-in">
+                                <label className="text-[9px] font-black text-amber-600 pl-1 flex items-center gap-1">
+                                  <Sparkles size={10}/> {agg.type === 'count_if' ? '조건 수식 (JS)' : '가공 수식 (Target JS)'}
+                                </label>
+                                <input 
+                                  value={agg.conditionValue || ''} 
+                                  onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map(a => a.id === agg.id ? { ...a, conditionValue: e.target.value } : a) })}
+                                  className="w-full p-2.5 text-[11px] rounded-xl border border-amber-200 font-mono font-bold bg-white outline-none focus:border-amber-400"
+                                  placeholder={agg.type === 'count_if' ? "예: val === '완료'" : "예: val * 1.1"}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-50"><label className="text-[10px] font-black text-indigo-600 block mb-3 uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap"><ArrowUpDown size={14}/> 정렬 기준 칼럼</label><select className="w-full p-3 rounded-xl bg-white border border-indigo-100 font-black text-slate-800 cursor-pointer outline-none focus:border-indigo-400" value={view.sortColumn || ''} onChange={e => onUpdate({...view, sortColumn: e.target.value || null, sortDirection: view.sortDirection || 'desc'})}><option value="">기본 정렬 (DB 설정순)</option>{availableColumns.map(col => <option key={col} value={col}>{col}</option>)}</select>{view.sortColumn && (<div className="mt-3 animate-in fade-in slide-in-from-top-2"><select className="w-full p-3 rounded-xl bg-white border border-indigo-100 font-black text-slate-600 cursor-pointer outline-none focus:border-indigo-400" value={view.sortDirection || 'desc'} onChange={e => onUpdate({...view, sortDirection: e.target.value as any})}><option value="desc">내림차순 (가장 큰/최신 값부터)</option><option value="asc">오름차순 (가장 작은/과거 값부터)</option></select></div>)}</div>
           </div>
-          <div className="space-y-4">
-            <div><label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 whitespace-nowrap">카드 가로 배치 (열 개수)</label><select className="w-full p-3 rounded-xl bg-white border-2 border-slate-100 font-black text-slate-800 cursor-pointer outline-none" value={view.columnCount || 1} onChange={e => onUpdate({...view, columnCount: Number(e.target.value)})}>{[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}열 {n === 1 ? '(리스트 형태)' : `(${n}단 격자 형태)`}</option>)}</select></div>
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-slate-400 block px-1 uppercase tracking-wider whitespace-nowrap">카드 가로 배치 (열 개수)</label>
+              <select className="w-full p-3 rounded-xl bg-white border-2 border-slate-100 font-black text-slate-800 cursor-pointer outline-none focus:border-indigo-200" value={view.columnCount || 1} onChange={e => onUpdate({...view, columnCount: Number(e.target.value)})}>{[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}열 {n === 1 ? '(리스트 형태)' : `(${n}단 격자 형태)`}</option>)}</select>
+            </div>
+
+
+            
             <div>
               <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5 whitespace-nowrap"><MousePointerClick size={14} className="text-indigo-500"/> 카드 클릭 액션</label>
               <select className="w-full p-3 rounded-xl bg-white border-2 border-slate-100 font-black text-slate-800 cursor-pointer outline-none" value={view.onClickActionId || ''} onChange={e => onUpdate({...view, onClickActionId: e.target.value || null})}>
@@ -909,7 +1126,43 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
       </section>
 
       <section className={`bg-white p-10 rounded-[3.5rem] shadow-2xl border-2 border-indigo-50 relative transition-all duration-500 ${!view.tableName ? 'opacity-40 pointer-events-none grayscale' : 'opacity-100'}`}>
-        <div className="flex justify-between items-center mb-10 min-w-max"><div className="flex items-center gap-4"><div className="p-3 bg-indigo-100 text-indigo-700 rounded-2xl"><LayoutTemplate size={28}/></div><h3 className="text-2xl font-black text-indigo-900 whitespace-nowrap">2. 카드 레이아웃 커스텀 설계</h3></div><button onClick={addRootRow} className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 whitespace-nowrap"><Plus size={18}/> 행(Row) 추가하기</button></div>
+        <div className="flex justify-between items-center mb-10 min-w-max border-b border-indigo-50 pb-8">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-indigo-100 text-indigo-700 rounded-2xl"><LayoutTemplate size={28}/></div>
+            <div>
+              <h3 className="text-2xl font-black text-indigo-900 whitespace-nowrap">2. 카드 레이아웃 커스텀 설계</h3>
+              <p className="text-xs text-indigo-400 font-bold mt-1">카드에 보여줄 데이터의 배치와 높이를 결정합니다.</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-6 bg-slate-50/80 p-3 rounded-2xl border border-slate-100 shadow-sm">
+            <div className="flex flex-col gap-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter px-1 flex items-center gap-1"><ArrowUpDown size={12}/> 카드 높이 모드</label>
+              <div className="flex bg-slate-200/50 p-1 rounded-xl border border-slate-200">
+                <button onClick={() => onUpdate({...view, cardHeightMode: 'auto'})} className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${view.cardHeightMode === 'auto' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>자동 (Auto)</button>
+                <button onClick={() => onUpdate({...view, cardHeightMode: 'fixed'})} className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${view.cardHeightMode === 'fixed' || !view.cardHeightMode ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>고정 (Fixed)</button>
+              </div>
+            </div>
+
+            {(!view.cardHeightMode || view.cardHeightMode === 'fixed') && (
+              <div className="flex flex-col gap-2 min-w-[200px] animate-in fade-in slide-in-from-right-4">
+                <div className="flex items-center justify-between px-1">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">고정 높이: <span className="text-indigo-600">{view.cardHeight || 120}px</span></label>
+                </div>
+                <input 
+                  type="range" min="40" max="400" step="5"
+                  value={view.cardHeight || 120}
+                  onChange={e => onUpdate({...view, cardHeight: Number(e.target.value)})}
+                  className="w-full h-1.5 bg-slate-300 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                />
+              </div>
+            )}
+
+            <div className="w-[1px] h-10 bg-slate-200 mx-1"></div>
+
+            <button onClick={addRootRow} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-sm shadow-xl shadow-indigo-200 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 whitespace-nowrap"><Plus size={18}/> 행(Row) 추가</button>
+          </div>
+        </div>
         <div className="space-y-4 overflow-visible w-full min-w-fit mt-10">
           {view.layoutRows.map(row => <RenderRowEditor key={row.id} row={row} depth={0} />)}
           {view.layoutRows.length === 0 && (<div className="py-24 border-4 border-dashed border-slate-100 rounded-[2.5rem] flex flex-col items-center justify-center text-slate-300 gap-4 bg-slate-50/50"><Plus size={48} className="opacity-20"/><p className="font-black text-slate-400">우측 상단의 버튼을 눌러 카드 디자인을 시작하세요</p></div>)}

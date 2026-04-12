@@ -444,22 +444,57 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   };
 
   const displayData = getFilteredData();
-  let groupedData: Record<string, any[]> = {};
+  let groupedData: Record<string, any> = {};
   if (currentView?.groupByColumn) {
     displayData.forEach(row => {
-      const groupKey = row[currentView.groupByColumn as string];
-      const key = (groupKey === null || groupKey === undefined || groupKey === '') ? '미분류' : String(groupKey);
-      if (!groupedData[key]) groupedData[key] = [];
-      groupedData[key].push(row);
+      const g1 = row[currentView.groupByColumn as string];
+      const k1 = (g1 === null || g1 === undefined || g1 === '') ? '미분류' : String(g1);
+      
+      if (currentView.groupByColumn2) {
+        if (!groupedData[k1]) groupedData[k1] = {};
+        const g2 = row[currentView.groupByColumn2 as string];
+        const k2 = (g2 === null || g2 === undefined || g2 === '') ? '미분류' : String(g2);
+        if (!groupedData[k1][k2]) groupedData[k1][k2] = [];
+        groupedData[k1][k2].push(row);
+      } else {
+        if (!groupedData[k1]) groupedData[k1] = [];
+        groupedData[k1].push(row);
+      }
     });
   }
 
-  const toggleGroup = (key: string) => setExpandedGroups(prev => prev[key] ? {} : { [key]: true });
+  const toggleGroup = (key: string) => {
+    setExpandedGroups(prev => {
+      const isOpening = !prev[key];
+      if (currentView?.groupAccordionMode === 'single' && isOpening) {
+        if (key.includes('|')) {
+          // 2차 그룹을 열 때: 부모 1차 그룹은 유지하고, 2차 그룹은 하나만 남김
+          const [parentKey] = key.split('|');
+          return { [parentKey]: true, [key]: true };
+        } else {
+          // 1차 그룹을 열 때: 다른 모든 그룹(1차/2차 가리지 않고) 닫기
+          return { [key]: true };
+        }
+      }
+      return { ...prev, [key]: !prev[key] };
+    });
+  };
   const groupKeys = Object.keys(groupedData);
   const isAllExpanded = groupKeys.length > 0 && groupKeys.every(k => expandedGroups[k]);
   const handleToggleAllGroups = () => {
     if (isAllExpanded) setExpandedGroups({}); 
-    else { const allOpen: Record<string, boolean> = {}; groupKeys.forEach(k => allOpen[k] = true); setExpandedGroups(allOpen); }
+    else { 
+      const allOpen: Record<string, boolean> = {}; 
+      groupKeys.forEach(k => {
+        allOpen[k] = true;
+        if (currentView?.groupByColumn2 && typeof groupedData[k] === 'object') {
+          Object.keys(groupedData[k]).forEach(subK => {
+            allOpen[`${k}|${subK}`] = true;
+          });
+        }
+      }); 
+      setExpandedGroups(allOpen); 
+    }
   };
 
   const getGridColsClass = (cols: number) => {
@@ -602,10 +637,17 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
             <div className="w-full flex-1 overflow-y-auto scrollbar-hide flex flex-col">
               {currentView?.groupByColumn ? (
                 <div className="flex flex-col pt-0 flex-1">
-                  {Object.entries(groupedData).map(([groupKey, rows]) => {
-                    const isExpanded = !!expandedGroups[groupKey];
+                  {Object.entries(groupedData)
+                    .sort(([a], [b]) => {
+                      const dir = currentView.groupSortDirection || 'asc';
+                      return dir === 'asc' ? a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }) : b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' });
+                    })
+                    .map(([groupKey, data]) => {
+                      const isLevel2 = currentView.groupByColumn2;
+                      const isExpanded = !!expandedGroups[groupKey];
+                      const rows = isLevel2 ? Object.values(data).flat() as any[] : data as any[];
                     
-                    // 🧠 [신규] 그룹 헤더 가공 및 디자인 로직
+                    // 🧠 그룹 헤더 가공 및 디자인 로직 (Level 1)
                     const displayLabel = (() => {
                       if (currentView.groupHeaderExpression) {
                         try {
@@ -619,38 +661,31 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                       return groupKey;
                     })();
 
-                    const IconComp = currentView.groupHeaderIcon && IconMap[currentView.groupHeaderIcon] 
-                      ? IconMap[currentView.groupHeaderIcon] 
-                      : Folder;
-
+                    const IconComp = currentView.groupHeaderIcon && IconMap[currentView.groupHeaderIcon] ? IconMap[currentView.groupHeaderIcon] : Folder;
                     const textAlignClass = currentView.groupHeaderAlign === 'center' ? 'justify-center' : currentView.groupHeaderAlign === 'right' ? 'justify-end' : 'justify-start';
                     const textColorClass = currentView.groupHeaderColor || 'text-indigo-900';
                     const textSizeClass = currentView.groupHeaderTextSize || 'text-[15px]';
 
-                    // 🧠 [신규] 통계 데이터 계산 엔진
-                    const renderAggregations = () => {
-                      if (!currentView.groupAggregations || currentView.groupAggregations.length === 0) {
-                        return <span className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-0.5 rounded-full">{rows.length}건</span>;
+                    // 🧠 통계 데이터 렌더러
+                    const renderAggregations = (aggRows: any[], aggs?: GroupAggregation[]) => {
+                      if (!aggs || aggs.length === 0) {
+                        return <span className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-0.5 rounded-full">{aggRows.length}건</span>;
                       }
                       
                       return (
-                        <div className="flex items-center gap-2">
-                          {currentView.groupAggregations.map((agg: GroupAggregation) => {
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {aggs.map((agg: GroupAggregation) => {
                             let value: any = 0;
                             if (agg.type === 'count') {
-                              value = rows.length;
+                              value = aggRows.length;
                             } else if (agg.column) {
-                              const rawValues = rows.map(r => r[agg.column as string]);
-                              
-                              // 🧠 [신규] 모든 통계 유형에 수식 엔진 적용
+                              const rawValues = aggRows.map(r => r[agg.column as string]);
                               const processedValues = rawValues.map((val, idx) => {
                                 if (!agg.conditionValue) return val;
                                 try {
-                                  // val(현재값), row(행전체) 변수 제공
                                   const fn = new Function('val', 'row', `try { return ${agg.conditionValue}; } catch { return false; }`);
-                                  return fn(val, rows[idx]);
+                                  return fn(val, aggRows[idx]);
                                 } catch (e) {
-                                  // 수식이 아닐 경우 (단순 문자열 등)
                                   return val === agg.conditionValue || String(val) === agg.conditionValue;
                                 }
                               });
@@ -665,8 +700,16 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                               }
                             }
                             
-                            // 천단위 콤마 처리 (숫자일 경우)
                             const formattedValue = !isNaN(Number(value)) ? Number(value).toLocaleString() : value;
+
+                            if (agg.displayStyle === 'text') {
+                              return (
+                                <div key={agg.id} className="flex items-center gap-1 text-[11px] font-black mr-1">
+                                  <span className="text-slate-400 font-bold">{agg.label}:</span>
+                                  <span className={agg.color?.replace('bg-', 'text-').split(' ')[1] || 'text-slate-600'}>{formattedValue}</span>
+                                </div>
+                              );
+                            }
 
                             return (
                               <div key={agg.id} className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black border ${agg.color || 'bg-slate-100 text-slate-500 border-slate-200'}`}>
@@ -681,39 +724,103 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
 
                     return (
                       <div key={groupKey} className="mb-0">
+                        {/* 1차 그룹 헤더 */}
                         <button 
                           onClick={() => toggleGroup(groupKey)} 
                           className={`w-full flex items-center justify-between px-5 py-4 bg-white border-b border-slate-200 hover:bg-slate-50 transition-colors ${currentView.groupHeaderAlign === 'center' ? 'flex-col gap-2' : ''}`}
                         >
                           <div className={`flex items-center gap-3 flex-1 ${textAlignClass}`}>
-                            <IconComp 
-                              className={isExpanded ? "text-indigo-500" : "text-slate-400"} 
-                              size={18} 
-                            />
+                            <IconComp className={isExpanded ? "text-indigo-500" : "text-slate-400"} size={18} />
                             <div className={`flex items-center gap-3 ${currentView.groupAggregationPosition === 'beside_label' ? 'flex-wrap' : ''}`}>
                               <span className={`${textSizeClass} font-black ${isExpanded ? textColorClass : 'text-slate-700'}`}>
                                 {displayLabel}
                               </span>
-                              {currentView.groupAggregationPosition === 'beside_label' && renderAggregations()}
+                              {currentView.groupAggregationPosition === 'beside_label' && renderAggregations(rows, currentView.groupAggregations)}
                             </div>
                           </div>
-                          
                           <div className="flex items-center gap-4">
-                            {(currentView.groupAggregationPosition === 'right_end' || !currentView.groupAggregationPosition) && renderAggregations()}
+                            {(currentView.groupAggregationPosition === 'right_end' || !currentView.groupAggregationPosition) && renderAggregations(rows, currentView.groupAggregations)}
                             <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : 'rotate-0'}`}>
                               <ChevronDown className={isExpanded ? "text-indigo-500" : "text-slate-300"} size={20} />
                             </div>
                           </div>
                         </button>
+
+                        {/* 확장된 내용 */}
                         {isExpanded && (
-                          <div className={`grid gap-0 bg-slate-50/50 border-b border-slate-200 shadow-inner ${gridColsClass}`}>
-                            {rows.map((row, idx) => {
-                              return (
-                                <div key={idx} className="flex flex-col bg-white border-b border-r border-slate-100 overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors relative group/card" style={{ minHeight: `${currentView?.cardHeight || 120}px` }} onClick={() => { const act = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (act) handleAction(act, row); }}>
-                                  <RenderPreviewLayout rows={currentView?.layoutRows || []} rowData={row} actions={appData.app_config.actions} onExecuteAction={handleAction} />
-                                </div>
-                              );
-                            })}
+                          <div className="bg-slate-50/30">
+                            {isLevel2 ? (
+                              // 2차 그룹 렌더링
+                                Object.entries(data as Record<string, any[]>)
+                                  .sort(([a], [b]) => {
+                                    const dir = currentView.groupSortDirection2 || 'asc';
+                                    return dir === 'asc' ? a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }) : b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' });
+                                  })
+                                  .map(([subKey, subRows]) => {
+                                const compositeKey = `${groupKey}|${subKey}`;
+                                const isSubExpanded = !!expandedGroups[compositeKey];
+
+                                // 🧠 그룹 헤더 가공 및 디자인 로직 (Level 2)
+                                const subDisplayLabel = (() => {
+                                  if (currentView.groupHeaderExpression2) {
+                                    try {
+                                      const fn = new Function('val', 'rowCount', `return ${currentView.groupHeaderExpression2}`);
+                                      return String(fn(subKey, subRows.length));
+                                    } catch (e) {
+                                      return subKey;
+                                    }
+                                  }
+                                  return subKey;
+                                })();
+
+                                const SubIconComp = currentView.groupHeaderIcon2 && IconMap[currentView.groupHeaderIcon2] ? IconMap[currentView.groupHeaderIcon2] : Folder;
+                                const subAlignClass = currentView.groupHeaderAlign2 === 'center' ? 'justify-center' : currentView.groupHeaderAlign2 === 'right' ? 'justify-end' : 'justify-start';
+
+                                return (
+                                  <div key={subKey} className="border-b border-slate-100">
+                                    <button 
+                                      onClick={() => toggleGroup(compositeKey)} 
+                                      className={`w-full flex items-center justify-between pl-10 pr-5 py-3 bg-slate-50/50 hover:bg-white transition-colors border-b border-slate-100/50 ${currentView.groupHeaderAlign2 === 'center' ? 'flex-col gap-1' : ''}`}
+                                    >
+                                      <div className={`flex items-center gap-2 flex-1 ${subAlignClass}`}>
+                                        <SubIconComp className={isSubExpanded ? (currentView.groupHeaderColor2 || "text-violet-600") : "text-slate-400"} size={14} />
+                                        <div className={`flex items-center gap-3 ${currentView.groupAggregationPosition2 === 'beside_label' ? 'flex-wrap' : ''}`}>
+                                          <span className={`${currentView.groupHeaderTextSize2 || 'text-[13px]'} font-black ${isSubExpanded ? (currentView.groupHeaderColor2 || 'text-violet-900') : 'text-slate-600'}`}>
+                                            {subDisplayLabel}
+                                          </span>
+                                          {currentView.groupAggregationPosition2 === 'beside_label' && renderAggregations(subRows, currentView.groupAggregations2)}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                        {(currentView.groupAggregationPosition2 === 'right_end' || !currentView.groupAggregationPosition2) && renderAggregations(subRows, currentView.groupAggregations2)}
+                                        <div className={`transition-transform duration-300 ${isSubExpanded ? 'rotate-180' : 'rotate-0'}`}>
+                                          <ChevronDown className="text-slate-300" size={16} />
+                                        </div>
+                                      </div>
+                                    </button>
+                                    
+                                    {isSubExpanded && (
+                                      <div className={`grid gap-0 bg-white border-b border-slate-100 shadow-inner p-1 ${gridColsClass}`}>
+                                        {subRows.map((row, idx) => (
+                                          <div key={idx} className="flex flex-col bg-white border border-slate-50 rounded-lg overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors relative group/card shadow-sm m-1" style={{ height: currentView.cardHeightMode === 'auto' ? 'auto' : undefined, minHeight: currentView.cardHeightMode === 'auto' ? 'fit-content' : `${currentView?.cardHeight || 120}px` }} onClick={() => { const act = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (act) handleAction(act, row); }}>
+                                            <RenderPreviewLayout rows={currentView?.layoutRows || []} rowData={row} actions={appData.app_config.actions} onExecuteAction={handleAction} />
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              // 1차 그룹 직속 데이터 렌더링
+                              <div className={`grid gap-0 bg-slate-50/50 border-b border-slate-200 shadow-inner ${gridColsClass}`}>
+                                {rows.map((row, idx) => (
+                                  <div key={idx} className="flex flex-col bg-white border-b border-r border-slate-100 overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors relative group/card" style={{ height: currentView.cardHeightMode === 'auto' ? 'auto' : undefined, minHeight: currentView.cardHeightMode === 'auto' ? 'fit-content' : `${currentView?.cardHeight || 120}px` }} onClick={() => { const act = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (act) handleAction(act, row); }}>
+                                    <RenderPreviewLayout rows={currentView?.layoutRows || []} rowData={row} actions={appData.app_config.actions} onExecuteAction={handleAction} />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -724,7 +831,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                 <div className={`grid gap-0 flex-1 content-start ${gridColsClass}`}>
                   {displayData.map((row, idx) => {
                     return (
-                      <div key={idx} className="flex flex-col bg-white border-b border-r border-slate-100 overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors relative group/card" style={{ minHeight: `${currentView?.cardHeight || 120}px` }} onClick={() => { const act = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (act) handleAction(act, row); }}>
+                      <div key={idx} className="flex flex-col bg-white border-b border-r border-slate-100 overflow-hidden cursor-pointer hover:bg-slate-50 transition-colors relative group/card" style={{ height: currentView.cardHeightMode === 'auto' ? 'auto' : undefined, minHeight: currentView.cardHeightMode === 'auto' ? 'fit-content' : `${currentView?.cardHeight || 120}px` }} onClick={() => { const act = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (act) handleAction(act, row); }}>
                         <RenderPreviewLayout rows={currentView?.layoutRows || []} rowData={row} actions={appData.app_config.actions} onExecuteAction={handleAction} />
                       </div>
                     );
