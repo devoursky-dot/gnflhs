@@ -4,3 +4,7 @@ C:/react-projects/gnflhs/app/design/action.tsx
 C:/react-projects/gnflhs/app/design/view.tsx
 C:/react-projects/gnflhs/app/design/picker.tsx
 C:/react-projects/gnflhs/app/design/types.ts
+C:/react-projects/gnflhs/app/page.tsx
+C:/react-projects/gnflhs/app/withAuth.tsx
+C:/react-projects/gnflhs/app/admin/page.tsx
+C:/react-projects/gnflhs/app/design/formulaExamples.ts

@@ -1,13 +1,12 @@
-// app/page.tsx
+// 파일 경로: app/page.tsx
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import { Search, Plus, LayoutGrid, Star, ArrowRight, LogIn, LogOut, Mail, Lock, ShieldCheck, User as UserIcon, X, CheckCircle2 } from 'lucide-react';
-import Cookies from 'js-cookie';
-// 🔥 앞서 만든 picker.tsx에서 IconMap을 가져와 앱의 고유 아이콘을 표시합니다.
 import { IconMap } from './design/picker';
+import { useAuth } from './useAuth';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
@@ -15,69 +14,26 @@ const supabase = createClient(
 );
 
 export default function MainAppLauncher() {
+  const {
+    user,
+    profile,
+    loading,
+    authError,
+    isAuthorized,
+    isAdmin,
+    handlePasswordLogin,
+    handleLogout,
+    handlePasswordChange,
+  } = useAuth();
+
   const [apps, setApps] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
 
-  // --- 인증 상태 관리 ---
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
+  // ── 로그인 폼 상태 ──
   const [loginId, setLoginId] = useState('');
   const [loginPass, setLoginPass] = useState('');
-  const [authError, setAuthError] = useState('');
 
-  useEffect(() => {
-    // 1. 쿠키에서 세션 확인 (로그인 유지)
-    const savedSession = Cookies.get('gnflhs_session');
-    if (savedSession) {
-      const sessionData = JSON.parse(savedSession);
-      const sid = sessionData.id || sessionData.email;
-      setUser(sessionData);
-      fetchUserProfile(sid, sessionData.type || 'teacher').then(() => {
-        setLoading(false);
-      });
-    } else {
-      setLoading(false);
-    }
-
-    // 2. 인증 상태 변경 리스너
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      // 구글 로그인 등 외부 인증 사용 시를 대비해 유지하되, 현재는 비워둡니다.
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // 사용자 정보 가져오기
-  const fetchUserProfile = async (id: string | undefined, type: string) => {
-    if (!id) return;
-    if (type === 'student') {
-      const { data, error } = await supabase
-        .from('students')
-        .select('students, name, pass')
-        .eq('students', id)
-        .single();
-      if (data) {
-        setProfile({ ...data, users: data.students, role: 'student' });
-        fetchApps();
-      } else {
-        console.error("User not found in students table:", error);
-      }
-    } else {
-      const { data, error } = await supabase
-        .from('teachers')
-        .select('users, name, role, pass')
-        .eq('users', id)
-        .single();
-      if (data) {
-        setProfile(data);
-        fetchApps();
-      } else {
-        console.error("User not found in teachers table:", error);
-      }
-    }
-  };
-
-  // 권한 모달 관련 상태
+  // ── 권한 모달 상태 ──
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
   const [selectedAppForAccess, setSelectedAppForAccess] = useState<any>(null);
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -86,7 +42,7 @@ export default function MainAppLauncher() {
   const [isSavingAccess, setIsSavingAccess] = useState(false);
   const [userSearchTerm, setUserSearchTerm] = useState('');
 
-  // 비밀번호 변경 모달 상태
+  // ── 비밀번호 변경 모달 상태 ──
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [pwdCurrent, setPwdCurrent] = useState('');
   const [pwdNew, setPwdNew] = useState('');
@@ -95,27 +51,28 @@ export default function MainAppLauncher() {
   const [pwdSuccess, setPwdSuccess] = useState('');
   const [isSavingPwd, setIsSavingPwd] = useState(false);
 
-  async function fetchApps() {
+  // ── 앱 목록 로드 ──
+  const fetchApps = async () => {
     try {
       const { data, error } = await supabase
         .from('apps')
         .select('id, name, created_at, app_config')
         .order('id', { ascending: false });
-
       if (error) throw error;
-
-      if (data) {
-        setApps(data);
-      }
+      if (data) setApps(data);
     } catch (error) {
       console.error('앱 목록 로드 실패:', error);
     }
-  }
+  };
 
+  useEffect(() => {
+    if (isAuthorized) fetchApps();
+  }, [isAuthorized]);
+
+  // ── 권한 모달 핸들러 ──
   const openAccessModal = async (e: React.MouseEvent, app: any) => {
     e.preventDefault();
     e.stopPropagation();
-
     setSelectedAppForAccess(app);
     const config = app.app_config || {};
     setAccessIsPublic(config.isPublic !== false);
@@ -143,14 +100,11 @@ export default function MainAppLauncher() {
         isPublic: accessIsPublic,
         allowedUsers: accessIsPublic ? [] : accessAllowedUsers
       };
-
       const { error } = await supabase
         .from('apps')
         .update({ app_config: updatedConfig })
         .eq('id', selectedAppForAccess.id);
-
       if (error) throw error;
-
       alert('앱 접근 권한이 업데이트되었습니다.');
       setIsAccessModalOpen(false);
       fetchApps();
@@ -167,123 +121,45 @@ export default function MainAppLauncher() {
     );
   };
 
-  const handlePasswordChange = async (e: React.FormEvent) => {
+  // ── 비밀번호 변경 핸들러 ──
+  const onPasswordChangeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPwdError('');
     setPwdSuccess('');
-    
-    if (pwdNew !== pwdConfirm) {
-      setPwdError('새 비밀번호가 일치하지 않습니다.');
-      return;
-    }
-    if (pwdCurrent !== profile?.pass) {
-      setPwdError('현재 비밀번호가 올바르지 않습니다.');
-      return;
-    }
-
     setIsSavingPwd(true);
-    try {
-      const table = user?.type === 'student' ? 'students' : 'teachers';
-      const column = user?.type === 'student' ? 'students' : 'users';
-      const sid = user?.id || user?.email;
 
-      const { error } = await supabase
-        .from(table)
-        .update({ pass: pwdNew })
-        .eq(column, sid);
+    const result = await handlePasswordChange(pwdCurrent, pwdNew, pwdConfirm);
 
-      if (error) throw error;
-      
-      setProfile({ ...profile, pass: pwdNew });
+    if (result.success) {
       setPwdSuccess('비밀번호가 성공적으로 변경되었습니다.');
       setTimeout(() => {
         setIsPasswordModalOpen(false);
-        setPwdCurrent('');
-        setPwdNew('');
-        setPwdConfirm('');
+        setPwdCurrent(''); setPwdNew(''); setPwdConfirm('');
         setPwdSuccess('');
       }, 1500);
-    } catch (err: any) {
-      setPwdError(`오류 발생: ${err.message}`);
-    } finally {
-      setIsSavingPwd(false);
+    } else {
+      setPwdError(result.error || '');
     }
+    setIsSavingPwd(false);
   };
 
-  const handlePasswordLogin = async (e: React.FormEvent) => {
+  // ── 로그인 핸들러 ──
+  const onLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setAuthError('');
-    try {
-      // 1. 교사 테이블 찾기
-      const { data: teacher } = await supabase
-        .from('teachers')
-        .select('*')
-        .eq('users', loginId)
-        .single();
-
-      let loginUser = null;
-      let loginType = '';
-
-      if (teacher && teacher.pass === loginPass) {
-        loginUser = teacher;
-        loginType = 'teacher';
-      } else {
-        // 2. 학생 테이블 찾기
-        const { data: student } = await supabase
-          .from('students')
-          .select('*')
-          .eq('students', loginId)
-          .single();
-
-        if (student && student.pass === loginPass) {
-          loginUser = student;
-          loginType = 'student';
-        } else {
-          throw new Error('아이디 또는 비밀번호가 올바르지 않습니다.');
-        }
-      }
-
-      // 로그인 성공 처리
-      const sessionInfo = { id: loginId, email: loginId, type: loginType };
-      Cookies.set('gnflhs_session', JSON.stringify(sessionInfo), {
-        expires: 7,
-        path: '/',
-        sameSite: 'lax'
-      });
-
-      setUser(sessionInfo);
-      setProfile(loginType === 'student' ? { ...loginUser, users: loginUser.students, role: 'student' } : loginUser);
-      fetchApps();
-    } catch (error: any) {
-      setAuthError(error.message);
-    }
+    await handlePasswordLogin(loginId, loginPass);
   };
 
-  const handleLogout = async () => {
-    // 쿠키 삭제 시에도 path를 명시해야 정확하게 삭제됩니다.
-    Cookies.remove('gnflhs_session', { path: '/' });
-    window.location.reload();
-  };
-
-  // 검색어 및 권한에 따른 앱 필터링 로직
+  // ── 앱 필터링 ──
   const filteredApps = apps.filter(app => {
-    // 1. 키워드 필터
     if (!app.name?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-
-    // 2. 권한 필터
-    if (profile?.role === 'admin') return true;
-
+    if (isAdmin) return true;
     const config = app.app_config || {};
     const isPublic = config.isPublic !== false;
     if (isPublic) return true;
-
     return config.allowedUsers && config.allowedUsers.includes(user?.id || user?.email);
   });
 
-  // --- 권한 확인 로직 ---
-  const isAuthorized = profile?.role === 'admin' || profile?.role === 'tch' || profile?.role === 'student';
-
-  // 1. 세션이 없거나 프로필이 없는 경우 (로그인 폼)
+  // ── 로그인 전 화면 ──
   if (!user || !profile || !isAuthorized) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
@@ -296,24 +172,19 @@ export default function MainAppLauncher() {
             <p className="text-slate-500 font-bold mt-2 italic">Teacher Access Only</p>
           </div>
 
-          {/* 로그인은 되었으나 권한이 없는 경우 (그외) */}
           {user && profile && !isAuthorized ? (
             <div className="text-center space-y-6">
               <div className="p-4 bg-amber-50 border border-amber-100 text-amber-700 text-sm font-bold rounded-2xl">
-                '{profile.name}'님은 등록된 교사/관리자 계정이 아닙니다. 접근 권한이 없습니다.
+                &apos;{profile.name}&apos;님은 등록된 교사/관리자 계정이 아닙니다. 접근 권한이 없습니다.
               </div>
-              <button
-                onClick={handleLogout}
-                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black flex items-center justify-center gap-2"
-              >
+              <button onClick={handleLogout} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black flex items-center justify-center gap-2">
                 <LogOut size={18} /> 다른 계정으로 로그인
               </button>
             </div>
           ) : (
-            // 일반 로그인 폼
             <>
               {authError && <div className="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-600 text-sm font-bold rounded-2xl">{authError}</div>}
-              <form onSubmit={handlePasswordLogin} className="space-y-4">
+              <form onSubmit={onLoginSubmit} className="space-y-4">
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input type="text" placeholder="아이디 (이메일 혹은 학번+이름)" value={loginId} onChange={(e) => setLoginId(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-indigo-50 transition-all text-slate-900" style={{ color: '#0f172a' }} required />
@@ -331,11 +202,11 @@ export default function MainAppLauncher() {
     );
   }
 
-  // --- 로그인 완료된 상태의 UI ---
+  // ── 로그인 완료 상태 UI ──
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans overflow-hidden">
 
-      {/* --- 헤더 영역 (고정) --- */}
+      {/* 헤더 */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shrink-0">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -344,10 +215,9 @@ export default function MainAppLauncher() {
             </div>
             <div>
               <h1 className="text-2xl font-black text-slate-900 tracking-tight">경남외고</h1>
-              {/* 로그인 상태 표시 */}
               <div className="flex items-center gap-2 mt-0.5">
-                <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${profile?.role === 'admin' ? 'text-indigo-600 bg-indigo-50' : profile?.role === 'student' ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'}`}>
-                  <UserIcon size={10} /> {profile?.role === 'admin' ? 'Super Admin' : profile?.role === 'student' ? 'Student' : 'Teacher'}
+                <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${isAdmin ? 'text-indigo-600 bg-indigo-50' : profile?.role === 'student' ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'}`}>
+                  <UserIcon size={10} /> {isAdmin ? 'Super Admin' : profile?.role === 'student' ? 'Student' : 'Teacher'}
                 </span>
                 <span className="text-[11px] font-bold text-slate-400">{profile?.name} ({user?.id || user?.email})</span>
               </div>
@@ -355,31 +225,19 @@ export default function MainAppLauncher() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* 비밀번호 변경 버튼 */}
-            <button
-              onClick={() => setIsPasswordModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl text-sm font-black transition-all"
-              title="비밀번호 변경"
-            >
+            <button onClick={() => setIsPasswordModalOpen(true)} className="flex items-center gap-2 px-4 py-2.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl text-sm font-black transition-all" title="비밀번호 변경">
               <Lock size={18} /> <span className="hidden sm:inline">비밀번호 변경</span>
             </button>
-            {/* 로그아웃 버튼 */}
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl text-sm font-black transition-all"
-              title="로그아웃"
-            >
+            <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl text-sm font-black transition-all" title="로그아웃">
               <LogOut size={18} /> <span className="hidden sm:inline">로그아웃</span>
             </button>
-
-            {/* 빌더 버튼 (Admin인 경우만 활성화) */}
             <Link
               href="/design"
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-md active:scale-95 
-                ${profile?.role === 'admin'
+                ${isAdmin
                   ? 'bg-slate-900 hover:bg-indigo-600 text-white opacity-100'
                   : 'bg-slate-100 text-slate-400 cursor-not-allowed grayscale'}`}
-              onClick={(e) => profile?.role !== 'admin' && e.preventDefault()}
+              onClick={(e) => !isAdmin && e.preventDefault()}
             >
               <Plus size={18} /> 빌더 열기
             </Link>
@@ -387,10 +245,8 @@ export default function MainAppLauncher() {
         </div>
       </header>
 
-      {/* --- 메인 컨텐츠 영역 --- */}
+      {/* 메인 컨텐츠 */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-10 flex flex-col gap-8 h-[calc(100vh-80px)]">
-
-        {/* 상단 검색바 */}
         <div className="relative shrink-0 z-10">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={22} />
           <input
@@ -402,7 +258,6 @@ export default function MainAppLauncher() {
           />
         </div>
 
-        {/* 앱 목록 (데이터가 많아지면 내부에서 스크롤 됨) */}
         <div className="flex-1 overflow-y-auto pb-10 scrollbar-hide">
           {loading ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-400 font-bold space-y-4">
@@ -424,7 +279,6 @@ export default function MainAppLauncher() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredApps.map((app) => {
-                // 앱 설정에서 저장된 아이콘 추출 (없으면 Star를 기본값으로 사용)
                 const iconName = app.app_config?.icon;
                 const AppIcon = iconName && IconMap && IconMap[iconName] ? IconMap[iconName] : Star;
 
@@ -434,10 +288,9 @@ export default function MainAppLauncher() {
                     href={`/preview/${app.id}`}
                     className="group bg-white border border-slate-200 rounded-3xl p-6 hover:border-indigo-400 hover:shadow-xl hover:shadow-indigo-100 transition-all duration-300 flex flex-col cursor-pointer hover:-translate-y-1 relative overflow-hidden"
                   >
-                    {/* 카드 호버 시 나타나는 배경 이펙트 */}
                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-[2] duration-500 ease-out z-0"></div>
 
-                    {profile?.role === 'admin' && (
+                    {isAdmin && (
                       <button
                         onClick={(e) => openAccessModal(e, app)}
                         className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white border border-slate-200 text-slate-400 flex items-center justify-center hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all z-20 shadow-sm opacity-0 group-hover:opacity-100"
@@ -485,10 +338,7 @@ export default function MainAppLauncher() {
               <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
                 <Lock className="text-indigo-600" /> 접근 권한 설정
               </h3>
-              <button
-                onClick={() => setIsAccessModalOpen(false)}
-                className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"
-              >
+              <button onClick={() => setIsAccessModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
                 <X size={20} />
               </button>
             </div>
@@ -497,16 +347,10 @@ export default function MainAppLauncher() {
               <div>
                 <label className="text-sm font-black text-slate-700 mb-2 block">권한 범위</label>
                 <div className="flex bg-slate-200/50 p-1 rounded-2xl">
-                  <button
-                    onClick={() => setAccessIsPublic(true)}
-                    className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all ${accessIsPublic ? 'bg-white shadow-md text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                  >
+                  <button onClick={() => setAccessIsPublic(true)} className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all ${accessIsPublic ? 'bg-white shadow-md text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>
                     🚀 전체 공개 (Public)
                   </button>
-                  <button
-                    onClick={() => setAccessIsPublic(false)}
-                    className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all ${!accessIsPublic ? 'bg-white shadow-md text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                  >
+                  <button onClick={() => setAccessIsPublic(false)} className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all ${!accessIsPublic ? 'bg-white shadow-md text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>
                     🔒 제한됨 (Private)
                   </button>
                 </div>
@@ -565,17 +409,10 @@ export default function MainAppLauncher() {
             </div>
 
             <div className="px-6 py-5 bg-white border-t flex gap-3 shrink-0">
-              <button
-                onClick={() => setIsAccessModalOpen(false)}
-                className="flex-1 py-4 text-slate-500 font-black rounded-2xl hover:bg-slate-100 transition-all border border-slate-100"
-              >
+              <button onClick={() => setIsAccessModalOpen(false)} className="flex-1 py-4 text-slate-500 font-black rounded-2xl hover:bg-slate-100 transition-all border border-slate-100">
                 취소
               </button>
-              <button
-                onClick={handleSaveAccess}
-                disabled={isSavingAccess}
-                className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
-              >
+              <button onClick={handleSaveAccess} disabled={isSavingAccess} className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50">
                 {isSavingAccess ? "저장 중..." : "권한 설정 저장"}
               </button>
             </div>
@@ -599,7 +436,7 @@ export default function MainAppLauncher() {
               {pwdError && <div className="mb-4 p-3 bg-rose-50 border border-rose-100 text-rose-600 text-xs font-bold rounded-xl">{pwdError}</div>}
               {pwdSuccess && <div className="mb-4 p-3 bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-bold rounded-xl">{pwdSuccess}</div>}
               
-              <form onSubmit={handlePasswordChange} className="space-y-4">
+              <form onSubmit={onPasswordChangeSubmit} className="space-y-4">
                 <div>
                   <label className="text-xs font-black text-slate-500 mb-1.5 block">현재 비밀번호</label>
                   <input type="password" value={pwdCurrent} onChange={(e) => setPwdCurrent(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all" required />

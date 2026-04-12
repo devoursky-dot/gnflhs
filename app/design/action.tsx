@@ -1,11 +1,35 @@
 // 파일 경로: app/design/action.tsx
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Action, View, SchemaData, InsertMapping } from './types';
-import { Trash2, Plus, DatabaseZap, HelpCircle, X, Code2, Layers, Settings2, Star, MessageSquare, Zap } from 'lucide-react';
+import { Trash2, Plus, DatabaseZap, HelpCircle, X, Code2, Layers, Settings2, Star, MessageSquare, Zap, Calculator } from 'lucide-react';
 import { IconMap } from './picker';
-import { FORMULA_EXAMPLES } from './formulaExamples';
+import { FORMULA_EXAMPLES } from './formulas';
+
+// ── 내부 유틸: 자동 확장형 텍스트 영역 ──
+function AutoExpandingTextarea({ value, onChange, placeholder, onFocus, className }: any) {
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+  }, [value]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={value}
+      onChange={onChange}
+      onFocus={onFocus}
+      placeholder={placeholder}
+      rows={1}
+      className={`${className} overflow-hidden resize-none transition-[height] duration-200`}
+    />
+  );
+}
 
 interface ActionEditorProps {
   action: Action;
@@ -287,19 +311,10 @@ export default function ActionEditor({
                               <option value="user_name">👤 계정 사용자 이름</option>
                               <option value="user_email">📧 계정 사용자 이메일</option>
                             </select>
-                            {mapping.mappingType === 'card_data' && (
-                              <button 
-                                onClick={() => {
-                                  const newArr = [...action.insertMappings!];
-                                  newArr[idx].isExpression = !newArr[idx].isExpression;
-                                  onUpdate({ ...action, insertMappings: newArr });
-                                }}
-                                className={`px-2 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all border-2 ${mapping.isExpression ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-400'}`}
-                                title="수식/조건문 모드 토글"
-                              >
-                                {mapping.isExpression ? 'Smart' : 'Basic'}
-                              </button>
-                            )}
+                            <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-indigo-100 shadow-sm">
+                              <Calculator size={14} className="text-indigo-400" />
+                              <span className="text-[10px] font-black text-indigo-600 uppercase">Smart Mapping</span>
+                            </div>
                           </div>
                         </div>
                         <div className="col-span-2">
@@ -335,21 +350,18 @@ export default function ActionEditor({
                                     </div>
                                   )}
                                   
-                                  {mapping.mappingType === 'card_data' && mapping.isExpression ? (
-                                    <textarea
+                                  {mapping.mappingType === 'card_data' ? (
+                                    <AutoExpandingTextarea
                                       value={mapping.sourceValue || ''}
-                                      onFocus={(e) => handleInputInteraction(mapping.id, e, 'insert')}
-                                      onClick={(e) => handleInputInteraction(mapping.id, e, 'insert')}
-                                      onKeyUp={(e) => handleInputInteraction(mapping.id, e, 'insert')}
-                                      onChange={(e) => {
+                                      onFocus={(e: any) => handleInputInteraction(mapping.id, e, 'insert')}
+                                      onChange={(e: any) => {
                                         const newArr = [...action.insertMappings!];
                                         newArr[idx].sourceValue = e.target.value;
                                         onUpdate({ ...action, insertMappings: newArr });
                                         handleInputInteraction(mapping.id, e, 'insert');
                                       }}
-                                      placeholder="{{컬럼1}} + {{컬럼2}}"
-                                      rows={2}
-                                      className="w-full p-3 text-sm font-mono font-bold bg-white border border-slate-200 rounded-lg outline-none focus:border-indigo-400"
+                                      placeholder="컬럼을 클릭하거나 수식을 입력하세요 (예: {{성}} + {{이름}})"
+                                      className="w-full p-3 text-sm font-bold bg-white border border-slate-200 rounded-lg outline-none focus:border-indigo-400"
                                     />
                                   ) : (
                                     <div className="flex gap-3 items-center">
@@ -361,24 +373,22 @@ export default function ActionEditor({
                                           newArr[idx].sourceValue = e.target.value;
                                           onUpdate({ ...action, insertMappings: newArr });
                                         }}
-                                        placeholder={mapping.mappingType === 'card_data' ? "예: 학번 또는 https://.../{{학번}}.jpg" : "값을 입력하세요"}
+                                        placeholder="값을 입력하세요"
                                         className="flex-1 p-2.5 text-sm font-bold border border-slate-200 rounded-lg focus:border-indigo-500 outline-none text-slate-900 bg-white"
                                         style={{ color: 'var(--text-primary)' }}
                                       />
-                                      {mapping.mappingType !== 'card_data' && (
-                                        <select
-                                          value={mapping.valueType || 'string'}
-                                          onChange={(e) => {
-                                            const newArr = [...action.insertMappings!];
-                                            newArr[idx].valueType = e.target.value as 'string' | 'number';
-                                            onUpdate({ ...action, insertMappings: newArr });
-                                          }}
-                                          className="p-2.5 text-xs font-bold border border-slate-200 rounded-lg text-slate-600 bg-white min-w-[100px]"
-                                        >
-                                          <option value="string">Text</option>
-                                          <option value="number">Number</option>
-                                        </select>
-                                      )}
+                                      <select
+                                        value={mapping.valueType || 'string'}
+                                        onChange={(e) => {
+                                          const newArr = [...action.insertMappings!];
+                                          newArr[idx].valueType = e.target.value as 'string' | 'number';
+                                          onUpdate({ ...action, insertMappings: newArr });
+                                        }}
+                                        className="p-2.5 text-xs font-bold border border-slate-200 rounded-lg text-slate-600 bg-white min-w-[100px]"
+                                      >
+                                        <option value="string">Text</option>
+                                        <option value="number">Number</option>
+                                      </select>
                                     </div>
                                   )}
                                </div>
@@ -518,19 +528,6 @@ export default function ActionEditor({
                               <option value="user_name">👤 계정 사용자 이름</option>
                               <option value="user_email">📧 계정 사용자 이메일</option>
                             </select>
-                            {mapping.mappingType === 'card_data' && (
-                              <button 
-                                onClick={() => {
-                                  const newArr = [...action.updateMappings!];
-                                  newArr[idx].isExpression = !newArr[idx].isExpression;
-                                  onUpdate({ ...action, updateMappings: newArr });
-                                }}
-                                className={`px-2 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all border-2 ${mapping.isExpression ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-400'}`}
-                                title="수식/조건문 모드 토글"
-                              >
-                                {mapping.isExpression ? 'Smart' : 'Basic'}
-                              </button>
-                            )}
                           </div>
                         </div>
                         <div className="col-span-2">
@@ -566,21 +563,18 @@ export default function ActionEditor({
                                     </div>
                                   )}
                                   
-                                  {mapping.mappingType === 'card_data' && mapping.isExpression ? (
-                                    <textarea
+                                  {mapping.mappingType === 'card_data' ? (
+                                    <AutoExpandingTextarea
                                       value={mapping.sourceValue || ''}
-                                      onFocus={(e) => handleInputInteraction(mapping.id, e, 'update')}
-                                      onClick={(e) => handleInputInteraction(mapping.id, e, 'update')}
-                                      onKeyUp={(e) => handleInputInteraction(mapping.id, e, 'update')}
-                                      onChange={(e) => {
+                                      onFocus={(e: any) => handleInputInteraction(mapping.id, e, 'update')}
+                                      onChange={(e: any) => {
                                         const newArr = [...action.updateMappings!];
                                         newArr[idx].sourceValue = e.target.value;
                                         onUpdate({ ...action, updateMappings: newArr });
                                         handleInputInteraction(mapping.id, e, 'update');
                                       }}
-                                      placeholder="{{컬럼1}} + {{컬럼2}}"
-                                      rows={2}
-                                      className="w-full p-3 text-sm font-mono font-bold bg-white border border-slate-200 rounded-lg outline-none focus:border-indigo-400"
+                                      placeholder="컬럼을 클릭하거나 수식을 입력하세요 (예: {{성}} + {{이름}})"
+                                      className="w-full p-3 text-sm font-bold bg-white border border-slate-200 rounded-lg outline-none focus:border-indigo-400"
                                     />
                                   ) : (
                                     <div className="flex gap-3 items-center">
@@ -592,24 +586,22 @@ export default function ActionEditor({
                                           newArr[idx].sourceValue = e.target.value;
                                           onUpdate({ ...action, updateMappings: newArr });
                                         }}
-                                        placeholder={mapping.mappingType === 'card_data' ? "예: 학번 또는 https://.../{{학번}}.jpg" : "값을 입력하세요"}
+                                        placeholder="값을 입력하세요"
                                         className="flex-1 p-2.5 text-sm font-bold border border-slate-200 rounded-lg focus:border-indigo-500 outline-none text-slate-900 bg-white"
                                         style={{ color: 'var(--text-primary)' }}
                                       />
-                                      {mapping.mappingType !== 'card_data' && (
-                                        <select
-                                          value={mapping.valueType || 'string'}
-                                          onChange={(e) => {
-                                            const newArr = [...action.updateMappings!];
-                                            newArr[idx].valueType = e.target.value as 'string' | 'number';
-                                            onUpdate({ ...action, updateMappings: newArr });
-                                          }}
-                                          className="p-2.5 text-xs font-bold border border-slate-200 rounded-lg text-slate-600 bg-white min-w-[100px]"
-                                        >
-                                          <option value="string">Text</option>
-                                          <option value="number">Number</option>
-                                        </select>
-                                      )}
+                                      <select
+                                        value={mapping.valueType || 'string'}
+                                        onChange={(e) => {
+                                          const newArr = [...action.updateMappings!];
+                                          newArr[idx].valueType = e.target.value as 'string' | 'number';
+                                          onUpdate({ ...action, updateMappings: newArr });
+                                        }}
+                                        className="p-2.5 text-xs font-bold border border-slate-200 rounded-lg text-slate-600 bg-white min-w-[100px]"
+                                      >
+                                        <option value="string">Text</option>
+                                        <option value="number">Number</option>
+                                      </select>
                                     </div>
                                   )}
                                </div>

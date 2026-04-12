@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js'; 
 import IconPicker, { IconMap } from './picker';
-import { FORMULA_EXAMPLES } from './formulaExamples';
+import { FORMULA_EXAMPLES } from './formulas';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
