@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/app/supabaseClient';
 import { 
   FolderOpen, FileText, Copy, Check, Loader2, RefreshCw, AlertCircle 
