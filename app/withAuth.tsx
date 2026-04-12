@@ -2,14 +2,9 @@
 
 import React, { useState, useLayoutEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/app/supabaseClient';
 import { Loader2 } from 'lucide-react';
 import Cookies from 'js-cookie';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-);
 
 interface AuthOptions {
   adminOnly?: boolean;

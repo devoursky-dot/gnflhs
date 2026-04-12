@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from '@/app/supabaseClient';
 import { 
   Database, Search, Loader2, Save, FilterX,
   RefreshCw, Trash2, Plus, Image as ImageIcon, X, Undo, Menu, Link
@@ -15,11 +15,6 @@ import ImageUploadModal from "./image";
 import RelationSyncModal from "./sync";
 import { EditableCell, ColumnHeader, COLOR_THEMES, DESIGN_STYLES } from "./table";
 import type { SchemaData } from "./table";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-);
 
 export default function AdminDashboardPage() {
   const [selectedTable, setSelectedTable] = useState<string | null>(null);

@@ -1,11 +1,6 @@
 // 파일 경로: app/preview/[appId]/utils.ts
 
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-);
+import { supabase } from '@/app/supabaseClient';
 
 /**
  * 통합 매핑 프로세서

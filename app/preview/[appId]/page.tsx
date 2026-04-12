@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/app/supabaseClient';
 import { X, CheckCircle2, ChevronLeft, Menu, Home, Layout, Search, ChevronDown, Folder, ChevronsUpDown, ChevronsUp, MousePointerClick, Plus, Minus, AlertCircle, Zap, Lock } from 'lucide-react';
 import { IconMap } from '@/app/design/picker'; 
 import withAuth from '@/app/withAuth';
@@ -13,11 +13,6 @@ import { processMappingValue, applyAdvancedFilter } from './utils';
 import RenderPreviewLayout from './renderer';
 import { InsertModal, UpdateModal } from './modals';
 import { GroupAggregation } from '@/app/design/types';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-);
 
 function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   const params = useParams();
@@ -529,24 +524,41 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
         
         {/* Header / Sidebar */}
         <div className="pt-6 pb-4 px-5 border-b md:border-r md:border-b-0 bg-white relative z-10 shadow-[0_2px_15px_rgba(0,0,0,0.03)] flex flex-col shrink-0 md:w-80 lg:w-96 md:h-screen">
-          <div className="flex items-center justify-between mb-5">
-            <div className="w-10">
-              {currentViewId !== appData?.app_config?.views?.[0]?.id && (
-                <button onClick={() => { setCurrentViewId(appData.app_config.views[0].id); setSearchTerm(''); setExpandedGroups({}); }} className="p-2 sm:p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all"><ChevronLeft size={22} /></button>
-              )}
-            </div>
-            <div className="font-extrabold text-slate-900 text-xl sm:text-2xl truncate flex-1 text-center tracking-tight flex items-center justify-center gap-2">
-              {currentView?.name || appData.name}
-            </div>
-            <div className="w-10 text-right relative">
-              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 sm:p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
-                <Menu size={22} />
-              </button>
-              
-              {isMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)}></div>
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden flex flex-col py-2 animate-in fade-in slide-in-from-top-2">
+          <div className="flex flex-col mb-5">
+            <div className="flex items-center justify-between relative pt-5">
+              {/* App Title (Left Aligned Top) */}
+              <div className="absolute top-0 left-0 px-2">
+                <span className="text-[10px] font-black text-indigo-500/70 uppercase tracking-[0.2em] whitespace-nowrap">
+                  {appData?.name || 'GNFLHS App'}
+                </span>
+              </div>
+
+              {/* Back Button (Left) */}
+              <div className="w-10 flex-shrink-0">
+                {currentViewId !== appData?.app_config?.views?.[0]?.id && (
+                  <button onClick={() => { setCurrentViewId(appData.app_config.views[0].id); setSearchTerm(''); setExpandedGroups({}); }} className="p-2 sm:p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
+                    <ChevronLeft size={22} />
+                  </button>
+                )}
+              </div>
+
+              {/* View Title (Center Aligned) */}
+              <div className="flex-1 min-w-0 text-center px-2">
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 truncate tracking-tighter leading-tight">
+                  {currentView?.name || 'Main View'}
+                </h1>
+              </div>
+
+              {/* Menu Button (Right) */}
+              <div className="w-10 text-right relative flex-shrink-0">
+                <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 sm:p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
+                  <Menu size={22} />
+                </button>
+                
+                {isMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)}></div>
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden flex flex-col py-2 animate-in fade-in slide-in-from-top-2">
                     <button 
                       onClick={() => { router.push('/'); setIsMenuOpen(false); }}
                       className="w-full px-4 py-3 text-left flex items-center gap-3 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 font-bold transition-colors border-b border-slate-100"
@@ -585,6 +597,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
               )}
             </div>
           </div>
+        </div>
           
           <div className="flex gap-2">
             <div className="relative flex-1">

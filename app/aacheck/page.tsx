@@ -1,18 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from '@/app/supabaseClient';
 import { 
   FolderOpen, FileText, Copy, Check, Loader2, RefreshCw, AlertCircle 
 } from "lucide-react";
-
-// ==========================================
-// 🔧 Supabase 클라이언트 설정
-// ==========================================
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-);
 
 // 사용할 버킷 이름
 const BUCKET_NAME = "photos";

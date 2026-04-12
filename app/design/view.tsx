@@ -7,14 +7,9 @@ import {
   Database, LayoutTemplate, Plus, Columns, Rows, ChevronLeft, 
   ChevronRight, X, MousePointerClick, Star, Filter, Search, Smartphone, Eye, Loader2, TableProperties, ArrowUpDown, FolderTree, Trash2, Minus, Wand2, Image as ImageIcon, Type, Sparkles, AlignLeft, AlignCenter, AlignRight, Lock, Zap, Settings2
 } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js'; 
+import { supabase } from '@/app/supabaseClient';
 import IconPicker, { IconMap } from './picker';
 import { FORMULA_EXAMPLES } from './formulas';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-);
 
 const REGEX_PRESETS = [
   { name: '전화번호 하이픈 (-)', pattern: '(\\d{3})(\\d{3,4})(\\d{4})', replace: '$1-$2-$3' },

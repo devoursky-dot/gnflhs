@@ -2,13 +2,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from '@/app/supabaseClient';
 import { Loader2, X, Link } from "lucide-react";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-);
 
 interface RelationSyncModalProps {
   isOpen: boolean;

@@ -2,13 +2,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from '@/app/supabaseClient';
 import { Loader2, Image as ImageIcon, Copy, Check, X, FolderOpen, ClipboardPaste } from "lucide-react";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-);
 
 type UploadStatus = 'pending' | 'uploading' | 'success' | 'error';
 interface UploadQueueItem {

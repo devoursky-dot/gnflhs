@@ -2,16 +2,11 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
-import { Search, Plus, LayoutGrid, Star, ArrowRight, LogIn, LogOut, Mail, Lock, ShieldCheck, User as UserIcon, X, CheckCircle2 } from 'lucide-react';
+import { Search, Plus, LayoutGrid, Star, ArrowRight, LogIn, LogOut, Mail, Lock, ShieldCheck, User as UserIcon, X, CheckCircle2, Copy, Database, Loader2 } from 'lucide-react';
 import { IconMap } from './design/picker';
 import { useAuth } from './useAuth';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-);
+import { supabase } from './supabaseClient';
 
 export default function MainAppLauncher() {
   const {
@@ -50,6 +45,12 @@ export default function MainAppLauncher() {
   const [pwdError, setPwdError] = useState('');
   const [pwdSuccess, setPwdSuccess] = useState('');
   const [isSavingPwd, setIsSavingPwd] = useState(false);
+
+  // ── 앱 복제 관련 상태 ──
+  const [isCloneModalOpen, setIsCloneModalOpen] = useState(false);
+  const [cloningApp, setCloningApp] = useState<any>(null);
+  const [tableMappings, setTableMappings] = useState<Record<string, { action: 'reuse' | 'clone', newName: string }>>({});
+  const [isCloning, setIsCloning] = useState(false);
 
   // ── 앱 목록 로드 ──
   const fetchApps = async () => {
@@ -141,6 +142,87 @@ export default function MainAppLauncher() {
       setPwdError(result.error || '');
     }
     setIsSavingPwd(false);
+  };
+
+  /**
+   * 앱 설정 내에서 사용 중인 테이블 목록 추출
+   */
+  const extractTablesFromApp = (config: any) => {
+    const tables = new Set<string>();
+    config.views?.forEach((v: any) => { if (v.tableName) tables.add(v.tableName); });
+    config.actions?.forEach((a: any) => {
+      if (a.insertTableName) tables.add(a.insertTableName);
+      if (a.updateTableName) tables.add(a.updateTableName);
+      if (a.deleteTableName) tables.add(a.deleteTableName);
+    });
+    return Array.from(tables);
+  };
+
+  /**
+   * 앱 복제 시작
+   */
+  const startCloneApp = (e: React.MouseEvent, app: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const config = app.app_config || { views: [], actions: [] };
+    const tables = extractTablesFromApp(config);
+    
+    const initialMappings: Record<string, { action: 'reuse' | 'clone', newName: string }> = {};
+    tables.forEach(t => {
+      initialMappings[t] = { action: 'reuse', newName: `${t}_copy` };
+    });
+    
+    setCloningApp(app);
+    setTableMappings(initialMappings);
+    setIsCloneModalOpen(true);
+  };
+
+  /**
+   * 앱 및 테이블 복제 실행
+   */
+  const handleCloneAppWithTables = async () => {
+    if (!cloningApp) return;
+    setIsCloning(true);
+    try {
+      const config = JSON.parse(JSON.stringify(cloningApp.app_config || { views: [], actions: [] }));
+      let configStr = JSON.stringify(config);
+
+      // 1단계: 테이블 복제
+      for (const [oldName, mapping] of Object.entries(tableMappings)) {
+        if (mapping.action === 'clone') {
+          const { error: rpcErr } = await supabase.rpc('clone_table', {
+            source_table: oldName,
+            target_table: mapping.newName,
+            copy_data: true
+          });
+          if (rpcErr) throw new Error(`[${oldName}] 테이블 복제 실패: ${rpcErr.message}`);
+          
+          const oldNameRegex = new RegExp(`"${oldName}"`, 'g');
+          configStr = configStr.replace(oldNameRegex, `"${mapping.newName}"`);
+        }
+      }
+
+      const newConfig = JSON.parse(configStr);
+      
+      // 2단계: 신규 앱 삽입
+      const { error: insErr } = await supabase.from('apps').insert([{
+        name: `${cloningApp.name} (복제본)`,
+        app_config: newConfig,
+        draft_config: newConfig
+      }]);
+
+      if (insErr) throw insErr;
+
+      alert('앱 복제가 완료되었습니다!');
+      setIsCloneModalOpen(false);
+      fetchApps(); // 목록 새로고침
+
+    } catch (error: any) {
+      alert(`복제 실패: ${error.message}`);
+    } finally {
+      setIsCloning(false);
+    }
   };
 
   // ── 로그인 핸들러 ──
@@ -290,15 +372,22 @@ export default function MainAppLauncher() {
                   >
                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-[2] duration-500 ease-out z-0"></div>
 
-                    {isAdmin && (
-                      <button
-                        onClick={(e) => openAccessModal(e, app)}
-                        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white border border-slate-200 text-slate-400 flex items-center justify-center hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all z-20 shadow-sm opacity-0 group-hover:opacity-100"
-                        title="접근 권한 설정"
-                      >
-                        <Lock size={16} />
-                      </button>
-                    )}
+                      <div className="absolute top-4 right-4 flex gap-2 z-20 opacity-0 group-hover:opacity-100 transition-all">
+                        <button
+                          onClick={(e) => startCloneApp(e, app)}
+                          className="w-10 h-10 rounded-full bg-white border border-slate-200 text-slate-400 flex items-center justify-center hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all shadow-sm"
+                          title="앱 복제하기"
+                        >
+                          <Copy size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => openAccessModal(e, app)}
+                          className="w-10 h-10 rounded-full bg-white border border-slate-200 text-slate-400 flex items-center justify-center hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all shadow-sm"
+                          title="접근 권한 설정"
+                        >
+                          <Lock size={16} />
+                        </button>
+                      </div>
 
                     <div className="relative z-10 flex items-start gap-4 mb-8">
                       <div className="w-14 h-14 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300 shadow-sm shrink-0">
@@ -457,6 +546,107 @@ export default function MainAppLauncher() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 앱 복제 모달 */}
+      {isCloneModalOpen && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-xl rounded-[3rem] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+            <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg"><Copy size={24} /></div>
+                <div>
+                  <h2 className="text-2xl font-black text-slate-800 tracking-tight">앱 및 테이블 복제하기</h2>
+                  <p className="text-sm text-slate-400 font-bold mt-1">"{cloningApp?.name}" 앱을 복사합니다.</p>
+                </div>
+              </div>
+              <button 
+                disabled={isCloning}
+                onClick={() => setIsCloneModalOpen(false)} 
+                className="p-3 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all disabled:opacity-30"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="p-10 max-h-[60vh] overflow-y-auto space-y-8">
+              <div className="bg-indigo-50/50 p-6 rounded-[2rem] border-2 border-indigo-100 flex items-start gap-4 animate-in slide-in-from-top-2">
+                <div className="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-black shrink-0 shadow-md">?</div>
+                <div>
+                  <p className="text-[15px] font-black text-slate-800 leading-snug">이 앱에서 사용하는 테이블들을 어떻게 처리할까요?</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {Object.keys(tableMappings).length === 0 ? (
+                  <div className="py-10 text-center text-slate-400 font-bold bg-slate-50 rounded-3xl border border-dashed italic">이 앱은 사용 중인 테이블이 없습니다.</div>
+                ) : (
+                  Object.entries(tableMappings).map(([oldName, mapping]) => (
+                    <div key={oldName} className={`p-6 rounded-[2rem] border-2 transition-all duration-300 ${mapping.action === 'clone' ? 'border-indigo-500 bg-white shadow-xl' : 'border-slate-100 bg-slate-50/30'}`}>
+                      <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                          <Database size={18} className={mapping.action === 'clone' ? 'text-indigo-600' : 'text-slate-400'} />
+                          <span className="font-extrabold text-slate-700">{oldName}</span>
+                        </div>
+                        <div className="flex bg-slate-100 p-1 rounded-xl">
+                          <button 
+                            disabled={isCloning}
+                            onClick={() => setTableMappings(prev => ({ ...prev, [oldName]: { ...prev[oldName], action: 'reuse' } }))}
+                            className={`px-4 py-1.5 text-[11px] font-black rounded-lg transition-all ${mapping.action === 'reuse' ? 'bg-white text-slate-600 shadow-sm' : 'text-slate-400'}`}
+                          >
+                            기존 유지
+                          </button>
+                          <button 
+                            disabled={isCloning}
+                            onClick={() => setTableMappings(prev => ({ ...prev, [oldName]: { ...prev[oldName], action: 'clone' } }))}
+                            className={`px-4 py-1.5 text-[11px] font-black rounded-lg transition-all ${mapping.action === 'clone' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
+                          >
+                            테이블 복제
+                          </button>
+                        </div>
+                      </div>
+
+                      {mapping.action === 'clone' && (
+                        <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                          <label className="text-[10px] font-black text-indigo-500 pl-1 uppercase tracking-widest">새 테이블 이름</label>
+                          <input 
+                            disabled={isCloning}
+                            value={mapping.newName}
+                            onChange={(e) => setTableMappings(prev => ({ ...prev, [oldName]: { ...prev[oldName], newName: e.target.value } }))}
+                            className="w-full p-4 bg-white border-2 border-indigo-100 focus:border-indigo-600 outline-none rounded-2xl font-black text-sm text-slate-800 transition-all shadow-inner"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="p-8 bg-white border-t border-slate-100 flex gap-4">
+              <button 
+                disabled={isCloning}
+                onClick={() => setIsCloneModalOpen(false)} 
+                className="flex-1 py-4 text-slate-400 font-extrabold rounded-2xl hover:bg-slate-100 transition-all disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button 
+                disabled={isCloning}
+                onClick={handleCloneAppWithTables}
+                className="flex-[2] py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 hover:scale-[1.02] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+              >
+                {isCloning ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    복제 중...
+                  </>
+                ) : (
+                  <>복제하기</>
+                )}
+              </button>
             </div>
           </div>
         </div>
