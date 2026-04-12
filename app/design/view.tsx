@@ -534,20 +534,42 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
       </section>
 
       <section className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 animate-in fade-in slide-in-from-bottom-8 duration-600 relative overflow-hidden">
-        {view.isLocked && (
-          <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-md flex flex-col items-center justify-center p-6 border-[3px] border-indigo-200 rounded-[2.5rem] animate-in zoom-in-95">
-             <div className="bg-white px-8 py-6 rounded-3xl shadow-2xl flex flex-col items-center gap-3 border border-indigo-50">
-               <div className="bg-indigo-100 p-4 rounded-full text-indigo-600 shadow-inner"><Lock size={32}/></div>
-               <h3 className="font-black text-slate-800 text-xl">데이터가 수동으로 고정되었습니다 🔒</h3>
-               <p className="text-sm font-bold text-slate-500 text-center leading-relaxed">
-                 선택된 <span className="text-indigo-600 text-lg border-b-2 border-indigo-200 px-1">{view.lockedRecordKeys?.length}</span> 개의 데이터만 화면에 표시됩니다.<br/>
-                 기준 스키마: <span className="text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md font-mono">[{view.lockedKeyColumn}]</span>
-               </p>
-               <button onClick={() => onUpdate({...view, isLocked: false})} className="mt-4 px-6 py-3 bg-white border-2 border-slate-200 hover:border-slate-800 hover:bg-slate-800 hover:text-white rounded-2xl text-slate-700 font-black transition-all shadow-sm">잠금 해제 (수동 픽 유지)</button>
-             </div>
+
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <div className={`p-3 text-white rounded-2xl shadow-lg transition-colors ${view.lockedRecordKeys?.length ? 'bg-rose-500' : 'bg-indigo-600'}`}>
+              <Database size={24}/>
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-slate-900 whitespace-nowrap">1. 데이터 조회 규칙 설정</h2>
+              <div className="flex items-center gap-2 mt-0.5">
+                {view.lockedRecordKeys?.length ? (
+                  <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2">
+                    <span className="text-xs font-black text-rose-600 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-100 flex items-center gap-1.5 shadow-sm">
+                      <Lock size={12}/> 수동 선택 모드 활성화 ({view.lockedRecordKeys.length}개 고정됨)
+                    </span>
+                    <button 
+                      onClick={() => onUpdate({ ...view, lockedRecordKeys: [], lockedKeyColumn: undefined, isLocked: false })}
+                      className="text-[10px] font-black text-slate-400 hover:text-rose-500 hover:bg-rose-50 px-2 py-1 rounded-lg transition-all border border-transparent hover:border-rose-100"
+                    >
+                      [전체 조회로 복구]
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500 font-bold whitespace-nowrap">어떤 데이터를 어떻게 보여줄지(필터링/정렬/그룹화) 설정하세요.</p>
+                )}
+              </div>
+            </div>
           </div>
-        )}
-        <div className="flex items-center justify-between mb-8"><div className="flex items-center gap-4"><div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg"><Database size={24}/></div><div><h2 className="text-xl font-black text-slate-900 whitespace-nowrap">1. 데이터 조회 규칙 설정</h2><p className="text-sm text-slate-500 font-bold whitespace-nowrap">어떤 데이터를 어떻게 보여줄지(필터링/정렬/그룹화) 설정하세요.</p></div></div>{view.tableName && <button onClick={fetchPreviewData} className="px-6 py-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl font-black text-sm flex items-center gap-2 transition-colors border border-indigo-200 whitespace-nowrap"><Eye size={18} /> 설정 확인 및 데이터 수동 픽(Pick)</button>}</div>
+          {view.tableName && (
+            <button 
+              onClick={fetchPreviewData} 
+              className={`px-6 py-3 rounded-xl font-black text-sm flex items-center gap-2 transition-all border whitespace-nowrap ${view.lockedRecordKeys?.length ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'}`}
+            >
+              <Eye size={18} /> {view.lockedRecordKeys?.length ? '수동 선택(Pick) 수정하기' : '설정 확인 및 데이터 수동 픽(Pick)'}
+            </button>
+          )}
+        </div>
         <div className="grid grid-cols-2 gap-8 min-w-max w-full">
           <div className="space-y-4">
             <div><label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1">연결 테이블</label><select className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-black text-slate-800 outline-none focus:border-indigo-500 transition-all cursor-pointer" value={view.tableName || ''} onChange={e => onUpdate({...view, tableName: e.target.value, filterColumn: null, sortColumn: null, groupByColumn: null, layoutRows: []})}><option value="">테이블 선택</option>{Object.keys(schemaData).map(t => <option key={t} value={t}>{t}</option>)}</select></div>
@@ -618,7 +640,184 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
         </div>
         <div className="grid grid-cols-2 gap-8 mt-8 pt-8 border-t border-slate-50 min-w-max w-full">
           <div className="space-y-6">
-            <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100"><label className="text-[10px] font-black text-blue-600 block mb-3 uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap"><FolderTree size={14}/> 데이터 묶어주기 (아코디언 형태)</label><select className="w-full p-3 rounded-xl bg-white border border-blue-200 font-black text-slate-800 cursor-pointer outline-none focus:border-blue-400" value={view.groupByColumn || ''} onChange={e => onUpdate({...view, groupByColumn: e.target.value || null})}><option value="">묶지 않음 (일반 리스트 형태)</option>{availableColumns.map(col => <option key={col} value={col}>{col} 칼럼 기준으로 묶기</option>)}</select></div>
+            <div className="bg-blue-50/50 p-6 rounded-[2.5rem] border-2 border-blue-100 space-y-6">
+              <label className="text-[11px] font-black text-blue-600 block uppercase tracking-widest flex items-center gap-2 px-1">
+                <FolderTree size={16}/> 데이터 묶어주기 (Grouping)
+              </label>
+              <select 
+                className="w-full p-4 rounded-2xl bg-white border-2 border-blue-200 font-black text-slate-800 cursor-pointer outline-none focus:border-blue-500 transition-all shadow-sm" 
+                value={view.groupByColumn || ''} 
+                onChange={e => onUpdate({...view, groupByColumn: e.target.value || null})}
+              >
+                <option value="">묶지 않음 (일반 리스트 형태)</option>
+                {availableColumns.map(col => <option key={col} value={col}>{col} 칼럼 기준으로 묶기</option>)}
+              </select>
+
+              {view.groupByColumn && (
+                <div className="space-y-6 pt-4 border-t border-blue-200 animate-in fade-in slide-in-from-top-4 duration-500">
+                  {/* 그룹 바 디자인 */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between px-1">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">헤더 디자인 및 가공</label>
+                      <button 
+                        onClick={() => onUpdate({ ...view, groupHeaderIcon: 'Folder', groupHeaderAlign: 'left', groupHeaderColor: 'text-indigo-900', groupHeaderTextSize: 'text-[15px]', groupHeaderExpression: '' })}
+                        className="text-[9px] font-black text-indigo-500 hover:text-indigo-700 transition-colors"
+                      >
+                        디자인 초기화
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 pl-1">헤더 아이콘</label>
+                        <select value={view.groupHeaderIcon || 'Folder'} onChange={e => onUpdate({...view, groupHeaderIcon: e.target.value})} className="w-full p-3 text-xs rounded-xl border border-slate-200 font-bold bg-white text-slate-700 outline-none">
+                          <option value="Folder">폴더</option><option value="Star">별</option><option value="Tag">태그</option><option value="User">사용자</option><option value="Circle">원형</option><option value="Hash">해시(#)</option><option value="Info">정보</option><option value="AlertCircle">경고</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 pl-1">헤더 색상</label>
+                        <select value={view.groupHeaderColor || 'text-indigo-900'} onChange={e => onUpdate({...view, groupHeaderColor: e.target.value})} className="w-full p-3 text-xs rounded-xl border border-slate-200 font-bold bg-white text-slate-700 outline-none">
+                          <option value="text-indigo-900">남색 (기본)</option><option value="text-slate-700">진회색</option><option value="text-emerald-700">초록색</option><option value="text-blue-700">파랑색</option><option value="text-rose-700">빨강색</option><option value="text-amber-700">주황색</option><option value="text-violet-700">보라색</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 pl-1">글자 크기 및 정렬</label>
+                        <div className="flex gap-1.5">
+                          <select value={view.groupHeaderTextSize || 'text-[15px]'} onChange={e => onUpdate({...view, groupHeaderTextSize: e.target.value})} className="flex-1 p-3 text-xs rounded-xl border border-slate-200 font-bold bg-white text-slate-700 outline-none">
+                            <option value="text-xs">작게</option><option value="text-[14px]">보통</option><option value="text-[15px]">조금 크게</option><option value="text-lg">크게</option><option value="text-xl">매우 크게</option>
+                          </select>
+                          <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+                            {[
+                              { id: 'left', icon: <AlignLeft size={14}/> },
+                              { id: 'center', icon: <AlignCenter size={14}/> },
+                              { id: 'right', icon: <AlignRight size={14}/> }
+                            ].map(a => (
+                              <button key={a.id} onClick={() => onUpdate({...view, groupHeaderAlign: a.id as any})} className={`p-2 rounded-lg transition-all ${view.groupHeaderAlign === a.id || (!view.groupHeaderAlign && a.id === 'left') ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>{a.icon}</button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 pl-1">통계 표시 위치</label>
+                        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 h-[44px]">
+                          <button 
+                            onClick={() => onUpdate({...view, groupAggregationPosition: 'beside_label'})}
+                            className={`flex-1 text-[9px] font-black rounded-lg transition-all ${view.groupAggregationPosition === 'beside_label' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
+                          >
+                            이름 바로 옆
+                          </button>
+                          <button 
+                            onClick={() => onUpdate({...view, groupAggregationPosition: 'right_end'})}
+                            className={`flex-1 text-[9px] font-black rounded-lg transition-all ${view.groupAggregationPosition === 'right_end' || !view.groupAggregationPosition ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
+                          >
+                            오른쪽 끝
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black text-indigo-500 pl-1 flex items-center gap-1"><Sparkles size={12}/> 헤더 가공 수식 (Expression)</label>
+                      <input 
+                        className="w-full p-4 rounded-2xl bg-white border border-indigo-100 font-mono text-[11px] font-bold text-slate-800 outline-none focus:border-indigo-400 transition-all shadow-inner"
+                        value={view.groupHeaderExpression || ''}
+                        onChange={e => onUpdate({...view, groupHeaderExpression: e.target.value})}
+                        placeholder="예: val + ' (' + rowCount + '명)'"
+                      />
+                      <p className="text-[9px] font-bold text-slate-400 px-1 italic">※ 가용한 변수: val (그룹값), rowCount (그룹 데이터 개수)</p>
+                    </div>
+                  </div>
+
+                  {/* 통계 요약 엔진 */}
+                  <div className="space-y-4 pt-4 border-t border-blue-100">
+                    <div className="flex items-center justify-between px-1">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">그룹 요약 통계 (Aggregations)</label>
+                      <button 
+                        onClick={() => onUpdate({ ...view, groupAggregations: [...(view.groupAggregations || []), { id: `agg_${Date.now()}`, type: 'count', label: '합계', color: 'bg-indigo-50 text-indigo-600' }] })}
+                        className="flex items-center gap-1 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black hover:bg-indigo-100 transition-all border border-indigo-100"
+                      >
+                        <Plus size={12}/> 통계 추가
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {(view.groupAggregations || []).map((agg, idx) => (
+                        <div key={agg.id} className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3 animate-in slide-in-from-right-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black py-1 px-2.5 rounded-full bg-slate-100 text-slate-500 uppercase tracking-widest">Summary #{idx+1}</span>
+                            <button onClick={() => onUpdate({ ...view, groupAggregations: view.groupAggregations?.filter(a => a.id !== agg.id) })} className="text-rose-300 hover:text-rose-500 transition-colors"><Trash2 size={14}/></button>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <label className="text-[9px] font-black text-slate-400 pl-1">계산 방식</label>
+                              <select 
+                                value={agg.type} 
+                                onChange={e => onUpdate({ ...view, groupAggregations: view.groupAggregations?.map(a => a.id === agg.id ? { ...a, type: e.target.value as any } : a) })}
+                                className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-slate-50 outline-none"
+                              >
+                                <option value="count">총 개수 (Count)</option>
+                                <option value="sum">합계 (Sum)</option>
+                                <option value="avg">평균 (Avg)</option>
+                                <option value="count_if">조건부 개수 (Count If)</option>
+                              </select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[9px] font-black text-slate-400 pl-1">표시 라벨</label>
+                              <input 
+                                value={agg.label} 
+                                onChange={e => onUpdate({ ...view, groupAggregations: view.groupAggregations?.map(a => a.id === agg.id ? { ...a, label: e.target.value } : a) })}
+                                className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-white outline-none"
+                                placeholder="예: 참여인원"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <label className="text-[9px] font-black text-slate-400 pl-1">대상 컬럼</label>
+                              <select 
+                                value={agg.column || ''} 
+                                onChange={e => onUpdate({ ...view, groupAggregations: view.groupAggregations?.map(a => a.id === agg.id ? { ...a, column: e.target.value } : a) })}
+                                className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-white outline-none"
+                              >
+                                <option value="">컬럼 선택</option>
+                                {availableColumns.map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                            </div>
+                            
+                            {(agg.type === 'sum' || agg.type === 'avg' || agg.type === 'count_if') && (
+                              <div className="space-y-1.5 animate-in fade-in">
+                                <label className="text-[9px] font-black text-amber-600 pl-1 flex items-center gap-1">
+                                  <Sparkles size={10}/> {agg.type === 'count_if' ? '조건 수식 (JS)' : '가공 수식 (Target JS)'}
+                                </label>
+                                <input 
+                                  value={agg.conditionValue || ''} 
+                                  onChange={e => onUpdate({ ...view, groupAggregations: view.groupAggregations?.map(a => a.id === agg.id ? { ...a, conditionValue: e.target.value } : a) })}
+                                  className="w-full p-2.5 text-[11px] rounded-xl border border-amber-200 font-mono font-bold bg-white outline-none focus:border-amber-400"
+                                  placeholder={agg.type === 'count_if' ? "예: val === '완료'" : "예: val * 1.1"}
+                                />
+                                <p className="text-[8px] font-bold text-slate-400 px-1 leading-tight">
+                                  {agg.type === 'count_if' ? '* val이 true면 카운트' : '* 가공된 값을 더함 (미입력 시 원본)'}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {(!view.groupAggregations || view.groupAggregations.length === 0) && (
+                        <div className="py-6 border-2 border-dashed border-slate-100 rounded-2xl flex flex-col items-center justify-center text-slate-300 gap-2">
+                          <p className="text-[10px] font-black">추가된 요약 통계가 없습니다.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-50"><label className="text-[10px] font-black text-indigo-600 block mb-3 uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap"><ArrowUpDown size={14}/> 정렬 기준 칼럼</label><select className="w-full p-3 rounded-xl bg-white border border-indigo-100 font-black text-slate-800 cursor-pointer outline-none focus:border-indigo-400" value={view.sortColumn || ''} onChange={e => onUpdate({...view, sortColumn: e.target.value || null, sortDirection: view.sortDirection || 'desc'})}><option value="">기본 정렬 (DB 설정순)</option>{availableColumns.map(col => <option key={col} value={col}>{col}</option>)}</select>{view.sortColumn && (<div className="mt-3 animate-in fade-in slide-in-from-top-2"><select className="w-full p-3 rounded-xl bg-white border border-indigo-100 font-black text-slate-600 cursor-pointer outline-none focus:border-indigo-400" value={view.sortDirection || 'desc'} onChange={e => onUpdate({...view, sortDirection: e.target.value as any})}><option value="desc">내림차순 (가장 큰/최신 값부터)</option><option value="asc">오름차순 (가장 작은/과거 값부터)</option></select></div>)}</div>
           </div>
           <div className="space-y-4">
@@ -765,15 +964,12 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
                 <button 
                   onClick={() => {
                     if (!tempKeyColumn) return alert('화면을 특정 데이터로 고정하려면 고유 식별자(PK) 칼럼을 먼저 선택해야 합니다.\n(예: 학번, 전화번호 등 중복되지 않는 칼럼)');
-                    if (selectedKeys.length === 0) return alert('아래 테이블에서 최소 1개의 데이터를 체크하여 선택하세요!');
-                    if (window.confirm(`${selectedKeys.length}개의 데이터를 선택하여 현재 화면 기능을 잠금(고정)하시겠습니까?\n이후 쿼리 변경 및 신규 데이터 조회가 제한되며 오직 선택된 데이터만 로드됩니다.`)) {
-                      onUpdate({ ...view, isLocked: true, lockedKeyColumn: tempKeyColumn, lockedRecordKeys: selectedKeys });
-                      setIsPreviewModalOpen(false);
-                    }
+                    onUpdate({ ...view, isLocked: selectedKeys.length > 0, lockedKeyColumn: tempKeyColumn, lockedRecordKeys: selectedKeys });
+                    setIsPreviewModalOpen(false);
                   }}
-                  className={`px-5 py-3 rounded-xl font-black shadow-md flex items-center gap-2 transition-all ${selectedKeys.length > 0 && tempKeyColumn ? 'bg-rose-500 hover:bg-rose-600 text-white hover:scale-105 active:scale-95 shadow-rose-200' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                  className={`px-8 py-3 rounded-xl font-black shadow-md flex items-center gap-2 transition-all ${tempKeyColumn ? 'bg-indigo-600 hover:bg-indigo-700 text-white hover:scale-105 active:scale-95 shadow-indigo-200' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
                 >
-                  <Lock size={18}/> {selectedKeys.length}개로 화면 잠금
+                  선택 완료 및 적용
                 </button>
                 <button onClick={() => setIsPreviewModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-slate-200 hover:bg-slate-300 rounded-full text-slate-500 hover:text-slate-800 transition-colors shrink-0 ml-2"><X size={20}/></button>
               </div>

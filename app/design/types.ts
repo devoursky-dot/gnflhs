@@ -1,5 +1,14 @@
 // 파일 경로: app/design/types.ts
 
+export type GroupAggregation = {
+  id: string;
+  type: 'count' | 'sum' | 'avg' | 'count_if';
+  column?: string;
+  conditionValue?: string;
+  label: string;
+  color?: string;
+};
+
 export type AppState = {
   id: number | null;
   name: string;
@@ -23,6 +32,13 @@ export type View = {
   sortDirection?: 'asc' | 'desc';
   
   groupByColumn?: string | null; 
+  groupHeaderIcon?: string | null;
+  groupHeaderAlign?: 'left' | 'center' | 'right';
+  groupHeaderColor?: string | null;
+  groupHeaderTextSize?: string;
+  groupHeaderExpression?: string; // 🔥 [신규] 그룹 헤더 수식 (가공용)
+  groupAggregations?: GroupAggregation[]; // 🔥 [신규] 통계 정보
+  groupAggregationPosition?: 'beside_label' | 'right_end'; // 🔥 [신규] 통계 표시 위치
   
   // 🔥 [출석부 다중선택 잠금 기능]
   isLocked?: boolean;

@@ -12,6 +12,7 @@ import withAuth from '@/app/withAuth';
 import { processMappingValue, applyAdvancedFilter } from './utils';
 import RenderPreviewLayout from './renderer';
 import { InsertModal, UpdateModal } from './modals';
+import { GroupAggregation } from '@/app/design/types';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "", 
@@ -109,7 +110,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     if (!view || !view.tableName) return;
     let query: any = supabase.from(view.tableName).select("*");
     
-    if (view.isLocked && view.lockedKeyColumn && view.lockedRecordKeys?.length > 0) {
+    if (view.lockedKeyColumn && view.lockedRecordKeys?.length > 0) {
       query = query.in(view.lockedKeyColumn, view.lockedRecordKeys);
     } else if (view.filterColumn && (view.filterValue || view.filterOperator?.includes('null'))) {
       query = applyAdvancedFilter(query, view.filterColumn, view.filterOperator || 'eq', view.filterValue || '', userProfile);
@@ -146,7 +147,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     try {
       let query: any = supabase.from(view.tableName).select("*");
       
-      if (view.isLocked && view.lockedKeyColumn && (view.lockedRecordKeys || []).length > 0) {
+      if (view.lockedKeyColumn && (view.lockedRecordKeys || []).length > 0) {
         query = query.in(view.lockedKeyColumn, view.lockedRecordKeys);
       } else if (view.filterColumn && (view.filterValue || view.filterOperator?.includes('null'))) {
         query = applyAdvancedFilter(query, view.filterColumn, view.filterOperator || 'eq', view.filterValue || '', userProfile);
@@ -603,11 +604,106 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                 <div className="flex flex-col pt-0 flex-1">
                   {Object.entries(groupedData).map(([groupKey, rows]) => {
                     const isExpanded = !!expandedGroups[groupKey];
+                    
+                    // 🧠 [신규] 그룹 헤더 가공 및 디자인 로직
+                    const displayLabel = (() => {
+                      if (currentView.groupHeaderExpression) {
+                        try {
+                          const fn = new Function('val', 'rowCount', `return ${currentView.groupHeaderExpression}`);
+                          return String(fn(groupKey, rows.length));
+                        } catch (e) {
+                          console.error("Group Expression Error:", e);
+                          return groupKey;
+                        }
+                      }
+                      return groupKey;
+                    })();
+
+                    const IconComp = currentView.groupHeaderIcon && IconMap[currentView.groupHeaderIcon] 
+                      ? IconMap[currentView.groupHeaderIcon] 
+                      : Folder;
+
+                    const textAlignClass = currentView.groupHeaderAlign === 'center' ? 'justify-center' : currentView.groupHeaderAlign === 'right' ? 'justify-end' : 'justify-start';
+                    const textColorClass = currentView.groupHeaderColor || 'text-indigo-900';
+                    const textSizeClass = currentView.groupHeaderTextSize || 'text-[15px]';
+
+                    // 🧠 [신규] 통계 데이터 계산 엔진
+                    const renderAggregations = () => {
+                      if (!currentView.groupAggregations || currentView.groupAggregations.length === 0) {
+                        return <span className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-0.5 rounded-full">{rows.length}건</span>;
+                      }
+                      
+                      return (
+                        <div className="flex items-center gap-2">
+                          {currentView.groupAggregations.map((agg: GroupAggregation) => {
+                            let value: any = 0;
+                            if (agg.type === 'count') {
+                              value = rows.length;
+                            } else if (agg.column) {
+                              const rawValues = rows.map(r => r[agg.column as string]);
+                              
+                              // 🧠 [신규] 모든 통계 유형에 수식 엔진 적용
+                              const processedValues = rawValues.map((val, idx) => {
+                                if (!agg.conditionValue) return val;
+                                try {
+                                  // val(현재값), row(행전체) 변수 제공
+                                  const fn = new Function('val', 'row', `try { return ${agg.conditionValue}; } catch { return false; }`);
+                                  return fn(val, rows[idx]);
+                                } catch (e) {
+                                  // 수식이 아닐 경우 (단순 문자열 등)
+                                  return val === agg.conditionValue || String(val) === agg.conditionValue;
+                                }
+                              });
+
+                              if (agg.type === 'sum') {
+                                value = processedValues.reduce((acc, v) => acc + (Number(v) || 0), 0);
+                              } else if (agg.type === 'avg') {
+                                const sum = processedValues.reduce((acc, v) => acc + (Number(v) || 0), 0);
+                                value = processedValues.length ? (sum / processedValues.length).toFixed(1) : 0;
+                              } else if (agg.type === 'count_if') {
+                                value = processedValues.filter(v => !!v).length;
+                              }
+                            }
+                            
+                            // 천단위 콤마 처리 (숫자일 경우)
+                            const formattedValue = !isNaN(Number(value)) ? Number(value).toLocaleString() : value;
+
+                            return (
+                              <div key={agg.id} className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black border ${agg.color || 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                <span className="opacity-70">{agg.label}:</span>
+                                <span>{formattedValue}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    };
+
                     return (
                       <div key={groupKey} className="mb-0">
-                        <button onClick={() => toggleGroup(groupKey)} className="w-full flex items-center justify-between px-5 py-4 bg-white border-b border-slate-200 hover:bg-indigo-50/50 transition-colors">
-                          <div className="flex items-center gap-3"><Folder className={isExpanded ? "text-indigo-500" : "text-slate-400"} size={18} /><span className={`text-[15px] font-black ${isExpanded ? 'text-indigo-900' : 'text-slate-700'}`}>{groupKey}</span><span className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-0.5 rounded-full">{rows.length}건</span></div>
-                          <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : 'rotate-0'}`}><ChevronDown className={isExpanded ? "text-indigo-500" : "text-slate-300"} size={20} /></div>
+                        <button 
+                          onClick={() => toggleGroup(groupKey)} 
+                          className={`w-full flex items-center justify-between px-5 py-4 bg-white border-b border-slate-200 hover:bg-slate-50 transition-colors ${currentView.groupHeaderAlign === 'center' ? 'flex-col gap-2' : ''}`}
+                        >
+                          <div className={`flex items-center gap-3 flex-1 ${textAlignClass}`}>
+                            <IconComp 
+                              className={isExpanded ? "text-indigo-500" : "text-slate-400"} 
+                              size={18} 
+                            />
+                            <div className={`flex items-center gap-3 ${currentView.groupAggregationPosition === 'beside_label' ? 'flex-wrap' : ''}`}>
+                              <span className={`${textSizeClass} font-black ${isExpanded ? textColorClass : 'text-slate-700'}`}>
+                                {displayLabel}
+                              </span>
+                              {currentView.groupAggregationPosition === 'beside_label' && renderAggregations()}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-4">
+                            {(currentView.groupAggregationPosition === 'right_end' || !currentView.groupAggregationPosition) && renderAggregations()}
+                            <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : 'rotate-0'}`}>
+                              <ChevronDown className={isExpanded ? "text-indigo-500" : "text-slate-300"} size={20} />
+                            </div>
+                          </div>
                         </button>
                         {isExpanded && (
                           <div className={`grid gap-0 bg-slate-50/50 border-b border-slate-200 shadow-inner ${gridColsClass}`}>
