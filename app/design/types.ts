@@ -28,6 +28,8 @@ export type VirtualColumn = {
     localKey: string;
     foreignKey: string;
     sourceColumn: string;
+    aggregationType?: 'none' | 'list' | 'unique_list' | 'count' | 'unique_count' | 'sum' | 'avg' | 'min' | 'max';
+    separator?: string;
   };
   formulaConfig?: {
     expression: string;

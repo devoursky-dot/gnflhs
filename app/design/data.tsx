@@ -283,57 +283,96 @@ export function VirtualTableEditor({
                     </div>
 
                     {col.type === 'join' ? (
-                      <div className="grid grid-cols-2 gap-6 bg-slate-50 p-6 rounded-2xl relative overflow-hidden">
+                      <div className="space-y-6 bg-slate-50 p-6 rounded-2xl relative overflow-hidden">
                         <div className="absolute right-[-20px] top-[-20px] opacity-[0.03] pointer-events-none">
                           <Link size={120} />
                         </div>
-                        <div className="space-y-4">
-                          <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 block px-1">가져올 대상 테이블</label>
-                            <select 
-                              value={col.joinConfig?.targetTable}
-                              onChange={e => updateColumn(col.id, { joinConfig: { ...col.joinConfig!, targetTable: e.target.value } })}
-                              className="w-full p-3 rounded-xl bg-white border border-slate-200 font-bold text-sm outline-none focus:border-indigo-400"
-                            >
-                              <option value="">-- 테이블 선택 --</option>
-                              {tableNames.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 block px-1">가져올 컬럼 (값)</label>
-                            <select 
-                              value={col.joinConfig?.sourceColumn}
-                              disabled={!col.joinConfig?.targetTable}
-                              onChange={e => updateColumn(col.id, { joinConfig: { ...col.joinConfig!, sourceColumn: e.target.value } })}
-                              className="w-full p-3 rounded-xl bg-white border border-slate-200 font-bold text-sm outline-none focus:border-indigo-400 disabled:opacity-50"
-                            >
-                              <option value="">-- 컬럼 선택 --</option>
-                              {col.joinConfig?.targetTable && schemaData[col.joinConfig.targetTable]?.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                          </div>
-                        </div>
-                        <div className="space-y-4">
-                          <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 block px-1 flex items-center gap-2">매칭 기준 (현재 테이블 <ChevronRight size={10} /> 대상 테이블)</label>
-                            <div className="flex items-center gap-2">
+                        
+                        <div className="grid grid-cols-2 gap-6 relative z-10">
+                          <div className="space-y-4">
+                            <div>
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 block px-1">가져올 대상 테이블</label>
                               <select 
-                                value={col.joinConfig?.localKey}
-                                onChange={e => updateColumn(col.id, { joinConfig: { ...col.joinConfig!, localKey: e.target.value } })}
-                                className="flex-1 p-3 rounded-xl bg-white border border-slate-200 font-bold text-sm outline-none focus:border-indigo-400"
+                                value={col.joinConfig?.targetTable}
+                                onChange={e => updateColumn(col.id, { joinConfig: { ...col.joinConfig!, targetTable: e.target.value } })}
+                                className="w-full p-3 rounded-xl bg-white border border-slate-200 font-bold text-sm outline-none focus:border-indigo-400 transition-all"
                               >
-                                <option value="">기준 컬럼</option>
-                                {availableColumns.map(c => <option key={c} value={c}>{c}</option>)}
+                                <option value="">-- 테이블 선택 --</option>
+                                {tableNames.map(t => <option key={t} value={t}>{t}</option>)}
                               </select>
-                              <span className="text-slate-300">=</span>
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 block px-1">가져올 컬럼 (값)</label>
                               <select 
-                                value={col.joinConfig?.foreignKey}
+                                value={col.joinConfig?.sourceColumn}
                                 disabled={!col.joinConfig?.targetTable}
-                                onChange={e => updateColumn(col.id, { joinConfig: { ...col.joinConfig!, foreignKey: e.target.value } })}
-                                className="flex-1 p-3 rounded-xl bg-white border border-slate-200 font-bold text-sm outline-none focus:border-indigo-400 disabled:opacity-50"
+                                onChange={e => updateColumn(col.id, { joinConfig: { ...col.joinConfig!, sourceColumn: e.target.value } })}
+                                className="w-full p-3 rounded-xl bg-white border border-slate-200 font-bold text-sm outline-none focus:border-indigo-400 disabled:opacity-50 transition-all"
                               >
-                                <option value="">대상 PK</option>
+                                <option value="">-- 컬럼 선택 --</option>
                                 {col.joinConfig?.targetTable && schemaData[col.joinConfig.targetTable]?.map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-4">
+                            <div>
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 block px-1 flex items-center gap-2">매칭 기준 (현재 <ChevronRight size={10} /> 대상)</label>
+                              <div className="flex items-center gap-2">
+                                <select 
+                                  value={col.joinConfig?.localKey}
+                                  onChange={e => updateColumn(col.id, { joinConfig: { ...col.joinConfig!, localKey: e.target.value } })}
+                                  className="flex-1 p-3 rounded-xl bg-white border border-slate-200 font-bold text-xs outline-none focus:border-indigo-400 transition-all"
+                                >
+                                  <option value="">기준 컬럼</option>
+                                  {availableColumns.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                                <span className="text-slate-300">=</span>
+                                <select 
+                                  value={col.joinConfig?.foreignKey}
+                                  disabled={!col.joinConfig?.targetTable}
+                                  onChange={e => updateColumn(col.id, { joinConfig: { ...col.joinConfig!, foreignKey: e.target.value } })}
+                                  className="flex-1 p-3 rounded-xl bg-white border border-slate-200 font-bold text-xs outline-none focus:border-indigo-400 disabled:opacity-50 transition-all"
+                                >
+                                  <option value="">대상 PK</option>
+                                  {col.joinConfig?.targetTable && schemaData[col.joinConfig.targetTable]?.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                              </div>
+                            </div>
+
+                            <div className="animate-in fade-in slide-in-from-top-2">
+                              <label className="text-[10px] font-black text-indigo-600 uppercase tracking-wider mb-2 block px-1 flex items-center gap-1.5"><Layers size={12}/> 집계 방식 (Aggregation)</label>
+                              <div className="flex gap-2">
+                                <select 
+                                  value={col.joinConfig?.aggregationType || 'none'}
+                                  onChange={e => updateColumn(col.id, { joinConfig: { ...col.joinConfig!, aggregationType: e.target.value as any } })}
+                                  className="flex-1 p-3 rounded-xl bg-white border-2 border-indigo-100 font-bold text-xs outline-none focus:border-indigo-400 transition-all text-indigo-700"
+                                >
+                                  <option value="none">단일 값 (마지막 데이터)</option>
+                                  <optgroup label="텍스트 가공 (Text)">
+                                    <option value="list">모든 데이터 나열 (List)</option>
+                                    <option value="unique_list">중복 제외 나열 (Unique List)</option>
+                                    <option value="count">데이터 개수 (Count)</option>
+                                    <option value="unique_count">중복 제외 개수 (Unique Count)</option>
+                                  </optgroup>
+                                  <optgroup label="숫자 통계 (Numeric)">
+                                    <option value="sum">합계 (Sum)</option>
+                                    <option value="avg">평균 (Avg)</option>
+                                    <option value="min">최소값 (Min)</option>
+                                    <option value="max">최대값 (Max)</option>
+                                  </optgroup>
+                                </select>
+                                
+                                {(col.joinConfig?.aggregationType === 'list' || col.joinConfig?.aggregationType === 'unique_list') && (
+                                  <input 
+                                    className="w-16 p-3 rounded-xl bg-white border-2 border-indigo-100 font-bold text-xs text-center outline-none focus:border-indigo-400 transition-all"
+                                    value={col.joinConfig?.separator || ', '}
+                                    onChange={e => updateColumn(col.id, { joinConfig: { ...col.joinConfig!, separator: e.target.value } })}
+                                    placeholder="구분자"
+                                    title="데이터를 구분할 문자를 입력하세요 (예: , 또는 /)"
+                                  />
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>

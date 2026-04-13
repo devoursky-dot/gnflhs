@@ -148,9 +148,14 @@ function AppBuilder() {
       alert('최초 1회는 우측 하단의 [🚀 저장 및 배포하기]를 진행하여 앱을 생성해주세요.');
       return;
     }
-    setIsPreviewSaving(viewId);
     try {
-      const draftPayload = { name: appState.name, draft_config: { views: appState.views, actions: appState.actions, icon: appState.icon } };
+      const config = { 
+        views: appState.views, 
+        actions: appState.actions, 
+        icon: appState.icon,
+        virtualTables: appState.virtualTables || [] 
+      };
+      const draftPayload = { name: appState.name, draft_config: config };
       const { error } = await supabase.from('apps').update(draftPayload).eq('id', appState.id);
       if (error) throw error;
       window.open(`/preview/${appState.id}?viewId=${viewId}&mode=draft`, 'LivePreviewWindow', 'width=420,height=850,resizable=yes,scrollbars=yes');

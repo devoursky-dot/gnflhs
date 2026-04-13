@@ -233,7 +233,7 @@ export const resolveVirtualData = async (baseData: any[], virtualTable: any): Pr
     const joinCols = columns.filter((c: any) => c.type === 'join' && c.joinConfig);
     
     for (const col of joinCols) {
-      const { targetTable, localKey, foreignKey, sourceColumn } = col.joinConfig;
+      const { targetTable, localKey, foreignKey, sourceColumn, aggregationType, separator } = col.joinConfig;
       if (!targetTable || !localKey || !foreignKey || !sourceColumn) continue;
 
       const localValues = Array.from(new Set(resolvedData.map(row => row[localKey]).filter(val => val !== undefined && val !== null)));
@@ -245,15 +245,55 @@ export const resolveVirtualData = async (baseData: any[], virtualTable: any): Pr
           .in(foreignKey, localValues);
 
         if (!error && foreignData) {
-          const lookupMap = new Map();
+          // 일대다 데이터를 그룹화함
+          const groupedForeign = new Map<string, any[]>();
           foreignData.forEach((fRow: any) => {
-            lookupMap.set(String(fRow[foreignKey]), fRow[sourceColumn]);
+            const k = String(fRow[foreignKey]);
+            if (!groupedForeign.has(k)) groupedForeign.set(k, []);
+            groupedForeign.get(k)?.push(fRow[sourceColumn]);
           });
 
-          resolvedData = resolvedData.map(row => ({
-            ...row,
-            [col.name]: lookupMap.get(String(row[localKey])) || null
-          }));
+          resolvedData = resolvedData.map(row => {
+            const matchingValues = groupedForeign.get(String(row[localKey])) || [];
+            let processedVal: any = null;
+
+            if (matchingValues.length > 0) {
+              const agg = aggregationType || 'none';
+              const sep = separator || ', ';
+
+              switch (agg) {
+                case 'none': 
+                  processedVal = matchingValues[matchingValues.length - 1]; 
+                  break;
+                case 'list': 
+                  processedVal = matchingValues.join(sep); 
+                  break;
+                case 'unique_list': 
+                  processedVal = Array.from(new Set(matchingValues)).join(sep); 
+                  break;
+                case 'count': 
+                  processedVal = matchingValues.length; 
+                  break;
+                case 'unique_count': 
+                  processedVal = new Set(matchingValues).size; 
+                  break;
+                case 'sum': 
+                  processedVal = matchingValues.reduce((acc, v) => acc + (Number(v) || 0), 0); 
+                  break;
+                case 'avg': 
+                  processedVal = matchingValues.reduce((acc, v) => acc + (Number(v) || 0), 0) / matchingValues.length; 
+                  break;
+                case 'min': 
+                  processedVal = Math.min(...matchingValues.map(v => Number(v) || 0)); 
+                  break;
+                case 'max': 
+                  processedVal = Math.max(...matchingValues.map(v => Number(v) || 0)); 
+                  break;
+              }
+            }
+
+            return { ...row, [col.name]: processedVal };
+          });
         }
       } else {
         resolvedData = resolvedData.map(row => ({ ...row, [col.name]: null }));
