@@ -240,6 +240,9 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   };
 
   const handleAction = async (action: any, rowData: any) => {
+    console.log("handleAction called with:", action.type, action);
+    // alert("액션 실행: " + action.type); // 디버깅용 (필요시 주석 해제)
+    
     if (action.type === 'alert') alert(action.message || '알림');
     else if (action.type === 'navigate') { setCurrentViewId(action.targetViewId); setSearchTerm(''); setExpandedGroups({}); }
     else if (action.type === 'insert_row') {
@@ -274,6 +277,89 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
         else init[m.targetColumn] = rowData[m.targetColumn] || '';
       });
       setUpdateFormData(init); setIsUpdateModalOpen(true);
+    } else if (action.type === 'send_sms') {
+      try {
+        console.log("🚀 SMS Action Triggered - searching for phone/message...");
+        let phone = '';
+        
+        // 1. 직접 지정된 컬럼에서 찾기
+        if (action.smsPhoneColumn) phone = rowData[action.smsPhoneColumn];
+        
+        // 2. 기본 컬럼명에서 추측 (phone, PHONE, 연락처)
+        if (!phone) phone = rowData.phone || rowData.PHONE || rowData['연락처'] || rowData['전화번호'];
+        
+        // 3. 없을 경우 Students 테이블에서 실시간 조회 (이름 또는 학번 기준)
+        if (!phone) {
+          const studentIdentifier = rowData.name || rowData.NAME || rowData.students || rowData.STUDENTS || rowData.student_id || rowData.STUDENT_ID;
+          console.log("🔍 Phone not found in current row, looking up Student:", studentIdentifier);
+          if (studentIdentifier) {
+            const { data: studentData, error: stuErr } = await supabase
+              .from('students')
+              .select('phone')
+              .or(`name.eq."${studentIdentifier}",student_id.eq."${studentIdentifier}"`)
+              .maybeSingle();
+            
+            if (stuErr) console.warn("❌ Student lookup error:", stuErr);
+            if (studentData?.phone) {
+              phone = studentData.phone;
+              console.log("✅ Found phone in DB:", phone);
+            }
+          }
+        }
+
+        // 메시지 템플릿 치환
+        let message = action.smsMessageTemplate || '';
+        message = message.replace(/{{(.*?)}}/g, (_: string, col: string) => {
+          const key = col.trim();
+          const val = rowData[key];
+          return val !== undefined && val !== null ? String(val) : '';
+        });
+
+        if (!phone) {
+            const proceed = confirm('대상 학생의 전화번호를 찾을 수 없습니다. 메시지를 클립보드에 복사할까요?');
+            if (!proceed) return;
+        }
+
+        // 기기 체크 및 실행
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        console.log("📱 Device Check - IsMobile:", isMobile, "IsIOS:", isIOS, "Phone:", phone);
+
+        if (isMobile && phone) {
+          // 모바일: 문자 앱으로 연결
+          // iOS는 &body= 또는 ;body= 를 사용하며, 안드로이드는 ?body= 를 주로 사용함
+          const phoneClean = phone.replace(/[^0-9]/g, '');
+          const smsUrl = isIOS 
+            ? `sms:${phoneClean}&body=${encodeURIComponent(message)}` 
+            : `sms:${phoneClean}?body=${encodeURIComponent(message)}`;
+          
+          console.log("📡 Triggering SMS URL:", smsUrl);
+          
+          // window.location.href 대신 window.open을 사용하거나 직접 클릭 이벤트를 시뮬레이션
+          window.location.href = smsUrl;
+          
+          // 2초 후에도 페이지가 떠나지 않았다면 클립보드 복사 안내
+          setTimeout(() => {
+              if (confirm("문자 앱이 열리지 않았나요? 메시지를 클립보드에 복사해 드릴까요?")) {
+                  navigator.clipboard.writeText(message);
+                  setToast({ message: "메시지가 복사되었습니다.", type: 'success' });
+              }
+          }, 2500);
+        } else {
+          // PC 또는 전화번호 부재: 클립보드 복사
+          console.log("💻 Desktop/No-Phone mode: Copying to clipboard");
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(message);
+            alert("메시지가 클립보드에 복사되었습니다.\n\n내용:\n" + message);
+            setToast({ message: "메시지가 클립보드에 복사되었습니다.", type: 'success' });
+          } else {
+            window.prompt("이 메시지를 복사하여 사용하세요:", message);
+          }
+        }
+      } catch (err: any) {
+        console.error("💥 SMS Action Error:", err);
+        alert("문자 전송 처리 중 오류가 발생했습니다: " + err.message);
+      }
     }
   };
 

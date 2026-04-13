@@ -53,11 +53,64 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
         </div>
 
         <div className="p-8 space-y-8 overflow-y-auto max-h-[75vh] bg-slate-50/50">
+          {/* ── 공통 텍스트 스타일링 (액션/필드 공통) ── */}
+          <div className="bg-white p-6 rounded-3xl border-2 border-slate-100 shadow-sm space-y-6 animate-in slide-in-from-top-2">
+            <div className="flex items-center gap-2 text-slate-800 mb-2 border-b border-slate-50 pb-3">
+              <Type size={18}/><h4 className="text-sm font-black tracking-tight">글꼴 및 텍스트 스타일</h4>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 pl-1 uppercase tracking-wider">글자 크기 (Size)</label>
+                <select value={data.textSize || ''} onChange={e => setData({...data, textSize: e.target.value})} className="w-full p-3 text-xs rounded-xl border-2 border-slate-50 font-black text-slate-800 focus:border-indigo-500 outline-none cursor-pointer bg-slate-50/50">
+                  <option value="">기본 (14px)</option>
+                  <option value="text-[10px]">초소형 (10px)</option>
+                  <option value="text-xs">아주 작게 (12px)</option>
+                  <option value="text-sm">작게 (14px)</option>
+                  <option value="text-base">보통 (16px)</option>
+                  <option value="text-lg">크게 (18px)</option>
+                  <option value="text-xl">매우 크게 (20px)</option>
+                  <option value="text-2xl">특대 (24px)</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 pl-1 uppercase tracking-wider">글자 굵기 (Weight)</label>
+                <select value={data.textWeight || ''} onChange={e => setData({...data, textWeight: e.target.value})} className="w-full p-3 text-xs rounded-xl border-2 border-slate-50 font-black text-slate-800 focus:border-indigo-500 outline-none cursor-pointer bg-slate-50/50">
+                  <option value="">기본 (Black)</option>
+                  <option value="font-normal">얇게 (Normal)</option>
+                  <option value="font-medium">중간 (Medium)</option>
+                  <option value="font-bold">굵게 (Bold)</option>
+                  <option value="font-black">매우 굵게 (Black)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 pl-1 uppercase tracking-wider">글자 정렬 (Align)</label>
+                <div className="flex bg-slate-50 rounded-xl border-2 border-slate-50 p-1">
+                  <button onClick={() => setData({...data, textAlign: 'left'})} className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all ${(!data.textAlign || data.textAlign === 'left') ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400'}`}><AlignLeft size={16}/></button>
+                  <button onClick={() => setData({...data, textAlign: 'center'})} className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all ${data.textAlign === 'center' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400'}`}><AlignCenter size={16}/></button>
+                  <button onClick={() => setData({...data, textAlign: 'right'})} className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all ${data.textAlign === 'right' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400'}`}><AlignRight size={16}/></button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 pl-1 uppercase tracking-wider">커스텀 색상 (Color)</label>
+                <input 
+                  type="color" 
+                  value={data.textColor || '#1e293b'} 
+                  onChange={e => setData({...data, textColor: e.target.value})}
+                  className="w-full h-[46px] rounded-xl border-2 border-slate-50 p-1 bg-slate-50/50 cursor-pointer"
+                />
+              </div>
+            </div>
+          </div>
+
           {data.contentType === 'action' ? (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
               <div className="bg-white p-6 rounded-3xl border-2 border-indigo-100 shadow-sm space-y-8">
-                <div className="flex items-center gap-2 text-indigo-700 mb-2">
-                  <MousePointerClick size={20}/><h4 className="text-lg font-black tracking-tight">액션 버튼 프리미엄 스타일링</h4>
+                <div className="flex items-center gap-2 text-indigo-700 mb-2 border-b border-indigo-50 pb-3">
+                  <MousePointerClick size={18}/><h4 className="text-sm font-black tracking-tight">액션 버튼 고급 스타일링</h4>
                 </div>
 
                 {/* 1. 버튼 모양 및 정렬 */}
@@ -82,7 +135,7 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <label className="text-[11px] font-black text-slate-500 pl-1 uppercase tracking-wider">버튼 정렬 (Align) & 구성</label>
+                    <label className="text-[11px] font-black text-slate-500 pl-1 uppercase tracking-wider">버튼 배치 (Align) & 구성</label>
                     <div className="grid grid-cols-2 gap-2">
                       <select value={data.buttonAlign || 'full'} onChange={e => setData({...data, buttonAlign: e.target.value as any})} className="w-full p-2.5 text-xs rounded-xl border-2 border-slate-100 font-bold text-slate-700 outline-none focus:border-indigo-500">
                         <option value="full">꽉 채우기 (Full)</option><option value="left">왼쪽</option><option value="center">가운데</option><option value="right">오른쪽</option>
@@ -143,7 +196,6 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
                     ))}
                   </div>
                 </div>
-                <p className="text-[10px] font-bold text-slate-400 px-1 italic">※ '배경 없음' 모양 선택 시 선택한 색상이 글자/아이콘 색상이 됩니다.</p>
               </div>
             </div>
           ) : (
@@ -172,44 +224,19 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
                   <p className="text-[10px] text-slate-400 font-bold px-2 text-center">* 원형은 인물 사진을 고려하여 자동으로 '위쪽(Top)'을 기준으로 둥글게 잘라냅니다.</p>
                 </div>
               ) : (
-                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-                  <div className="grid grid-cols-2 gap-4 pb-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 pl-1">글자 크기 (Size)</label>
-                      <select value={data.textSize || ''} onChange={e => setData({...data, textSize: e.target.value})} className="w-full p-3 text-sm rounded-xl border-2 border-slate-100 font-bold text-slate-900 focus:border-indigo-500 outline-none cursor-pointer" style={{ color: 'var(--text-primary)' }}>
-                        <option value="">기본 (14px)</option><option value="text-[10px]">초소형 (10px)</option><option value="text-xs">아주 작게 (12px)</option><option value="text-sm">작게 (14px)</option><option value="text-base">보통 (16px)</option><option value="text-lg">크게 (18px)</option><option value="text-xl">매우 크게 (20px)</option><option value="text-2xl">특대 (24px)</option><option value="text-3xl">초특대 (30px)</option>
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 pl-1">글자 굵기 (Weight)</label>
-                      <select value={data.textWeight || ''} onChange={e => setData({...data, textWeight: e.target.value})} className="w-full p-3 text-sm rounded-xl border-2 border-slate-100 font-bold text-slate-900 focus:border-indigo-500 outline-none cursor-pointer" style={{ color: 'var(--text-primary)' }}>
-                        <option value="">기본 (Black)</option><option value="font-normal">얇게 (Normal)</option><option value="font-medium">중간 (Medium)</option><option value="font-bold">굵게 (Bold)</option><option value="font-black">매우 굵게 (Black)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 pb-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 pl-1">글자 정렬 (Align)</label>
-                      <div className="flex bg-white rounded-xl border-2 border-slate-100 p-1">
-                        <button onClick={() => setData({...data, textAlign: 'left'})} className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all ${(!data.textAlign || data.textAlign === 'left') ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:bg-slate-50'}`}><AlignLeft size={18}/></button>
-                        <button onClick={() => setData({...data, textAlign: 'center'})} className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all ${data.textAlign === 'center' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:bg-slate-50'}`}><AlignCenter size={18}/></button>
-                        <button onClick={() => setData({...data, textAlign: 'right'})} className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all ${data.textAlign === 'right' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:bg-slate-50'}`}><AlignRight size={18}/></button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 pl-1">글자 색상 (Color)</label>
-                      <select value={data.textColor || ''} onChange={e => setData({...data, textColor: e.target.value})} className="w-full p-3 text-sm rounded-xl border-2 border-slate-100 font-bold text-slate-900 focus:border-indigo-500 outline-none cursor-pointer" style={{ color: 'var(--text-primary)' }}>
-                        <option value="">기본 색상</option>
-                        <option value="text-slate-500">회색 (Slate)</option>
-                        <option value="text-indigo-600">청보라 (Indigo)</option>
-                        <option value="text-blue-600">파랑 (Blue)</option>
-                        <option value="text-emerald-600">초록 (Emerald)</option>
-                        <option value="text-rose-600">빨강 (Rose)</option>
-                        <option value="text-amber-600">주황 (Amber)</option>
-                        <option value="text-white">흰색 (White - 어두운 배경용)</option>
-                      </select>
-                    </div>
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 pt-2">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 pl-1">글자 색상 (Color)</label>
+                    <select value={data.textColor || ''} onChange={e => setData({...data, textColor: e.target.value})} className="w-full p-3 text-sm rounded-xl border-2 border-slate-100 font-bold text-slate-900 focus:border-indigo-500 outline-none cursor-pointer" style={{ color: 'var(--text-primary)' }}>
+                      <option value="">기본 색상</option>
+                      <option value="text-slate-500">회색 (Slate)</option>
+                      <option value="text-indigo-600">청보라 (Indigo)</option>
+                      <option value="text-blue-600">파랑 (Blue)</option>
+                      <option value="text-emerald-600">초록 (Emerald)</option>
+                      <option value="text-rose-600">빨강 (Rose)</option>
+                      <option value="text-amber-600">주황 (Amber)</option>
+                      <option value="text-white">흰색 (White - 어두운 배경용)</option>
+                    </select>
                   </div>
 
                   {/* ⚡ 데이터 가공 파이프라인 가이드 UI */}
@@ -345,13 +372,13 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
                           placeholder="예: $1..." 
                         />
                       </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+              )}
+            </>
+          )}
+        </div>
 
       <div className="p-6 bg-white border-t flex gap-3">
         <button onClick={onClose} className="flex-1 py-4 text-slate-500 font-black rounded-2xl hover:bg-slate-100 transition-all">취소</button>

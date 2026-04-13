@@ -74,11 +74,19 @@ export default function RenderPreviewLayout({ rows, rowData, actions, onExecuteA
               const alignItemClass = cell.textAlign === 'center' ? 'items-center text-center' : cell.textAlign === 'right' ? 'items-end text-right' : 'items-start text-left';
               const textSizeClass = cell.textSize || 'text-[14px]';
               const textWeightClass = cell.textWeight || 'font-black';
-              const textColorClass = cell.textColor || 'text-slate-800';
+              
+              const isHexColor = cell.textColor?.startsWith('#');
+              const textColorClass = isHexColor ? '' : (cell.textColor || 'text-slate-800');
+              const textInlineStyle = isHexColor ? { color: cell.textColor } : {};
 
               return (
                 <div key={cell.id} style={{ flex: cell.flex }} className={`flex flex-col justify-center min-w-0 overflow-hidden relative border-slate-100/50 p-0.5 ${alignItemClass}`}>
-                  <span className={`${textSizeClass} ${textWeightClass} ${textColorClass} break-words leading-tight w-full`}>{displayText}</span>
+                  <span 
+                    className={`${textSizeClass} ${textWeightClass} ${textColorClass} break-words leading-tight w-full`}
+                    style={textInlineStyle}
+                  >
+                    {displayText}
+                  </span>
                 </div>
               );
             }
@@ -130,15 +138,19 @@ export default function RenderPreviewLayout({ rows, rowData, actions, onExecuteA
                     }
                   }
 
+                  const textColorIsHex = cell.textColor?.startsWith('#');
+                  const btnTextColorClass = textColorIsHex ? '' : (cell.textColor || '');
+                  const btnInlineStyle = textColorIsHex ? { color: cell.textColor } : {};
+
                   return (
                     <div className={`w-full h-full flex items-center p-0.5 ${wrapperAlignClass}`}>
                       <button 
-                        onClick={(e) => { e.stopPropagation(); onExecuteAction(act, rowData); }} 
-                        className={`text-[10px] font-bold flex items-center justify-center gap-1 overflow-hidden ${shapeClass} ${btnWidthClass} ${styleClasses}`}
-                        style={inlineStyles}
+                         onClick={(e) => { e.stopPropagation(); onExecuteAction(act, rowData); }} 
+                         className={`${cell.textSize || 'text-[10px]'} ${cell.textWeight || 'font-bold'} ${btnTextColorClass} flex items-center justify-center gap-1 overflow-hidden ${shapeClass} ${btnWidthClass} ${styleClasses}`}
+                         style={{ ...inlineStyles, ...btnInlineStyle }}
                       >
-                        {(bStyle === 'icon' || bStyle === 'both') && <ActIcon size={12} className="shrink-0" />}
-                        {(bStyle === 'text' || bStyle === 'both') && <span className="truncate">{act.name}</span>}
+                         {(bStyle === 'icon' || bStyle === 'both') && <ActIcon size={cell.textSize?.includes('lg') || cell.textSize?.includes('xl') ? 16 : 12} className="shrink-0" />}
+                         {(bStyle === 'text' || bStyle === 'both') && <span className="truncate">{act.name}</span>}
                       </button>
                     </div>
                   );
