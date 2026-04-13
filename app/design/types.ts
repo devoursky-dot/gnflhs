@@ -16,6 +16,29 @@ export type AppState = {
   icon?: string | null;
   views: View[];
   actions: Action[];
+  virtualTables?: VirtualTable[]; // 🔥 [신규] 전역 가상 테이블 설정
+};
+
+export type VirtualColumn = {
+  id: string;
+  name: string;
+  type: 'join' | 'formula';
+  joinConfig?: {
+    targetTable: string;
+    localKey: string;
+    foreignKey: string;
+    sourceColumn: string;
+  };
+  formulaConfig?: {
+    expression: string;
+  };
+};
+
+export type VirtualTable = {
+  id: string;
+  name: string;
+  baseTableName: string;
+  columns: VirtualColumn[];
 };
 
 export type View = {

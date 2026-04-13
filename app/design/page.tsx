@@ -11,6 +11,8 @@ import ActionEditor from './action';
 import { Plus, Send, Loader2, ExternalLink, Trash2, FolderOpen, X, Star, ArrowUp, ArrowDown, Copy, PanelLeftClose, PanelLeft, Database } from 'lucide-react';
 import IconPicker, { IconMap } from './picker'; 
 import withAuth from '../withAuth';
+import { VirtualTableManager, VirtualTableEditor } from './data';
+import { VirtualTable } from './types';
 
 function AppBuilder() { 
   const router = useRouter();
@@ -31,6 +33,9 @@ function AppBuilder() {
   const [savedAppsList, setSavedAppsList] = useState<any[]>([]);
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  
+  // 가상 테이블 관련 상태
+  const [activeVirtualTable, setActiveVirtualTable] = useState<VirtualTable | null>(null);
 
   // --- [앱 복제 관련 상태] ---
   const [isCloneModalOpen, setIsCloneModalOpen] = useState(false);
@@ -159,7 +164,12 @@ function AppBuilder() {
   const handleSaveAndDeploy = async () => {
     setIsSaving(true);
     try {
-      const config = { views: appState.views, actions: appState.actions, icon: appState.icon };
+      const config = { 
+        views: appState.views, 
+        actions: appState.actions, 
+        icon: appState.icon,
+        virtualTables: appState.virtualTables || [] 
+      };
       const payload = { name: appState.name, app_config: config, draft_config: config };
 
       if (!appState.id) {
@@ -206,7 +216,8 @@ function AppBuilder() {
         name: data.name || '이름 없는 앱',
         icon: configToLoad.icon || null,
         views: configToLoad.views || [],
-        actions: configToLoad.actions || []
+        actions: configToLoad.actions || [],
+        virtualTables: configToLoad.virtualTables || []
       });
       const firstViewId = configToLoad.views?.[0]?.id || 'v1';
       setActiveItem({ type: 'view', id: firstViewId });
@@ -506,6 +517,13 @@ function AppBuilder() {
                 })}
               </div>
             </div>
+
+            {/* --- [신규] DATABASES (가상 테이블) 관리 섹션 --- */}
+            <VirtualTableManager 
+              appState={appState} 
+              setAppState={setAppState} 
+              onEdit={(table) => setActiveVirtualTable(table)} 
+            />
           </div>
 
           <div className="p-6 bg-slate-50 border-t border-slate-200 shrink-0 z-30">
@@ -549,6 +567,7 @@ function AppBuilder() {
                 view={activeView} 
                 schemaData={schemaData} 
                 actions={appState.actions} 
+                virtualTables={appState.virtualTables}
                 onUpdate={(upd) => setAppState({...appState, views: appState.views.map(v => v.id===upd.id ? upd : v)})} 
               />
             )}
@@ -556,6 +575,7 @@ function AppBuilder() {
                <ActionEditor 
                 action={activeAction} 
                 schemaData={schemaData} 
+                virtualTables={appState.virtualTables}
                 onUpdate={(upd) => setAppState({...appState, actions: appState.actions.map(a => a.id===upd.id ? upd : a)})} 
                 onDelete={deleteAction}
                 onOpenIconPicker={() => setIsIconPickerOpen(true)}
@@ -675,6 +695,23 @@ function AppBuilder() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* --- [가상 테이블 편집 모달 라이프사이클] --- */}
+      {activeVirtualTable && (
+        <VirtualTableEditor 
+          isOpen={!!activeVirtualTable}
+          table={activeVirtualTable}
+          schemaData={schemaData}
+          onClose={() => setActiveVirtualTable(null)}
+          onSave={(updated) => {
+            setAppState({
+              ...appState,
+              virtualTables: (appState.virtualTables || []).map(t => t.id === updated.id ? updated : t)
+            });
+            setActiveVirtualTable(null);
+          }}
+        />
       )}
     </div>
   );

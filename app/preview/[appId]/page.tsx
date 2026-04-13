@@ -10,7 +10,7 @@ import withAuth from '@/app/withAuth';
 
 // ── 모듈화된 유틸/컴포넌트 import ──
 import { 
-  evaluateExpression, processMappingValue, applyViewQuery, getSortedGroupKeys 
+  evaluateExpression, processMappingValue, applyViewQuery, getSortedGroupKeys, resolveVirtualData, applyClientFilters 
 } from './utils';
 import RenderPreviewLayout from './renderer';
 import { InsertModal, UpdateModal } from './modals';
@@ -50,6 +50,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   const [automationProgress, setAutomationProgress] = useState(0);
   const [automationLog, setAutomationLog] = useState("");
   const [viewStates, setViewStates] = useState<Record<string, { hidden: boolean, disabled: boolean, label?: string }>>({});
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (toast) {
@@ -94,10 +95,44 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
 
   const fetchTableData = async (view: any) => {
     if (!view || !view.tableName) return;
-    let query: any = supabase.from(view.tableName).select("*");
-    query = applyViewQuery(query, view, userProfile);
-    const { data } = await query.limit(3000); 
-    if (data) setTableData(prev => ({ ...prev, [view.tableName]: data }));
+    
+    try {
+      const isVt = view.tableName.startsWith('vt_');
+      const vt = isVt ? appData?.app_config?.virtualTables?.find((v: any) => v.id === view.tableName) : null;
+      
+      // 가상 테이블인데 정의를 못 찾은 경우 (삭제됨 등) 처리
+      if (isVt && !vt) {
+        // appData가 있을 때만 에러로 간주 (null일 때는 아직 로딩 중인 상태일 수 있음)
+        if (appData) {
+          console.error("Virtual table definition not found for:", view.tableName);
+          setTableData(prev => ({ ...prev, [view.tableName]: [] }));
+        }
+        return;
+      }
+
+      const fetchTable = vt ? vt.baseTableName : view.tableName;
+      if (!fetchTable) return;
+
+      let query: any = supabase.from(fetchTable).select("*");
+      query = applyViewQuery(query, view, userProfile);
+      const { data, error } = await query.limit(3000); 
+      
+      if (error) throw error;
+
+      let finalData = data || [];
+      if (vt && finalData.length > 0) {
+        finalData = await resolveVirtualData(finalData, vt);
+      }
+
+      // 🔥 클라이언트 사이드 최종 필터 적용 (가상 컬럼 지원)
+      finalData = applyClientFilters(finalData, view, userProfile);
+
+      setTableData(prev => ({ ...prev, [view.tableName]: finalData }));
+    } catch (err: any) {
+      console.error("Error fetching table data:", err);
+      setToast({ message: `데이터 로드 중 오류가 발생했습니다: ${err.message}`, type: 'error' });
+      setTableData(prev => ({ ...prev, [view.tableName]: [] }));
+    }
   };
 
   useEffect(() => {
@@ -116,10 +151,20 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     if (!view.tableName) return;
     setIsAutomating(true); setAutomationProgress(10); setAutomationLog(`${view.name} 자동화 시작...`);
     try {
-      let query: any = supabase.from(view.tableName).select("*");
+      const isVt = view.tableName.startsWith('vt_');
+      const vt = isVt ? appData?.app_config?.virtualTables?.find((v: any) => v.id === view.tableName) : null;
+      const fetchTable = vt ? vt.baseTableName : view.tableName;
+
+      let query: any = supabase.from(fetchTable).select("*");
       query = applyViewQuery(query, view, userProfile);
-      const { data: filterRows, error: fetchErr } = await query.limit(500);
+      const { data: rawRows, error: fetchErr } = await query.limit(500);
       if (fetchErr) throw fetchErr;
+      
+      let filterRows = rawRows || [];
+      if (vt && filterRows.length > 0) {
+        filterRows = await resolveVirtualData(filterRows, vt);
+      }
+
       if (!filterRows || filterRows.length === 0) { setIsAutomating(false); return; }
       if (action.batchMode && (action.type === 'insert_row' || action.type === 'update_row')) {
         const payloads = filterRows.map((row: any) => {
@@ -139,8 +184,11 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
           return payload;
         });
         if (action.type === 'insert_row') {
-           const targetTable = action.insertTableName?.trim();
-           if (!targetTable) throw new Error("대상 테이블(insertTableName)이 설정되지 않았습니다.");
+           const targetTableId = action.insertTableName?.trim();
+           if (!targetTableId) throw new Error("대상 테이블(insertTableName)이 설정되지 않았습니다.");
+           
+           const targetVt = targetTableId.startsWith('vt_') ? appData?.app_config?.virtualTables?.find((v: any) => v.id === targetTableId) : null;
+           const targetTable = targetVt ? targetVt.baseTableName : targetTableId;
            setAutomationLog(`데이터 ${payloads.length}건 저장 중...`);
            const { error: insErr } = await supabase.from(targetTable).insert(payloads);
            if (insErr && insErr.code === '23505') {
@@ -148,8 +196,11 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
              for (const p of payloads) { try { await supabase.from(targetTable).insert(p); } catch {} }
            } else if (insErr) throw insErr;
         } else if (action.type === 'update_row') {
-           const targetTable = action.updateTableName?.trim();
-           if (!targetTable) throw new Error("대상 테이블(updateTableName)이 설정되지 않았습니다.");
+           const targetTableId = action.updateTableName?.trim();
+           if (!targetTableId) throw new Error("대상 테이블(updateTableName)이 설정되지 않았습니다.");
+
+           const targetVt = targetTableId.startsWith('vt_') ? appData?.app_config?.virtualTables?.find((v: any) => v.id === targetTableId) : null;
+           const targetTable = targetVt ? targetVt.baseTableName : targetTableId;
            setAutomationLog(`데이터 ${payloads.length}건 수정 중...`);
            await supabase.from(targetTable).upsert(payloads.map((p: any, i: number) => ({ ...p, id: filterRows[i].id })));
         }
@@ -202,9 +253,14 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       });
       setFormData(init); setIsInputModalOpen(true);
     } else if (action.type === 'delete_row') {
-      if (!action.deleteTableName || !rowData.id) return;
+      const targetTableId = action.deleteTableName;
+      if (!targetTableId || !rowData.id) return;
       if (!window.confirm("삭제하시겠습니까?")) return;
-      await supabase.from(action.deleteTableName).delete().eq('id', rowData.id);
+
+      const targetVt = targetTableId.startsWith('vt_') ? appData?.app_config?.virtualTables?.find((v: any) => v.id === targetTableId) : null;
+      const targetTable = targetVt ? targetVt.baseTableName : targetTableId;
+
+      await supabase.from(targetTable).delete().eq('id', rowData.id);
       fetchTableData(currentView);
     } else if (action.type === 'update_row') {
       if (!action.updateTableName || !rowData.id) return;
@@ -225,7 +281,11 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     if (!activeInsertAction) return; 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from(activeInsertAction.insertTableName).insert([forced || formData]);
+      const targetTableId = activeInsertAction.insertTableName;
+      const targetVt = targetTableId.startsWith('vt_') ? appData?.app_config?.virtualTables?.find((v: any) => v.id === targetTableId) : null;
+      const targetTable = targetVt ? targetVt.baseTableName : targetTableId;
+
+      const { error } = await supabase.from(targetTable).insert([forced || formData]);
       if (error) throw error;
       setToast({ message: "성공적으로 저장되었습니다.", type: 'success' });
       setIsInputModalOpen(false); 
@@ -241,7 +301,11 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     if (!activeUpdateAction || !activeRowData) return; 
     setIsUpdating(true);
     try {
-      const { error } = await supabase.from(activeUpdateAction.updateTableName).update(forced || updateFormData).eq('id', activeRowData.id);
+      const targetTableId = activeUpdateAction.updateTableName;
+      const targetVt = targetTableId.startsWith('vt_') ? appData?.app_config?.virtualTables?.find((v: any) => v.id === targetTableId) : null;
+      const targetTable = targetVt ? targetVt.baseTableName : targetTableId;
+
+      const { error } = await supabase.from(targetTable).update(forced || updateFormData).eq('id', activeRowData.id);
       if (error) throw error;
       setToast({ message: "성공적으로 수정되었습니다.", type: 'success' });
       setIsUpdateModalOpen(false); 
@@ -333,28 +397,37 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   if (loading) return <div className="h-screen bg-slate-50 flex items-center justify-center font-black text-slate-300">LOADING...</div>;
 
   return (
-    <div className="h-screen bg-white flex overflow-hidden">
+    <div className="h-screen bg-white flex overflow-hidden relative">
       {/* Toast */}
       {toast && (
-        <div className="fixed top-10 left-1/2 -translate-x-1/2 z-[2000] px-6 py-4 bg-indigo-600 text-white rounded-full shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4">
-           {toast.type === 'success' ? <CheckCircle2 size={20}/> : <AlertCircle size={20}/>}
-           <span className="font-black text-sm">{toast.message}</span>
+        <div className="fixed top-10 left-1/2 -translate-x-1/2 z-[2000] px-4 py-2 bg-indigo-600 text-white rounded-none shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+           {toast.type === 'success' ? <CheckCircle2 size={18}/> : <AlertCircle size={18}/>}
+           <span className="font-bold text-xs">{toast.message}</span>
         </div>
       )}
 
-      {/* Sidebar */}
-      <div className="w-full md:w-80 lg:w-96 border-r flex flex-col pt-8 px-6 bg-white shrink-0">
-        <div className="flex items-center justify-between mb-8">
+      {/* Sidebar (Responsive Drawer) */}
+      <div 
+        className={`fixed inset-y-0 left-0 z-[1000] w-72 bg-white border-r flex flex-col pt-4 px-4 transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:w-72 lg:w-80 shrink-0 ${
+          isMobileSidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full md:translate-x-0'
+        }`}
+      >
+        <div className="flex items-center justify-between mb-4">
            <div className="flex flex-col">
               <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{appData?.name}</span>
               <h1 className="text-2xl font-black text-slate-900 tracking-tighter">{currentView?.name}</h1>
            </div>
-           <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2.5 text-slate-400 hover:bg-slate-50 rounded-xl transition-all"><Menu size={24}/></button>
+           <button 
+             onClick={() => { setIsMenuOpen(!isMenuOpen); setIsMobileSidebarOpen(false); }} 
+             className="p-2.5 text-slate-400 hover:bg-slate-50 rounded-xl transition-all"
+           >
+             <Menu size={24}/>
+           </button>
         </div>
         
-        <div className="relative mb-6">
-           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
-           <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="데이터를 검색하세요..." className="w-full pl-11 pr-4 py-4 bg-slate-50 rounded-2xl text-sm font-bold border-2 border-transparent focus:border-indigo-500 transition-all outline-none" />
+        <div className="relative mb-3">
+           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
+           <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="검색..." className="w-full pl-9 pr-3 py-2 bg-slate-50 rounded-none text-xs font-bold border-2 border-transparent focus:border-indigo-500 transition-all outline-none" />
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-1 scrollbar-hide pr-2">
@@ -363,7 +436,16 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
               const isActive = currentViewId === v.id;
               const st = viewStates[v.id];
               return (
-                <button key={v.id} disabled={st?.disabled} onClick={() => { setCurrentViewId(v.id); setSearchTerm(''); }} className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${isActive ? 'bg-indigo-600 text-white shadow-xl translate-x-1' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'} ${st?.disabled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                <button 
+                  key={v.id} 
+                  disabled={st?.disabled} 
+                  onClick={() => { 
+                    setCurrentViewId(v.id); 
+                    setSearchTerm(''); 
+                    if (typeof window !== 'undefined' && window.innerWidth < 768) setIsMobileSidebarOpen(false); 
+                  }} 
+                  className={`w-full flex items-center justify-between p-3 rounded-none transition-all ${isActive ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'} ${st?.disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                >
                    <div className="flex items-center gap-4"><Icon size={20}/> <span className="font-black text-[15px]">{st?.label || v.name}</span></div>
                    {st?.disabled && <Lock size={14}/>}
                 </button>
@@ -372,18 +454,44 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
         </div>
       </div>
 
+      {/* Mobile Sidebar Overlay */}
+      {isMobileSidebarOpen && (
+        <div 
+          className="fixed inset-0 z-[999] bg-slate-900/40 backdrop-blur-sm md:hidden animate-in fade-in duration-300"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
+
       {/* Main Content */}
       <div className="flex-1 flex flex-col bg-slate-50 relative overflow-hidden">
-        <div className="flex items-center justify-between p-6 shrink-0">
-           <div className="px-4 py-1.5 bg-white border border-slate-200 rounded-full text-[11px] font-black text-slate-400 shadow-sm">{displayData.length} RECORDS FOUND</div>
+        {/* Mobile Navbar */}
+        <div className="md:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 shrink-0">
+          <div className="flex items-center gap-3">
+             <button 
+               onClick={() => setIsMobileSidebarOpen(true)}
+               className="p-2 text-slate-500 hover:bg-slate-50 rounded-xl"
+             >
+               <Menu size={24}/>
+             </button>
+             <h2 className="text-lg font-black text-slate-800 tracking-tight truncate max-w-[200px]">{currentView?.name || "App"}</h2>
+          </div>
+          <button 
+            onClick={() => setIsMenuOpen(true)}
+            className="p-2 text-slate-400"
+          >
+            <Home size={22}/>
+          </button>
+        </div>
+        <div className="flex items-center justify-between p-3 shrink-0">
+           <div className="px-3 py-1 bg-white border border-slate-200 rounded-none text-[10px] font-bold text-slate-400">{displayData.length} RECORDS</div>
            {currentView?.groupByColumn && (
-             <button onClick={handleToggleGroups} className="px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[11px] font-black hover:bg-indigo-100 transition-all flex items-center gap-2">
-               {isAllExpanded ? <ChevronsUp size={14}/> : <ChevronsUpDown size={14}/>} {isAllExpanded ? '모두 접기' : '모두 펼치기'}
+             <button onClick={handleToggleGroups} className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-none text-[10px] font-bold hover:bg-indigo-100 transition-all flex items-center gap-1">
+               {isAllExpanded ? <ChevronsUp size={12}/> : <ChevronsUpDown size={12}/>} {isAllExpanded ? '접기' : '펼치기'}
              </button>
            )}
         </div>
 
-        <div className="flex-1 overflow-y-scroll px-6 pb-20 scrollbar-hide">
+        <div className="flex-1 overflow-y-scroll px-1 md:px-6 pb-20 scrollbar-hide">
            {currentView?.groupByColumn ? (
              <div className="space-y-4">
                {groupKeys.map(k => {
@@ -395,14 +503,14 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                  const lbl1 = currentView.groupHeaderExpression ? String(new Function('val','rowCount', `return ${currentView.groupHeaderExpression}`)(k, allInG1.length)) : k;
 
                  return (
-                   <div key={k} className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-                     <button onClick={() => toggleGroup(k)} className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-all">
-                       <div className="flex items-center gap-4">
-                         <Icon1 size={20} className={isExp ? 'text-indigo-600' : 'text-slate-300'}/>
-                         <span className={`text-[17px] font-black ${isExp ? 'text-slate-900' : 'text-slate-600'}`}>{lbl1}</span>
+                   <div key={k} className="bg-white rounded-none border border-slate-200 overflow-hidden">
+                     <button onClick={() => toggleGroup(k)} className="w-full flex items-center justify-between p-3 hover:bg-slate-50 transition-all">
+                       <div className="flex items-center gap-3">
+                         <Icon1 size={18} className={isExp ? 'text-indigo-600' : 'text-slate-300'}/>
+                         <span className={`text-[15px] font-bold ${isExp ? 'text-slate-900' : 'text-slate-600'}`}>{lbl1}</span>
                          {renderAggregations(allInG1, currentView.groupAggregations)}
                        </div>
-                       <ChevronDown size={22} className={`text-slate-300 transition-all duration-300 ${isExp ? 'rotate-180' : ''}`}/>
+                       <ChevronDown size={18} className={`text-slate-300 transition-all duration-300 ${isExp ? 'rotate-180' : ''}`}/>
                      </button>
                      {isExp && (
                        <div className="bg-slate-50/50 border-t border-slate-100 p-2">
@@ -411,7 +519,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                            const Icon2 = IconMap[currentView.groupHeaderIcon2] || Folder;
                            const lbl2 = currentView.groupHeaderExpression2 ? String(new Function('val','rowCount', `return ${currentView.groupHeaderExpression2}`)(sk, rs.length)) : sk;
                            return (
-                             <div key={fk} className="ml-4 border-l-2 border-indigo-100">
+                             <div key={fk} className="ml-1 md:ml-4 border-l-2 border-indigo-100">
                                {currentView.groupByColumn2 ? (
                                  <>
                                    <button onClick={() => toggleGroup(fk)} className="w-full flex items-center justify-between p-4 hover:bg-white rounded-2xl transition-all">
@@ -422,10 +530,10 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                                      </div>
                                      <ChevronDown size={18} className={`text-slate-300 transition-all ${isSkExp ? 'rotate-180' : ''}`}/>
                                    </button>
-                                   {isSkExp && <div className={`grid ${gridClass} gap-4 p-4`}>{rs.map((r: any) => <div key={r.id} onClick={() => { const ac = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (ac) handleAction(ac, r); }} className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-xl transition-all cursor-pointer"><RenderPreviewLayout rows={currentView.layoutRows} rowData={r} actions={appData.app_config.actions} onExecuteAction={handleAction}/></div>)}</div>}
+                                   {isSkExp && <div className={`grid ${gridClass} gap-1 p-1`}>{rs.map((r: any) => <div key={r.id} onClick={() => { const ac = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (ac) handleAction(ac, r); }} className="bg-white rounded-none border border-slate-100 overflow-hidden hover:border-indigo-300 transition-all cursor-pointer"><RenderPreviewLayout rows={currentView.layoutRows} rowData={r} actions={appData.app_config.actions} onExecuteAction={handleAction}/></div>)}</div>}
                                  </>
                                ) : (
-                                 <div className={`grid ${gridClass} gap-4 p-4`}>{rs.map((r: any) => <div key={r.id} onClick={() => { const ac = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (ac) handleAction(ac, r); }} className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-xl transition-all cursor-pointer"><RenderPreviewLayout rows={currentView.layoutRows} rowData={r} actions={appData.app_config.actions} onExecuteAction={handleAction}/></div>)}</div>
+                                 <div className={`grid ${gridClass} gap-1 p-1`}>{rs.map((r: any) => <div key={r.id} onClick={() => { const ac = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (ac) handleAction(ac, r); }} className="bg-white rounded-none border border-slate-100 overflow-hidden hover:border-indigo-300 transition-all cursor-pointer"><RenderPreviewLayout rows={currentView.layoutRows} rowData={r} actions={appData.app_config.actions} onExecuteAction={handleAction}/></div>)}</div>
                                )}
                              </div>
                            );
@@ -437,8 +545,8 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                })}
              </div>
            ) : (
-             <div className={`grid ${gridClass} gap-6`}>
-               {displayData.map((r: any) => <div key={r.id} onClick={() => { const ac = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (ac) handleAction(ac, r); }} className="bg-white rounded-3xl border border-slate-200 overflow-hidden hover:shadow-2xl transition-all cursor-pointer"><RenderPreviewLayout rows={currentView?.layoutRows || []} rowData={r} actions={appData?.app_config?.actions} onExecuteAction={handleAction}/></div>)}
+             <div className={`grid ${gridClass} gap-2`}>
+               {displayData.map((r: any) => <div key={r.id} onClick={() => { const ac = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (ac) handleAction(ac, r); }} className="bg-white rounded-none border border-slate-200 overflow-hidden transition-all cursor-pointer"><RenderPreviewLayout rows={currentView?.layoutRows || []} rowData={r} actions={appData?.app_config?.actions} onExecuteAction={handleAction}/></div>)}
              </div>
            )}
         </div>
@@ -458,21 +566,21 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       
       {/* Menu Modal Overlay */}
       {isMenuOpen && (
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="w-full max-w-sm bg-white rounded-[2.5rem] shadow-2xl overflow-hidden p-8 animate-in zoom-in-95 duration-300">
-             <div className="flex items-center justify-between mb-8">
-                <h2 className="text-xl font-black text-slate-900 tracking-tighter">애플리케이션 메뉴</h2>
-                <button onClick={() => setIsMenuOpen(false)} className="p-2.5 bg-slate-100 text-slate-400 rounded-full hover:bg-slate-200 transition-all"><X size={20}/></button>
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="w-full max-w-sm bg-white rounded-none shadow-2xl overflow-hidden p-6 animate-in zoom-in-95 duration-300">
+             <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-bold text-slate-900 tracking-tight">메뉴</h2>
+                <button onClick={() => setIsMenuOpen(false)} className="p-2 bg-slate-100 text-slate-400 rounded-none hover:bg-slate-200 transition-all"><X size={18}/></button>
              </div>
-             <div className="space-y-4">
-                <button onClick={() => { router.push('/'); setIsMenuOpen(false); }} className="w-full flex items-center gap-4 p-5 bg-slate-50 text-slate-700 rounded-3xl font-black hover:bg-indigo-50 hover:text-indigo-600 transition-all"><Home size={22}/> 대시보드로 이동</button>
-                <div className="h-px bg-slate-100 my-2"></div>
-                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest pl-2">Available Views</p>
-                <div className="max-h-60 overflow-y-auto space-y-2 pr-2 scrollbar-hide">
+             <div className="space-y-2">
+                <button onClick={() => { router.push('/'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 p-4 bg-slate-50 text-slate-700 rounded-none font-bold hover:bg-indigo-50 hover:text-indigo-600 transition-all"><Home size={20}/> 대시보드</button>
+                <div className="h-px bg-slate-100 my-1"></div>
+                <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest pl-1">Views</p>
+                <div className="max-h-60 overflow-y-auto space-y-1 pr-1 scrollbar-hide">
                    {(appData?.app_config?.views || []).map((v: any) => {
                       const Icon = IconMap[v.icon] || Layout;
                       const active = currentViewId === v.id;
-                      return <button key={v.id} onClick={() => { setCurrentViewId(v.id); setIsMenuOpen(false); }} className={`w-full flex items-center gap-4 p-4 rounded-2xl font-black transition-all ${active ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}><Icon size={18}/> {v.name}</button>;
+                      return <button key={v.id} onClick={() => { setCurrentViewId(v.id); setIsMenuOpen(false); }} className={`w-full flex items-center gap-3 p-3 rounded-none font-bold transition-all ${active ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}><Icon size={16}/> {v.name}</button>;
                    })}
                 </div>
              </div>

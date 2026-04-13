@@ -19,11 +19,11 @@ export function InsertModal({ isOpen, onClose, action, formData, setFormData, on
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-white w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
-        <div className="p-6 border-b flex justify-between items-center bg-white">
-          <h3 className="text-xl font-black text-slate-800 flex items-center gap-2"><CheckCircle2 className="text-indigo-600" /> 데이터 추가</h3>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"><X /></button>
+    <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0">
+      <div className="bg-white w-full max-w-md rounded-none shadow-xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
+        <div className="p-4 border-b flex justify-between items-center bg-white">
+          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><CheckCircle2 className="text-indigo-600" size={18} /> 데이터 추가</h3>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-none transition-colors"><X size={20}/></button>
         </div>
         <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto bg-slate-50">
           {action?.insertMappings?.filter((m: any) => m.mappingType === 'prompt').map((mapping: any) => {
@@ -33,14 +33,14 @@ export function InsertModal({ isOpen, onClose, action, formData, setFormData, on
             const options = hasOptions ? mapping.promptOptions.split(',').map((o: string) => o.trim()) : [];
             
             return (
-              <div key={mapping.id} className="space-y-3 p-4 bg-white rounded-[1.5rem] border border-slate-100 shadow-sm">
-                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">{mapping.sourceValue || mapping.targetColumn}</label>
+              <div key={mapping.id} className="space-y-2 p-3 bg-white rounded-none border border-slate-100">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">{mapping.sourceValue || mapping.targetColumn}</label>
                 
                 {isNumber ? (
-                  <div className="flex items-center gap-4 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                  <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-none border border-slate-100">
                     <button 
                       onClick={() => setFormData({ ...formData, [mapping.targetColumn]: Number(val) - (mapping.numberStep || 1) })}
-                      className="w-12 h-12 flex items-center justify-center bg-white rounded-xl shadow-sm text-slate-600 hover:text-indigo-600 active:scale-90 transition-all border border-slate-100"
+                      className="w-10 h-10 flex items-center justify-center bg-white rounded-none text-slate-600 hover:text-indigo-600 active:scale-95 transition-all border border-slate-100"
                     >
                       <Minus size={20} />
                     </button>
@@ -62,7 +62,7 @@ export function InsertModal({ isOpen, onClose, action, formData, setFormData, on
                 ) : hasOptions ? (
                   <div className="space-y-3">
                     <div className="flex flex-wrap gap-2">
-                      {options.map((opt: string) => (
+                       {options.map((opt: string) => (
                         <button 
                           key={opt}
                           onClick={() => {
@@ -76,7 +76,7 @@ export function InsertModal({ isOpen, onClose, action, formData, setFormData, on
                               onSubmit(updatedData);
                             }
                           }}
-                          className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all border-2 ${val === opt ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}
+                          className={`px-3 py-2 rounded-none text-xs font-bold transition-all border-2 ${val === opt ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}
                         >
                           {opt}
                         </button>
@@ -84,7 +84,7 @@ export function InsertModal({ isOpen, onClose, action, formData, setFormData, on
                       {mapping.allowCustomPrompt && (
                         <button 
                           onClick={() => setFormData({ ...formData, [mapping.targetColumn]: options.includes(val) ? '' : val })}
-                          className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all border-2 ${!options.includes(val) && val !== '' ? 'bg-rose-500 border-rose-500 text-white shadow-md' : 'bg-white border-slate-100 text-slate-600 hover:border-rose-200'}`}
+                          className={`px-3 py-2 rounded-none text-xs font-bold transition-all border-2 ${!options.includes(val) && val !== '' ? 'bg-rose-500 border-rose-500 text-white' : 'bg-white border-slate-100 text-slate-600 hover:border-rose-200'}`}
                         >
                           기타(직접)
                         </button>
@@ -95,33 +95,33 @@ export function InsertModal({ isOpen, onClose, action, formData, setFormData, on
                         type="text" 
                         value={options.includes(val) ? '' : val} 
                         onChange={(e) => setFormData({ ...formData, [mapping.targetColumn]: e.target.value })}
-                        className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-white focus:border-indigo-500 outline-none font-bold text-slate-900 transition-all shadow-sm animate-in slide-in-from-top-1" 
+                        className="w-full p-3 rounded-none border border-slate-100 bg-white focus:border-indigo-500 outline-none font-bold text-slate-900 text-sm transition-all" 
                         placeholder="내용을 직접 입력하세요..." 
                       />
                     )}
                   </div>
                 ) : (
-                  <input 
-                    type="text" 
-                    value={val} 
-                    onChange={(e) => setFormData({ ...formData, [mapping.targetColumn]: e.target.value })} 
-                    className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-white focus:border-indigo-500 outline-none font-bold text-slate-900 transition-all shadow-sm" 
-                    placeholder="내용을 입력하세요..." 
-                  />
+                     <input 
+                      type="text" 
+                      value={val} 
+                      onChange={(e) => setFormData({ ...formData, [mapping.targetColumn]: e.target.value })} 
+                      className="w-full p-3 rounded-none border border-slate-100 bg-white focus:border-indigo-500 outline-none font-bold text-slate-900 text-sm transition-all" 
+                      placeholder="내용 입력..." 
+                    />
                 )}
               </div>
             );
           })}
           {action?.insertMappings?.filter((m: any) => m.mappingType !== 'prompt').length > 0 && <div className="pt-4 border-t border-slate-200"><p className="text-[10px] font-bold text-slate-400 uppercase italic">* 나머지 설정된 데이터는 백그라운드에서 함께 저장됩니다.</p></div>}
         </div>
-        <div className="p-6 bg-white border-t flex gap-3">
-          <button onClick={onClose} className="flex-1 py-4 text-slate-500 font-black rounded-2xl hover:bg-slate-100 transition-all border border-slate-100">취소</button>
+        <div className="p-4 bg-white border-t flex gap-2">
+          <button onClick={onClose} className="flex-1 py-3 text-slate-500 font-bold rounded-none hover:bg-slate-100 transition-all border border-slate-100 text-sm">취소</button>
           <button 
             onClick={() => onSubmit()} 
             disabled={isSubmitting} 
-            className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
+            className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-none hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50 text-sm"
           >
-            {isSubmitting ? "저장 중..." : "저장 완료"}
+            {isSubmitting ? "중..." : "저장"}
           </button>
         </div>
       </div>
@@ -144,11 +144,11 @@ export function UpdateModal({ isOpen, onClose, action, formData, setFormData, on
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-white w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
-        <div className="p-6 border-b flex justify-between items-center bg-white">
-          <h3 className="text-xl font-black text-slate-800 flex items-center gap-2"><Zap className="text-rose-500" /> 데이터 수정</h3>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"><X /></button>
+    <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0">
+      <div className="bg-white w-full max-w-md rounded-none shadow-xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
+        <div className="p-4 border-b flex justify-between items-center bg-white">
+          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Zap className="text-rose-500" size={18} /> 데이터 수정</h3>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-none transition-colors"><X size={20}/></button>
         </div>
         <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto bg-slate-50">
           {action?.updateMappings?.filter((m: any) => m.mappingType === 'prompt').map((mapping: any) => {
@@ -158,14 +158,14 @@ export function UpdateModal({ isOpen, onClose, action, formData, setFormData, on
             const options = hasOptions ? mapping.promptOptions.split(',').map((o: string) => o.trim()) : [];
 
             return (
-              <div key={mapping.id} className="space-y-3 p-4 bg-white rounded-[1.5rem] border border-slate-100 shadow-sm">
-                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">{mapping.sourceValue || mapping.targetColumn}</label>
+              <div key={mapping.id} className="space-y-2 p-3 bg-white rounded-none border border-slate-100">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">{mapping.sourceValue || mapping.targetColumn}</label>
                 
                 {isNumber ? (
-                  <div className="flex items-center gap-4 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                  <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-none border border-slate-100">
                     <button 
                       onClick={() => setFormData({ ...formData, [mapping.targetColumn]: Number(val) - (mapping.numberStep || 1) })}
-                      className="w-12 h-12 flex items-center justify-center bg-white rounded-xl shadow-sm text-slate-600 hover:text-indigo-600 active:scale-90 transition-all border border-slate-100"
+                      className="w-10 h-10 flex items-center justify-center bg-white rounded-none text-slate-600 hover:text-indigo-600 active:scale-95 transition-all border border-slate-100"
                     >
                       <Minus size={20} />
                     </button>
@@ -179,7 +179,7 @@ export function UpdateModal({ isOpen, onClose, action, formData, setFormData, on
                     </div>
                     <button 
                       onClick={() => setFormData({ ...formData, [mapping.targetColumn]: Number(val) + (mapping.numberStep || 1) })}
-                      className="w-12 h-12 flex items-center justify-center bg-indigo-600 rounded-xl shadow-md text-white hover:bg-indigo-700 active:scale-90 transition-all"
+                      className="w-10 h-10 flex items-center justify-center bg-indigo-600 rounded-none text-white hover:bg-indigo-700 active:scale-95 transition-all"
                     >
                       <Plus size={20} />
                     </button>
@@ -191,7 +191,7 @@ export function UpdateModal({ isOpen, onClose, action, formData, setFormData, on
                         <button 
                           key={opt}
                           onClick={() => setFormData({ ...formData, [mapping.targetColumn]: opt })}
-                          className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all border-2 ${val === opt ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}
+                          className={`px-3 py-2 rounded-none text-xs font-bold transition-all border-2 ${val === opt ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}
                         >
                           {opt}
                         </button>
@@ -199,7 +199,7 @@ export function UpdateModal({ isOpen, onClose, action, formData, setFormData, on
                       {mapping.allowCustomPrompt && (
                         <button 
                           onClick={() => setFormData({ ...formData, [mapping.targetColumn]: options.includes(val) ? '' : val })}
-                          className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all border-2 ${!options.includes(val) && val !== '' ? 'bg-rose-500 border-rose-500 text-white shadow-md' : 'bg-white border-slate-100 text-slate-600 hover:border-rose-200'}`}
+                          className={`px-3 py-2 rounded-none text-xs font-bold transition-all border-2 ${!options.includes(val) && val !== '' ? 'bg-rose-500 border-rose-500 text-white' : 'bg-white border-slate-100 text-slate-600 hover:border-rose-200'}`}
                         >
                           기타(직접)
                         </button>
@@ -210,7 +210,7 @@ export function UpdateModal({ isOpen, onClose, action, formData, setFormData, on
                         type="text" 
                         value={options.includes(val) ? '' : val} 
                         onChange={(e) => setFormData({ ...formData, [mapping.targetColumn]: e.target.value })}
-                        className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-white focus:border-indigo-500 outline-none font-bold text-slate-900 transition-all shadow-sm animate-in slide-in-from-top-1" 
+                        className="w-full p-3 rounded-none border border-slate-100 bg-white focus:border-indigo-500 outline-none font-bold text-slate-900 text-sm transition-all" 
                         placeholder="내용을 직접 입력하세요..." 
                       />
                     )}
@@ -220,7 +220,7 @@ export function UpdateModal({ isOpen, onClose, action, formData, setFormData, on
                     type="text" 
                     value={val} 
                     onChange={(e) => setFormData({ ...formData, [mapping.targetColumn]: e.target.value })} 
-                    className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-white focus:border-indigo-500 outline-none font-bold text-slate-900 transition-all shadow-sm" 
+                    className="w-full p-3 rounded-none border border-slate-100 bg-white focus:border-indigo-500 outline-none font-bold text-slate-900 text-sm transition-all" 
                     placeholder="수정할 내용을 입력하세요..." 
                   />
                 )}
@@ -229,10 +229,10 @@ export function UpdateModal({ isOpen, onClose, action, formData, setFormData, on
           })}
           {action?.updateMappings?.filter((m: any) => m.mappingType !== 'prompt').length > 0 && <div className="pt-4 border-t border-slate-200"><p className="text-[10px] font-bold text-slate-400 uppercase italic">* 나머지 설정된 데이터는 백그라운드에서 함께 수정됩니다.</p></div>}
         </div>
-        <div className="p-6 bg-white border-t flex gap-3">
-          <button onClick={onClose} className="flex-1 py-4 text-slate-500 font-black rounded-2xl hover:bg-slate-100 transition-all border border-slate-100">취소</button>
-          <button onClick={() => onSubmit()} disabled={isUpdating} className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50">
-            {isUpdating ? "수정 중..." : "수정 완료"}
+        <div className="p-4 bg-white border-t flex gap-2">
+          <button onClick={onClose} className="flex-1 py-3 text-slate-500 font-bold rounded-none hover:bg-slate-100 transition-all border border-slate-100 text-sm">취소</button>
+          <button onClick={() => onSubmit()} disabled={isUpdating} className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-none hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50 text-sm">
+            {isUpdating ? "중..." : "수정"}
           </button>
         </div>
       </div>

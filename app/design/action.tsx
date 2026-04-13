@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Action, View, SchemaData, InsertMapping } from './types';
+import { Action, View, SchemaData, InsertMapping, VirtualTable } from './types';
 import { Trash2, Plus, DatabaseZap, HelpCircle, X, Code2, Layers, Settings2, Star, MessageSquare, Zap, Calculator } from 'lucide-react';
 import { IconMap } from './picker';
 import { FORMULA_EXAMPLES } from './formulas';
@@ -34,6 +34,7 @@ function AutoExpandingTextarea({ value, onChange, placeholder, onFocus, classNam
 interface ActionEditorProps {
   action: Action;
   schemaData: SchemaData;
+  virtualTables?: VirtualTable[];
   onUpdate: (updated: Action) => void;
   onDelete: (id: string) => void;
   onOpenIconPicker: () => void;
@@ -42,6 +43,7 @@ interface ActionEditorProps {
 export default function ActionEditor({ 
   action, 
   schemaData, 
+  virtualTables = [],
   onUpdate, 
   onDelete,
   onOpenIconPicker 
@@ -187,7 +189,14 @@ export default function ActionEditor({
               className="w-full p-3 rounded-xl border border-indigo-200 bg-white font-bold text-indigo-900 outline-none min-w-[300px]"
             >
               <option value="">데이터를 가져올 테이블을 선택하세요</option>
-              {Object.keys(schemaData).map(table => <option key={table} value={table}>{table}</option>)}
+              <optgroup label="데이터베이스 테이블">
+                {Object.keys(schemaData).sort().map(table => <option key={table} value={table}>{table}</option>)}
+              </optgroup>
+              {virtualTables.length > 0 && (
+                <optgroup label="가상 테이블 (Virtual)">
+                  {virtualTables.map(vt => <option key={vt.id} value={vt.id}>🔑 {vt.name} (가상)</option>)}
+                </optgroup>
+              )}
             </select>
             <p className="mt-2 text-[10px] text-indigo-400 font-bold whitespace-nowrap">* '현재 카드 데이터 재사용' 시 아래 선택한 테이블의 컬럼들이 목록에 나타납니다.</p>
           </div>
@@ -220,7 +229,14 @@ export default function ActionEditor({
                 className="w-full p-3 rounded-xl border border-rose-200 bg-rose-50 font-bold text-rose-800 outline-none min-w-[300px]"
               >
                 <option value="">테이블을 선택하세요</option>
-                {Object.keys(schemaData).map(table => <option key={table} value={table}>{table}</option>)}
+                <optgroup label="데이터베이스 테이블">
+                  {Object.keys(schemaData).sort().map(table => <option key={table} value={table}>{table}</option>)}
+                </optgroup>
+                {virtualTables.length > 0 && (
+                  <optgroup label="가상 테이블 (원본에 저장)">
+                    {virtualTables.map(vt => <option key={vt.id} value={vt.id}>💾 {vt.name} (가상)</option>)}
+                  </optgroup>
+                )}
               </select>
 
               <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-100">
@@ -334,19 +350,28 @@ export default function ActionEditor({
                                   {mapping.mappingType === 'card_data' && (
                                     <div className="flex flex-wrap gap-1.5 p-1 border-b border-indigo-100/50 pb-2 mb-1">
                                       <span className="text-[9px] font-black text-indigo-400 w-full mb-1">클릭하여 컬럼 삽입:</span>
-                                      {(schemaData[action.tableName || ''] || []).length === 0 && (
-                                        <div className="text-[10px] text-rose-500 font-bold py-1">⚠️ 상단에서 '소스 데이터 테이블'을 먼저 선택해야 컬럼 목록이 나타납니다.</div>
-                                      )}
-                                      {(schemaData[action.tableName || ''] || []).map(col => (
-                                        <button key={col} onClick={() => {
-                                           const newArr = [...action.insertMappings!];
-                                           // Basic 모드여도 조합 가능한 {{}} 형태로 삽입
-                                           newArr[idx].sourceValue = (newArr[idx].sourceValue || '') + (mapping.isExpression ? `{{${col}}}` : `{{${col}}}`);
-                                           onUpdate({ ...action, insertMappings: newArr });
-                                        }} className="px-2 py-1 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-indigo-600 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all shadow-sm">
-                                          {col}
-                                        </button>
-                                      ))}
+                                      {(() => {
+                                        const sourceTableId = action.tableName || '';
+                                        const isVt = sourceTableId.startsWith('vt_');
+                                        const vt = isVt ? virtualTables.find(v => v.id === sourceTableId) : null;
+                                        const baseName = vt ? vt.baseTableName : sourceTableId;
+                                        const cols = baseName ? [
+                                          ...(schemaData[baseName] || []),
+                                          ...(vt ? vt.columns.map(c => c.name) : [])
+                                        ] : [];
+
+                                        if (cols.length === 0) return <div className="text-[10px] text-rose-500 font-bold py-1">⚠️ 상단에서 '소스 데이터 테이블'을 먼저 선택해야 컬럼 목록이 나타납니다.</div>;
+                                        
+                                        return cols.map(col => (
+                                          <button key={col} onClick={() => {
+                                            const newArr = [...action.insertMappings!];
+                                            newArr[idx].sourceValue = (newArr[idx].sourceValue || '') + `{{${col}}}`;
+                                            onUpdate({ ...action, insertMappings: newArr });
+                                          }} className="px-2 py-1 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-indigo-600 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all shadow-sm">
+                                            {col}
+                                          </button>
+                                        ));
+                                      })()}
                                     </div>
                                   )}
                                   

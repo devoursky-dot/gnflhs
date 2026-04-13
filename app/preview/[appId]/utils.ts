@@ -19,7 +19,6 @@ export const processMappingValue = (value: string, rowData: any): any => {
   }
   
   // 2단계: {{ }}가 포함되어 있거나 수식 기호가 있는 경우 스마트 엔진 실행
-  // 단순 문자열(예: "서울")은 evaluateExpression에서 그대로 반환됨
   return evaluateExpression(strVal, rowData);
 };
 
@@ -28,155 +27,255 @@ export const processMappingValue = (value: string, rowData: any): any => {
  */
 export const evaluateExpression = (expr: string, rowData: any): any => {
   if (!expr) return '';
+
   try {
-    // {{컬럼}} 패턴을 context['컬럼']으로 변환
-    const jsExpr = expr.replace(/{{(.*?)}}/g, (_match, col) => {
-      return `(context['${col.trim()}'] === undefined ? '' : context['${col.trim()}'])`;
+    // {{컬럼명}} 패턴 치환
+    let processedExpr = expr.replace(/\{\{(.*?)\}\}/g, (_, key) => {
+      const k = key.trim();
+      const val = rowData ? rowData[k] : undefined;
+      if (typeof val === 'string') return `"${val.replace(/"/g, '\\"')}"`;
+      if (typeof val === 'number') return String(val);
+      if (val === null || val === undefined) return 'null';
+      return JSON.stringify(val);
     });
 
-    const d = new Date();
-    const today = d.toLocaleDateString('sv-SE'); // YYYY-MM-DD
-    const month = today.substring(0, 7);           // YYYY-MM
-    const year = today.substring(0, 4);            // YYYY
-    const time = d.toLocaleTimeString('sv-SE', { hour12: false }); // HH:mm:ss
-    const now = `${today} ${time}`;                // YYYY-MM-DD HH:mm:ss
-
-    const func = new Function('context', 'today', 'month', 'year', 'time', 'now', `
-      try {
-        return ${jsExpr};
-      } catch (e) {
-        return undefined;
+    // 샌드박스화된 실행 (간단한 수식용)
+    // context를 통해 rowData에 직접 접근도 가능하게 함
+    const func = new Function('context', `
+      with(context) {
+        try {
+          return ${processedExpr};
+        } catch(e) {
+          return "${processedExpr.replace(/"/g, '\\"')}";
+        }
       }
     `);
-    
-    let result = func(rowData || {}, today, month, year, time, now);
-    
-    if (result === undefined) {
-      console.warn("Expression evaluation fallback to template:", expr);
-      return resolveTemplateValue(expr, rowData);
-    }
-
-    return result === null ? '' : result;
+    return func(rowData || {});
   } catch (err) {
-    console.error("Expression parse error:", err, expr);
-    return resolveTemplateValue(expr, rowData);
+    // 수식이 아니거나 평가 실패 시 원본 혹은 에러 메시지 반환
+    return expr;
   }
 };
 
 /**
- * {{컬럼}} 패턴 치환 헬퍼
- */
-export const resolveTemplateValue = (template: string, rowData: any): string => {
-  if (!template) return '';
-  if (!template.includes('{{')) return template;
-  return template.replace(/{{(.*?)}}/g, (_: string, col: string) => {
-    const val = rowData[col.trim()];
-    return val !== undefined && val !== null ? String(val) : '';
-  });
-};
-
-/**
- * 노코딩 스타일 지능형 필터 적용 엔진
- * 매직 키워드(today, 어제, me 등) 및 고급 연산자 지원
- */
-export const applyAdvancedFilter = (query: any, column: string, operator: string, value: string, userProfile?: any) => {
-  if (!column || !operator) return query;
-  const op = operator;
-  const val = String(value || '').trim();
-  
-  // 1단계: 매직 키워드 처리
-  let finalVal: any = val;
-  const now = new Date();
-  const isoToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  
-  if (val === 'today' || val === '오늘') {
-    return query.gte(column, isoToday).lte(column, `${isoToday}T23:59:59`);
-  }
-  if (val === 'yesterday' || val === '어제') {
-    const yesterdayDate = new Date();
-    yesterdayDate.setDate(now.getDate() - 1);
-    const isoYesterday = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getDate()).padStart(2, '0')}`;
-    return query.gte(column, isoYesterday).lte(column, `${isoYesterday}T23:59:59`);
-  }
-  if (val === 'this_month' || val === '이번 달') {
-    const firstDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-    const lastDayDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const lastDay = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`;
-    return query.gte(column, firstDay).lte(column, `${lastDay}T23:59:59`);
-  }
-  if (val === 'me' || val === '나') {
-    finalVal = userProfile?.email || userProfile?.name || '';
-  }
-
-  // 2단계: 연산자별 쿼리 변환
-  switch (op) {
-    case 'eq': return query.eq(column, finalVal);
-    case 'neq': return query.neq(column, finalVal);
-    case 'like': 
-    case 'contains': return query.ilike(column, `%${finalVal}%`);
-    case 'starts': return query.ilike(column, `${finalVal}%`);
-    case 'ends': return query.ilike(column, `%${finalVal}`);
-    case 'gt': return query.gt(column, finalVal);
-    case 'lt': return query.lt(column, finalVal);
-    case 'gte': return query.gte(column, finalVal);
-    case 'lte': return query.lte(column, finalVal);
-    case 'is_null': return query.is(column, null);
-    case 'is_not_null': return query.not(column, 'is', null);
-    case 'in': 
-      const list = finalVal.split(',').map((s: string) => s.trim()).filter((s: string) => s !== '');
-      return query.in(column, list);
-    case 'between':
-      if (finalVal.includes('..')) {
-        const [start, end] = finalVal.split('..').map((s: string) => s.trim());
-        return query.gte(column, start).lte(column, end);
-      }
-      return query;
-    default: return query.eq(column, finalVal);
-  }
-};
-/**
- * 뷰 전체 쿼리(필터+다중정렬) 통합 엔진
- * 중복 코드를 제거하고 일관된 데이터 조회를 보장함
+ * 뷰 쿼리 적용 (필터/정렬)
+ * 물리적 DB 컬럼에 대한 쿼리만 담당합니다. (가상 컬럼 제외)
  */
 export const applyViewQuery = (query: any, view: any, userProfile?: any) => {
-  if (!view) return query;
-
   let q = query;
 
-  // 1. 수동 픽(잠금) 처리
-  if (view.lockedKeyColumn && view.lockedRecordKeys?.length > 0) {
-    q = q.in(view.lockedKeyColumn, view.lockedRecordKeys);
-  } 
-  // 2. 고급 필터 처리
-  else if (view.filterColumn && (view.filterValue || view.filterOperator?.includes('null'))) {
-    q = applyAdvancedFilter(q, view.filterColumn, view.filterOperator || 'eq', view.filterValue || '', userProfile);
+  // 1. [스마트 필터] 단일 조건 처리 (에디터 호환)
+  if (view.filterColumn && (view.filterValue || view.filterOperator?.includes('null'))) {
+    const col = view.filterColumn;
+    const op = view.filterOperator || 'eq';
+    let val = view.filterValue;
+    
+    // 이 시점에서는 물리 컬럼인지 가상 컬럼인지 확실히 알 수 없으므로 우선 적용 시도
+    // (보통 fetchTableData에서 물리 컬럼인 경우에만 이 함수를 호출하게 가공함)
+    q = applySingleFilter(q, col, op, val, userProfile);
   }
 
-  // 3. 1차 정렬
+  // 2. [기존] 복합 필터 리스트 처리 (필요시)
+  if (view.filters && view.filters.length > 0) {
+    view.filters.forEach((f: any) => {
+      if (!f.column || !f.operator) return;
+      q = applySingleFilter(q, f.column, f.operator, f.value, userProfile);
+    });
+  }
+
+  // 3. 정렬 적용 (물리 컬럼인 경우만)
   if (view.sortColumn) {
-    q = q.order(view.sortColumn, { ascending: view.sortDirection === 'asc' });
-  }
-
-  // 4. 2차 정렬 (신규)
-  if (view.sortColumn2) {
-    q = q.order(view.sortColumn2, { ascending: view.sortDirection2 === 'asc' });
+    q = q.order(view.sortColumn, { ascending: view.sortDirection !== 'desc' });
   }
 
   return q;
 };
 
 /**
- * 그룹화된 데이터의 키(헤더) 정렬 헬퍼
- * '미분류'는 항상 마지막에 배치하며 숫자/문자 정렬 지원
+ * 단일 필터 조건을 Supabase 쿼리에 적용하는 내부 유틸
  */
-export const getSortedGroupKeys = (groupedData: Record<string, any>, direction: 'asc' | 'desc' = 'asc') => {
+const applySingleFilter = (q: any, col: string, op: string, val: any, userProfile: any) => {
+  let v = val;
+  if (v === '{{currentUser.email}}' || v === 'me') v = userProfile?.email;
+  if (v === '{{currentUser.name}}') v = userProfile?.name;
+
+  // 오늘/어제 등 특수 상구 처리
+  const now = new Date();
+  const isoToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  
+  if (v === 'today' || v === '오늘') {
+    return q.gte(col, isoToday).lte(col, `${isoToday}T23:59:59`);
+  } else if (v === 'yesterday' || v === '어제') {
+    const yestDate = new Date();
+    yestDate.setDate(now.getDate() - 1);
+    const isoYesterday = `${yestDate.getFullYear()}-${String(yestDate.getMonth() + 1).padStart(2, '0')}-${String(yestDate.getDate()).padStart(2, '0')}`;
+    return q.gte(col, isoYesterday).lte(col, `${isoYesterday}T23:59:59`);
+  } else if (v === 'this_month' || v === '이번 달') {
+    const firstDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const lastDayDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const lastDay = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`;
+    return q.gte(col, firstDay).lte(col, `${lastDay}T23:59:59`);
+  }
+
+  switch (op) {
+    case 'eq': return q.eq(col, v);
+    case 'neq': return q.neq(col, v);
+    case 'gt': return q.gt(col, v);
+    case 'gte': return q.gte(col, v);
+    case 'lt': return q.lt(col, v);
+    case 'lte': return q.lte(col, v);
+    case 'contains':
+    case 'like': return q.ilike(col, `%${v}%`);
+    case 'starts': return q.ilike(col, `${v}%`);
+    case 'ends': return q.ilike(col, `%${v}`);
+    case 'in': return q.in(col, String(v).split(',').map(s => s.trim()));
+    case 'is_null': return q.is(col, null);
+    case 'is_not_null': return q.not(col, 'is', null);
+    case 'between':
+      if (String(v).includes('..')) {
+        const [start, end] = String(v).split('..').map(s => s.trim());
+        return q.gte(col, start).lte(col, end);
+      }
+      return q;
+    default: return q;
+  }
+};
+
+/**
+ * 🔥 클라이언트 사이드 필터 엔진
+ * 가상 컬럼을 포함한 모든 필터를 자바스크립트 레벨에서 최종 적용합니다.
+ */
+export const applyClientFilters = (data: any[], view: any, userProfile?: any): any[] => {
+  if (!data || !data.length) return [];
+  let result = [...data];
+
+  const check = (row: any, col: string, op: string, val: any): boolean => {
+    let rowVal = row[col];
+    let v = val;
+    if (v === '{{currentUser.email}}' || v === 'me') v = userProfile?.email;
+    if (v === '{{currentUser.name}}') v = userProfile?.name;
+
+    // 날짜 특수처리
+    if (v === 'today' || v === '오늘') {
+      const now = new Date();
+      const isoToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      return String(rowVal).startsWith(isoToday);
+    }
+    // ... 어제/이번달 생략 가능 (필요시 추가)
+
+    const rv = rowVal === null || rowVal === undefined ? '' : String(rowVal);
+    const sv = v === null || v === undefined ? '' : String(v);
+
+    switch (op) {
+      case 'eq': return String(rowVal) === String(v);
+      case 'neq': return String(rowVal) !== String(v);
+      case 'gt': return Number(rowVal) > Number(v);
+      case 'gte': return Number(rowVal) >= Number(v);
+      case 'lt': return Number(rowVal) < Number(v);
+      case 'lte': return Number(rowVal) <= Number(v);
+      case 'contains':
+      case 'like': return rv.toLowerCase().includes(sv.toLowerCase());
+      case 'starts': return rv.toLowerCase().startsWith(sv.toLowerCase());
+      case 'ends': return rv.toLowerCase().endsWith(sv.toLowerCase());
+      case 'is_null': return rowVal === null || rowVal === undefined || rowVal === '';
+      case 'is_not_null': return rowVal !== null && rowVal !== undefined && rowVal !== '';
+      case 'in': return sv.split(',').map(s => s.trim()).includes(rv);
+      case 'between':
+        if (sv.includes('..')) {
+          const [s, e] = sv.split('..').map(x => x.trim());
+          return Number(rowVal) >= Number(s) && Number(rowVal) <= Number(e);
+        }
+        return true;
+      default: return true;
+    }
+  };
+
+  // 1. 단일 필터 적용
+  if (view.filterColumn) {
+    result = result.filter(r => check(r, view.filterColumn, view.filterOperator || 'eq', view.filterValue));
+  }
+
+  // 2. 복합 필터 리스트 적용
+  if (view.filters && view.filters.length > 0) {
+    view.filters.forEach((f: any) => {
+      result = result.filter(r => check(r, f.column, f.operator, f.value));
+    });
+  }
+
+  return result;
+};
+
+/**
+ * 그룹 키 정렬 유틸
+ */
+export const getSortedGroupKeys = (groupedData: Record<string, any>, direction: 'asc' | 'desc') => {
   return Object.keys(groupedData).sort((a, b) => {
     if (a === '미분류') return 1;
     if (b === '미분류') return -1;
-    
-    // 숫자 포함 여부에 따라 지능형 정렬 (localeCompare numeric: true)
     return direction === 'asc' 
-      ? a.localeCompare(b, undefined, { numeric: true }) 
+      ? a.localeCompare(b, undefined, { numeric: true })
       : b.localeCompare(a, undefined, { numeric: true });
   });
+};
+
+/**
+ * 🔥 가상 데이터 프로세싱 엔진
+ * 실제 DB 데이터에 Join 및 Formula 컬럼을 입혀서 반환합니다.
+ */
+export const resolveVirtualData = async (baseData: any[], virtualTable: any): Promise<any[]> => {
+  if (!virtualTable || !baseData.length) return baseData;
+
+  try {
+    let resolvedData = [...baseData];
+    const columns = virtualTable.columns || [];
+
+    // 1단계: 조인(Join) 컬럼 처리
+    const joinCols = columns.filter((c: any) => c.type === 'join' && c.joinConfig);
+    
+    for (const col of joinCols) {
+      const { targetTable, localKey, foreignKey, sourceColumn } = col.joinConfig;
+      if (!targetTable || !localKey || !foreignKey || !sourceColumn) continue;
+
+      const localValues = Array.from(new Set(resolvedData.map(row => row[localKey]).filter(val => val !== undefined && val !== null)));
+      
+      if (localValues.length > 0) {
+        const { data: foreignData, error } = await (supabase as any)
+          .from(targetTable)
+          .select(`${foreignKey}, ${sourceColumn}`)
+          .in(foreignKey, localValues);
+
+        if (!error && foreignData) {
+          const lookupMap = new Map();
+          foreignData.forEach((fRow: any) => {
+            lookupMap.set(String(fRow[foreignKey]), fRow[sourceColumn]);
+          });
+
+          resolvedData = resolvedData.map(row => ({
+            ...row,
+            [col.name]: lookupMap.get(String(row[localKey])) || null
+          }));
+        }
+      } else {
+        resolvedData = resolvedData.map(row => ({ ...row, [col.name]: null }));
+      }
+    }
+
+    // 2단계: 수식(Formula) 컬럼 처리
+    const formulaCols = columns.filter((c: any) => c.type === 'formula' && c.formulaConfig);
+    
+    for (const col of formulaCols) {
+      const expr = col.formulaConfig.expression;
+      if (!expr) continue;
+
+      resolvedData = resolvedData.map(row => ({
+        ...row,
+        [col.name]: evaluateExpression(expr, row)
+      }));
+    }
+
+    return resolvedData;
+  } catch (err) {
+    console.error("resolveVirtualData error:", err);
+    return baseData;
+  }
 };

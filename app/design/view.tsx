@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { View, SchemaData, LayoutRow, Action, LayoutCell } from './types';
+import { View, SchemaData, LayoutRow, Action, LayoutCell, VirtualTable } from './types';
 import { 
   Database, LayoutTemplate, Plus, Columns, Rows, ChevronLeft, 
   ChevronRight, X, MousePointerClick, Star, Filter, Search, Smartphone, Eye, Loader2, TableProperties, ArrowUpDown, FolderTree, Trash2, Minus, Wand2, Image as ImageIcon, Type, Sparkles, AlignLeft, AlignCenter, AlignRight, Lock, Zap, Settings2
@@ -10,6 +10,7 @@ import {
 import { supabase } from '@/app/supabaseClient';
 import IconPicker, { IconMap } from './picker';
 import { FORMULA_EXAMPLES } from './formulas';
+import { resolveVirtualData } from '../preview/[appId]/utils';
 
 const REGEX_PRESETS = [
   { name: '전화번호 하이픈 (-)', pattern: '(\\d{3})(\\d{3,4})(\\d{4})', replace: '$1-$2-$3' },
@@ -365,6 +366,7 @@ interface ViewEditorProps {
   view: View;
   schemaData: SchemaData;
   actions: Action[];
+  virtualTables?: VirtualTable[];
   onUpdate: (updated: View) => void;
 }
 
@@ -413,10 +415,19 @@ const SortConfigSection = ({
   </div>
 );
 
-export default function ViewEditor({ view, schemaData, actions, onUpdate }: ViewEditorProps) {
+export default function ViewEditor({ view, schemaData, actions, virtualTables = [], onUpdate }: ViewEditorProps) {
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
   const [formatModalCell, setFormatModalCell] = useState<LayoutCell | null>(null);
-  const availableColumns = view.tableName ? schemaData[view.tableName] || [] : [];
+
+  // --- [신규] 가상 테이블 및 컬럼 계산 로직 ---
+  const isVirtual = view.tableName?.startsWith('vt_');
+  const virtualTable = isVirtual ? virtualTables.find(vt => vt.id === view.tableName) : null;
+  const baseTableName = virtualTable ? virtualTable.baseTableName : view.tableName;
+  
+  const availableColumns = baseTableName ? [
+    ...(schemaData[baseTableName] || []),
+    ...(virtualTable ? virtualTable.columns.map(c => c.name) : [])
+  ] : [];
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
@@ -426,9 +437,18 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
 
   const fetchPreviewData = async () => {
     if (!view.tableName) return alert("먼저 테이블을 선택해주세요.");
-    setIsPreviewModalOpen(true); setIsLoadingPreview(true);
+    
+    // [스마트 기본값] id가 있으면 자동으로 선택, 이미 저장된게 있으면 그것을 우선함
+    const defaultKey = view.lockedKeyColumn || (availableColumns.includes('id') ? 'id' : '');
+    setTempKeyColumn(defaultKey);
+    setSelectedKeys(view.lockedRecordKeys || []);
+
+    setIsPreviewModalOpen(true); 
+    setIsLoadingPreview(true);
+
     try {
-      let query = supabase.from(view.tableName).select('*').limit(30000); 
+      // 1. 데이터 가져오기 (가상이면 베이스 테이블에서 가져옴)
+      let query = supabase.from(baseTableName!).select('*').limit(30000); 
       
       // 🧠 [신규] 노코딩 스타일 지능형 필터 동기화
       if (view.filterColumn && (view.filterValue || view.filterOperator?.includes('null'))) {
@@ -436,55 +456,65 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
         const val = String(view.filterValue || '').trim();
         const col = view.filterColumn;
 
-        // 로컬 타임존 기반 날짜 계산
-        const now = new Date();
-        const isoToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        // 원본 테이블에 있는 컬럼인 경우에만 쿼리단에서 필터링 (가상 컬럼 필터는 나중에 클라이언트 처리)
+        if (schemaData[baseTableName!]?.includes(col)) {
+          const now = new Date();
+          const isoToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-        // 매직 키워드 분기
-        if (val === 'today' || val === '오늘') {
-          query = query.gte(col, isoToday).lte(col, `${isoToday}T23:59:59`);
-        } else if (val === 'yesterday' || val === '어제') {
-          const yestDate = new Date();
-          yestDate.setDate(now.getDate() - 1);
-          const isoYesterday = `${yestDate.getFullYear()}-${String(yestDate.getMonth() + 1).padStart(2, '0')}-${String(yestDate.getDate()).padStart(2, '0')}`;
-          query = query.gte(col, isoYesterday).lte(col, `${isoYesterday}T23:59:59`);
-        } else if (val === 'this_month' || val === '이번 달') {
-          const firstDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-          const lastDayDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-          const lastDay = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`;
-          query = query.gte(col, firstDay).lte(col, `${lastDay}T23:59:59`);
-        } else {
-          // 일반 연산자 처리
-          switch (op) {
-            case 'eq': query = query.eq(col, val); break;
-            case 'neq': query = query.neq(col, val); break;
-            case 'contains':
-            case 'like': query = query.ilike(col, `%${val}%`); break;
-            case 'starts': query = query.ilike(col, `${val}%`); break;
-            case 'ends': query = query.ilike(col, `%${val}`); break;
-            case 'gt': query = query.gt(col, val); break;
-            case 'lt': query = query.lt(col, val); break;
-            case 'gte': query = query.gte(col, val); break;
-            case 'lte': query = query.lte(col, val); break;
-            case 'is_null': query = query.is(col, null); break;
-            case 'is_not_null': query = query.not(col, 'is', null); break;
-            case 'in': query = query.in(col, val.split(',').map(s => s.trim()).filter(s => s !== '')); break;
-            case 'between':
-              if (val.includes('..')) {
-                const [start, end] = val.split('..').map(s => s.trim());
-                query = query.gte(col, start).lte(col, end);
-              }
-              break;
-            default: query = query.eq(col, val);
+          if (val === 'today' || val === '오늘') {
+            query = query.gte(col, isoToday).lte(col, `${isoToday}T23:59:59`);
+          } else if (val === 'yesterday' || val === '어제') {
+            const yestDate = new Date();
+            yestDate.setDate(now.getDate() - 1);
+            const isoYesterday = `${yestDate.getFullYear()}-${String(yestDate.getMonth() + 1).padStart(2, '0')}-${String(yestDate.getDate()).padStart(2, '0')}`;
+            query = query.gte(col, isoYesterday).lte(col, `${isoYesterday}T23:59:59`);
+          } else if (val === 'this_month' || val === '이번 달') {
+            const firstDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+            const lastDayDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            const lastDay = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`;
+            query = query.gte(col, firstDay).lte(col, `${lastDay}T23:59:59`);
+          } else {
+            switch (op) {
+              case 'eq': query = query.eq(col, val); break;
+              case 'neq': query = query.neq(col, val); break;
+              case 'contains':
+              case 'like': query = query.ilike(col, `%${val}%`); break;
+              case 'starts': query = query.ilike(col, `${val}%`); break;
+              case 'ends': query = query.ilike(col, `%${val}`); break;
+              case 'gt': query = query.gt(col, val); break;
+              case 'lt': query = query.lt(col, val); break;
+              case 'gte': query = query.gte(col, val); break;
+              case 'lte': query = query.lte(col, val); break;
+              case 'is_null': query = query.is(col, null); break;
+              case 'is_not_null': query = query.not(col, 'is', null); break;
+              case 'in': query = query.in(col, val.split(',').map(s => s.trim()).filter(s => s !== '')); break;
+              case 'between':
+                if (val.includes('..')) {
+                  const [start, end] = val.split('..').map(s => s.trim());
+                  query = query.gte(col, start).lte(col, end);
+                }
+                break;
+            }
           }
         }
       }
 
-      if (view.sortColumn) query = query.order(view.sortColumn, { ascending: view.sortDirection === 'asc' });
+      // 정렬 적용
+      if (view.sortColumn && schemaData[baseTableName!]?.includes(view.sortColumn)) {
+        query = query.order(view.sortColumn, { ascending: view.sortDirection === 'asc' });
+      }
+
       const { data, error } = await query;
       if (error) throw error;
-      setPreviewData(data || []);
-    } catch (err: any) { alert("데이터를 불러오지 못했습니다: " + err.message); } 
+
+      // 2. 가상 데이터 리졸빙 (Join & Formula 적용)
+      let finalData = data || [];
+      if (virtualTable) {
+        finalData = await resolveVirtualData(finalData, virtualTable);
+      }
+
+      setPreviewData(finalData);
+    } catch (err: any) { alert("데이터 로드 실패: " + err.message); } 
     finally { setIsLoadingPreview(false); }
   };
 
@@ -612,7 +642,24 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
         </div>
         <div className="grid grid-cols-2 gap-8 min-w-max w-full">
           <div className="space-y-4">
-            <div><label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1">연결 테이블</label><select className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-black text-slate-800 outline-none focus:border-indigo-500 transition-all cursor-pointer" value={view.tableName || ''} onChange={e => onUpdate({...view, tableName: e.target.value, filterColumn: null, sortColumn: null, groupByColumn: null, layoutRows: []})}><option value="">테이블 선택</option>{Object.keys(schemaData).map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+            <div>
+              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1">연결 테이블</label>
+              <select 
+                className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-black text-slate-800 outline-none focus:border-indigo-500 transition-all cursor-pointer" 
+                value={view.tableName || ''} 
+                onChange={e => onUpdate({...view, tableName: e.target.value, filterColumn: null, sortColumn: null, groupByColumn: null, layoutRows: []})}
+              >
+                <option value="">테이블 선택</option>
+                <optgroup label="데이터베이스 테이블 (Supabase)">
+                  {Object.keys(schemaData).sort().map(t => <option key={t} value={t}>{t}</option>)}
+                </optgroup>
+                {virtualTables.length > 0 && (
+                  <optgroup label="가상 테이블 (Virtual)">
+                    {virtualTables.map(vt => <option key={vt.id} value={vt.id}>🔑 {vt.name} (가상)</option>)}
+                  </optgroup>
+                )}
+              </select>
+            </div>
             <div><label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5"><Filter size={14}/> 1단계 서버 필터 (선택사항)</label><select className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-black text-indigo-600 outline-none focus:border-indigo-500 transition-all cursor-pointer" value={view.filterColumn || ''} onChange={e => onUpdate({...view, filterColumn: e.target.value || null})}><option value="">필터 없음 (전체 데이터 가져오기)</option>{availableColumns.map(col => <option key={col} value={col}>{col}</option>)}</select></div>
           </div>
           <div className="bg-slate-50/50 rounded-3xl p-6 border-2 border-dashed border-slate-200 flex flex-col justify-center">
