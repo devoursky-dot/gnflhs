@@ -31,6 +31,8 @@ export type View = {
   
   sortColumn?: string | null;    
   sortDirection?: 'asc' | 'desc';
+  sortColumn2?: string | null;    
+  sortDirection2?: 'asc' | 'desc';
   
   groupByColumn?: string | null; 
   groupHeaderIcon?: string | null;

@@ -41,7 +41,7 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
   };
 
   return (
-    <div className="fixed inset-0 z-[800] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="bg-white w-full max-w-2xl rounded-[2.5rem] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
         <div className="p-6 border-b flex justify-between items-center bg-slate-50">
           <div className="flex items-center gap-3">
@@ -367,6 +367,51 @@ interface ViewEditorProps {
   actions: Action[];
   onUpdate: (updated: View) => void;
 }
+
+// ── [신규] 정렬 설정 서브 컴포넌트 (모듈화) ──
+const SortConfigSection = ({ 
+  label, 
+  column, 
+  direction, 
+  availableColumns, 
+  onColumnChange, 
+  onDirectionChange,
+  isSecondary = false
+}: {
+  label: string;
+  column: string | null | undefined;
+  direction: 'asc' | 'desc' | undefined;
+  availableColumns: string[];
+  onColumnChange: (val: string | null) => void;
+  onDirectionChange: (val: 'asc' | 'desc') => void;
+  isSecondary?: boolean;
+}) => (
+  <div className={`p-5 rounded-2xl border transition-all ${isSecondary ? 'bg-slate-50/80 border-slate-100 mt-3' : 'bg-indigo-50/50 border-indigo-50'}`}>
+    <label className={`text-[10px] font-black block mb-3 uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap ${isSecondary ? 'text-slate-400' : 'text-indigo-600'}`}>
+      <ArrowUpDown size={14}/> {label}
+    </label>
+    <select 
+      className="w-full p-3 rounded-xl bg-white border border-slate-200 font-black text-slate-800 cursor-pointer outline-none focus:border-indigo-400 transition-all" 
+      value={column || ''} 
+      onChange={e => onColumnChange(e.target.value || null)}
+    >
+      <option value="">{isSecondary ? '(2차 정렬 없음)' : '기본 정렬 (DB 설정순)'}</option>
+      {availableColumns.map(col => <option key={col} value={col}>{col}</option>)}
+    </select>
+    {column && (
+      <div className="mt-3 animate-in fade-in slide-in-from-top-2">
+        <select 
+          className="w-full p-3 rounded-xl bg-white border border-slate-200 font-black text-slate-600 cursor-pointer outline-none focus:border-indigo-400" 
+          value={direction || 'desc'} 
+          onChange={e => onDirectionChange(e.target.value as any)}
+        >
+          <option value="desc">내림차순 (가장 큰/최신 값부터)</option>
+          <option value="asc">오름차순 (가장 작은/과거 값부터)</option>
+        </select>
+      </div>
+    )}
+  </div>
+);
 
 export default function ViewEditor({ view, schemaData, actions, onUpdate }: ViewEditorProps) {
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
@@ -1024,7 +1069,27 @@ export default function ViewEditor({ view, schemaData, actions, onUpdate }: View
                 </div>
               )}
             </div>
-            <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-50"><label className="text-[10px] font-black text-indigo-600 block mb-3 uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap"><ArrowUpDown size={14}/> 정렬 기준 칼럼</label><select className="w-full p-3 rounded-xl bg-white border border-indigo-100 font-black text-slate-800 cursor-pointer outline-none focus:border-indigo-400" value={view.sortColumn || ''} onChange={e => onUpdate({...view, sortColumn: e.target.value || null, sortDirection: view.sortDirection || 'desc'})}><option value="">기본 정렬 (DB 설정순)</option>{availableColumns.map(col => <option key={col} value={col}>{col}</option>)}</select>{view.sortColumn && (<div className="mt-3 animate-in fade-in slide-in-from-top-2"><select className="w-full p-3 rounded-xl bg-white border border-indigo-100 font-black text-slate-600 cursor-pointer outline-none focus:border-indigo-400" value={view.sortDirection || 'desc'} onChange={e => onUpdate({...view, sortDirection: e.target.value as any})}><option value="desc">내림차순 (가장 큰/최신 값부터)</option><option value="asc">오름차순 (가장 작은/과거 값부터)</option></select></div>)}</div>
+            <div className="space-y-1">
+              <SortConfigSection 
+                label="1차 정렬 기준"
+                column={view.sortColumn}
+                direction={view.sortDirection}
+                availableColumns={availableColumns}
+                onColumnChange={val => onUpdate({ ...view, sortColumn: val, sortDirection: view.sortDirection || 'desc' })}
+                onDirectionChange={val => onUpdate({ ...view, sortDirection: val })}
+              />
+              {view.sortColumn && (
+                <SortConfigSection 
+                  label="2차 정렬 (1차 기준이 같을 때)"
+                  column={view.sortColumn2}
+                  direction={view.sortDirection2}
+                  availableColumns={availableColumns.filter(c => c !== view.sortColumn)}
+                  onColumnChange={val => onUpdate({ ...view, sortColumn2: val, sortDirection2: view.sortDirection2 || 'desc' })}
+                  onDirectionChange={val => onUpdate({ ...view, sortDirection2: val })}
+                  isSecondary
+                />
+              )}
+            </div>
           </div>
           <div className="space-y-6">
             <div className="space-y-3">

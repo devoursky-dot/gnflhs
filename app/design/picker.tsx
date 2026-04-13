@@ -79,7 +79,7 @@ export default function IconPicker({ isOpen, onClose, onSelect, selectedIcon }: 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 lg:p-10">
+    <div className="fixed inset-0 z-[1000] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 lg:p-10">
       {/* 모달 컨테이너 (좌측 사이드바 + 우측 그리드 구조) */}
       <div className="bg-white w-full max-w-6xl h-[85vh] rounded-3xl shadow-2xl flex overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-200">
         

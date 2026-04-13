@@ -398,7 +398,7 @@ function AppBuilder() {
       )}
 
       <aside className={`
-        fixed lg:static top-0 left-0 z-50 h-screen bg-white shrink-0 shadow-2xl transition-all duration-300 ease-in-out border-r border-slate-200
+        fixed lg:static top-0 left-0 z-40 h-screen bg-white shrink-0 shadow-2xl transition-all duration-300 ease-in-out border-r border-slate-200
         ${isSidebarOpen ? 'translate-x-0 w-[320px]' : '-translate-x-full lg:translate-x-0 lg:w-0 overflow-hidden lg:border-none'}
       `}>
         <div className="w-[320px] flex flex-col h-full">
@@ -523,7 +523,7 @@ function AppBuilder() {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col relative z-10 bg-slate-50 h-screen overflow-hidden">
+      <main className="flex-1 flex flex-col relative bg-slate-50 h-screen overflow-hidden">
         <header className="h-16 border-b bg-white px-6 flex items-center shadow-sm shrink-0 z-20">
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)} 

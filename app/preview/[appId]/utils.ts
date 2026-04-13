@@ -134,3 +134,49 @@ export const applyAdvancedFilter = (query: any, column: string, operator: string
     default: return query.eq(column, finalVal);
   }
 };
+/**
+ * 뷰 전체 쿼리(필터+다중정렬) 통합 엔진
+ * 중복 코드를 제거하고 일관된 데이터 조회를 보장함
+ */
+export const applyViewQuery = (query: any, view: any, userProfile?: any) => {
+  if (!view) return query;
+
+  let q = query;
+
+  // 1. 수동 픽(잠금) 처리
+  if (view.lockedKeyColumn && view.lockedRecordKeys?.length > 0) {
+    q = q.in(view.lockedKeyColumn, view.lockedRecordKeys);
+  } 
+  // 2. 고급 필터 처리
+  else if (view.filterColumn && (view.filterValue || view.filterOperator?.includes('null'))) {
+    q = applyAdvancedFilter(q, view.filterColumn, view.filterOperator || 'eq', view.filterValue || '', userProfile);
+  }
+
+  // 3. 1차 정렬
+  if (view.sortColumn) {
+    q = q.order(view.sortColumn, { ascending: view.sortDirection === 'asc' });
+  }
+
+  // 4. 2차 정렬 (신규)
+  if (view.sortColumn2) {
+    q = q.order(view.sortColumn2, { ascending: view.sortDirection2 === 'asc' });
+  }
+
+  return q;
+};
+
+/**
+ * 그룹화된 데이터의 키(헤더) 정렬 헬퍼
+ * '미분류'는 항상 마지막에 배치하며 숫자/문자 정렬 지원
+ */
+export const getSortedGroupKeys = (groupedData: Record<string, any>, direction: 'asc' | 'desc' = 'asc') => {
+  return Object.keys(groupedData).sort((a, b) => {
+    if (a === '미분류') return 1;
+    if (b === '미분류') return -1;
+    
+    // 숫자 포함 여부에 따라 지능형 정렬 (localeCompare numeric: true)
+    return direction === 'asc' 
+      ? a.localeCompare(b, undefined, { numeric: true }) 
+      : b.localeCompare(a, undefined, { numeric: true });
+  });
+};
