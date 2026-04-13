@@ -171,39 +171,96 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
             else if (m.mappingType === 'static') payload[m.targetColumn] = m.sourceValue;
             else if (m.mappingType === 'user_name') payload[m.targetColumn] = userProfile?.name || '';
             else if (m.mappingType === 'user_email') payload[m.targetColumn] = userProfile?.email || '';
+            else if (m.mappingType === 'prompt') {
+              // 팁: 배치 모드에서는 프롬프트를 띄울 수 없으므로 기본값을 사용합니다.
+              if (m.valueType === 'number') payload[m.targetColumn] = m.defaultNumberValue ?? 0;
+              else payload[m.targetColumn] = ''; // 텍스트형 프롬프트는 빈값 또는 정적값으로 처리
+            }
             
             if (m.valueType === 'number') payload[m.targetColumn] = Number(payload[m.targetColumn]) || 0;
           });
           return payload;
         });
 
+        console.log("Automation Debug:", { 
+          targetTable: action.insertTableName || action.updateTableName,
+          batchMode: action.batchMode,
+          payloadCount: payloads.length,
+          payloadSample: payloads[0] 
+        });
+
         setAutomationProgress(70);
         setAutomationLog(`데이터 ${payloads.length}건 저장 중...`);
 
         if (action.type === 'insert_row') {
-           const { error: insErr } = await supabase.from(action.insertTableName).insert(payloads);
-           if (insErr) throw insErr;
+           const targetTable = action.insertTableName?.trim();
+           if (!targetTable) throw new Error("대상 테이블(insertTableName)이 설정되지 않았습니다.");
+           
+           const { error: insErr } = await supabase.from(targetTable).insert(payloads);
+           if (insErr) {
+             if (insErr.code === '23505') {
+               console.warn("중복 데이터 감지: 개별 저장으로 전환합니다.");
+               setAutomationLog(`중복 제외 ${payloads.length}건 처리 중...`);
+               
+               // 개별적으로 시도하여 중복이 아닌 데이터만이라도 저장되게 함
+               // 병렬 처리(allSettled) 시 발생할 수 있는 오류를 방지하기 위해 순차 처리로 복구
+               for (const p of payloads) {
+                 try {
+                   await supabase.from(targetTable).insert(p);
+                 } catch (e) {
+                   // 개별 에러(중복 등)는 무시하고 계속 진행
+                 }
+               }
+             } else {
+               console.error("Supabase Insert Error Detail:", {
+                 message: insErr.message,
+                 code: insErr.code,
+                 details: insErr.details,
+                 hint: insErr.hint,
+                 keys: Object.keys(insErr),
+                 raw: insErr
+               });
+               throw insErr;
+             }
+           }
         } else if (action.type === 'update_row') {
-           const { error: updErr } = await supabase.from(action.updateTableName).upsert(
+           const targetTable = action.updateTableName?.trim();
+           if (!targetTable) throw new Error("대상 테이블(updateTableName)이 설정되지 않았습니다.");
+           
+           const { error: updErr } = await supabase.from(targetTable).upsert(
              payloads.map((p: any, i: number) => ({ ...p, id: filterRows[i].id }))
            );
-           if (updErr) throw updErr;
+           if (updErr) {
+             console.error("Supabase Upsert Error Detail:", {
+               message: updErr.message,
+               code: updErr.code,
+               details: updErr.details,
+               hint: updErr.hint,
+               keys: Object.keys(updErr),
+               raw: updErr
+             });
+             throw updErr;
+           }
         }
       } else {
         await handleAction(action, filterRows[0]);
       }
 
       setAutomationProgress(100);
-      setAutomationLog("완료되었습니다! 이동 중...");
+      setAutomationLog("완료되었습니다!");
+      setToast({ message: `${action.name} 완료: 데이터 처리가 마무리되었습니다.`, type: 'success' });
       
       setTimeout(() => {
         setIsAutomating(false);
-        if (action.targetViewId) setCurrentViewId(action.targetViewId);
+        if (action.targetViewId && action.targetViewId !== currentViewId) setCurrentViewId(action.targetViewId);
         evaluateAllViewStates();
-      }, 800);
+      }, 500);
 
     } catch (err: any) {
-      setToast({ message: `자동화 실패: ${err.message}`, type: 'error' });
+      console.error("Automation Error Detail:", err);
+      // 🔥 에러 객체가 JSON.stringify에서 {}로 나올 수 있으므로 속성 하나하나 확인
+      const errorMsg = err.message || err.details || err.hint || (typeof err === 'string' ? err : JSON.stringify(err));
+      setToast({ message: `자동화 실패: ${errorMsg || '알 수 없는 오류'}`, type: 'error' });
       setIsAutomating(false);
     }
   };

@@ -31,32 +31,34 @@ export const evaluateExpression = (expr: string, rowData: any): any => {
   try {
     // {{컬럼}} 패턴을 context['컬럼']으로 변환
     const jsExpr = expr.replace(/{{(.*?)}}/g, (_match, col) => {
-      return `context['${col.trim()}']`;
+      return `(context['${col.trim()}'] === undefined ? '' : context['${col.trim()}'])`;
     });
 
-    // 템플릿 형태(단순 문자열 + {{}}) 인지, 순수 JS 수식인지 판별은 
-    // new Function 실행 결과로 자연스럽게 처리됨
-    const func = new Function('context', `
+    const d = new Date();
+    const today = d.toLocaleDateString('sv-SE'); // YYYY-MM-DD
+    const month = today.substring(0, 7);           // YYYY-MM
+    const year = today.substring(0, 4);            // YYYY
+    const time = d.toLocaleTimeString('sv-SE', { hour12: false }); // HH:mm:ss
+    const now = `${today} ${time}`;                // YYYY-MM-DD HH:mm:ss
+
+    const func = new Function('context', 'today', 'month', 'year', 'time', 'now', `
       try {
         return ${jsExpr};
       } catch (e) {
-        // JS 수식으로 실행 실패 시 (예: '서울' 같은 단어는 에러남) 
-        // 템플릿 문자열로 다시 시도
         return undefined;
       }
     `);
     
-    let result = func(rowData || {});
+    let result = func(rowData || {}, today, month, year, time, now);
     
-    // 만약 수식 실행 결과가 undefined라면 (JS 에러 등), 
-    // 템플릿 치환 결과(resolveTemplateValue)를 반환
     if (result === undefined) {
+      console.warn("Expression evaluation fallback to template:", expr);
       return resolveTemplateValue(expr, rowData);
     }
 
     return result === null ? '' : result;
   } catch (err) {
-    // 파싱 레벨 에러 시 템플릿 치환으로 폴백
+    console.error("Expression parse error:", err, expr);
     return resolveTemplateValue(expr, rowData);
   }
 };
