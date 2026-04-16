@@ -170,6 +170,7 @@ export type ActionStep = {
   confirmationMessage?: string | null;
   smsTableName?: string | null;
   smsPhoneColumn?: string | null;
+  smsTargetColumn?: string | null;
   smsMessageTemplate?: string | null;
   tableName?: string | null; // 소스 데이터 테이블
   batchMode?: boolean; // 다중 데이터 일괄 처리 모드

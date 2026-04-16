@@ -350,7 +350,8 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   const handleSmsAction = async (action: any, rowData: any) => {
     try {
       let phone = '';
-      if (action.smsPhoneColumn) phone = rowData[action.smsPhoneColumn];
+      if (action.smsTargetColumn) phone = rowData[action.smsTargetColumn];
+      else if (action.smsPhoneColumn) phone = rowData[action.smsPhoneColumn];
       if (!phone) phone = rowData.phone || rowData.PHONE || rowData['연락처'] || rowData['전화번호'];
       if (!phone) {
         const studentIdentifier = rowData.name || rowData.NAME || rowData.students || rowData.STUDENTS || rowData.student_id || rowData.STUDENT_ID;
