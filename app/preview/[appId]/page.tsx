@@ -9,7 +9,8 @@ import withAuth from '@/app/withAuth';
 
 // ── 모듈화된 유틸/컴포넌트 import ──
 import { 
-  evaluateExpression, processMappingValue, applyViewQuery, getSortedGroupKeys, resolveVirtualData, applyClientFilters 
+  evaluateExpression, processMappingValue, applyViewQuery, getSortedGroupKeys, resolveVirtualData, applyClientFilters,
+  getKSTDate, getKSTHelpers
 } from './utils';
 import RenderPreviewLayout from './renderer';
 import { InsertModal, UpdateModal } from './modals';
@@ -27,7 +28,7 @@ const getStickyStyles = (isSticky: boolean, showTopBar: boolean, level: number =
   } else {
     // 2단계: 1단계가 Sticky인 경우 1단계 헤더 높이(약 45px)만큼 내려서 고정
     if (isParentSticky) {
-      topClass = 'top-[44px] md:top-[45px]';
+      topClass = 'top-[64px] md:top-[64px]';
     } else {
       topClass = 'top-0';
     }
@@ -158,13 +159,17 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     if (currentView) { 
       fetchTableData(currentView); 
       setExpandedGroups({}); 
-      evaluateAllViewStates();
       if (currentView.onInitActionId) {
         const initAct = appData?.app_config?.actions?.find((a: any) => a.id === currentView.onInitActionId);
         if (initAct) handleInitAutomation(initAct, currentView);
       }
     }
-  }, [currentViewId, currentView]);
+  }, [currentViewId, currentView, userProfile]);
+
+  // 🔥 [중요] 데이터가 변경될 때마다 가시성 수식을 재평가하여 실시간 반응성 확보
+  useEffect(() => {
+    evaluateAllViewStates();
+  }, [currentViewId, appData, tableData]);
 
   const buildPayloadFromMappings = (mappings: any[] | undefined, row: any): Record<string, any> => {
     const payload: Record<string, any> = {};
@@ -197,6 +202,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
 
     try {
       const steps = action.steps && action.steps.length > 0 ? action.steps : [action];
+
       const firstStep = steps[0]; 
       const isBatchMode = !!(firstStep.batchMode || action.batchMode);
 
@@ -211,52 +217,46 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
         if (fetchErr) throw fetchErr;
 
         let sourceRows = rawRows || [];
+
         if (vt && sourceRows.length > 0) {
           sourceRows = await resolveVirtualData(sourceRows, vt);
         }
 
         if (sourceRows.length > 0) {
           const stepType = firstStep.type; 
-
           if (stepType === 'insert_row') {
             const mappings = firstStep.insertMappings;        
             const targetTable = resolveTableName(firstStep.insertTableName); 
-
             if (targetTable && mappings && mappings.length > 0) {
               const payloads = sourceRows.map((row: any) => buildPayloadFromMappings(mappings, row));
-              setAutomationLog(`데이터 ${payloads.length}건 추가 중...`);
+              setAutomationLog(`학생 ${payloads.length}명 배치 중...`);
+              
               const { error: insertErr } = await supabase.from(targetTable).insert(payloads);
-              if (insertErr) throw insertErr;
-            }
-          } else if (stepType === 'update_row') {
-            const mappings = firstStep.updateMappings;        
-            const targetTable = resolveTableName(firstStep.updateTableName); 
-
-            if (targetTable && mappings && mappings.length > 0) {
-              setAutomationLog(`데이터 ${sourceRows.length}건 수정 중...`);
-              for (const row of sourceRows) {
-                if (!row.id) continue;
-                const payload = buildPayloadFromMappings(mappings, row);
-                await supabase.from(targetTable).update(payload).eq('id', row.id);
+              
+              if (insertErr) {
+                console.warn("Insert error during batch automation:", insertErr);
               }
             }
           }
         }
 
+        // 1단계에 targetViewId가 있거나, 다음 단계가 있는 경우 처리
         if (steps.length > 1) {
           const remainingSteps = steps.slice(1);
           await processNextStep(remainingSteps, sourceRows?.[0] || {});
+        } else if (firstStep.targetViewId) {
+          setCurrentViewId(firstStep.targetViewId);
         }
-
       } else {
         setAutomationLog("시작 동작 실행 중...");
         await processNextStep(steps, {});
       }
 
+      // 모든 자동화 단계 완료 후 즉시 상태 평가 (감독중... 표시 주역)
       await evaluateAllViewStates();
       setAutomationProgress(100);
       setAutomationLog("완료!");
-      setTimeout(() => setIsAutomating(false), 800);
+      setTimeout(() => setIsAutomating(false), 500);
 
     } catch (err: any) {
       const errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
@@ -268,54 +268,70 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   const evaluateAllViewStates = async () => {
     if (!appData?.app_config?.views) return;
     const newStates: Record<string, any> = {};
-    const now = new Date();
-    const isoToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    
+    const { today: isoToday, tomorrow: isoTomorrow } = getKSTHelpers();
+
+    // 🔥 [수정] 참조 오류 방지를 위해 함수를 먼저 정의
+    const rowCountFn = async (t: string, f: Record<string, any> = {}) => {
+      const resolvedT = resolveTableName(t) || t; 
+      let q = supabase.from(resolvedT).select("*", { count: "exact", head: true });
+      let filterLog = "";
+      Object.entries(f).forEach(([k, v]) => { 
+        if (v === 'today' || v === isoToday || (typeof v === 'string' && v.includes(isoToday))) {
+          q = q.gte(k, isoToday).lt(k, isoTomorrow); 
+          filterLog += `${k} gte ${isoToday} lt ${isoTomorrow} `;
+        } else {
+          q = q.eq(k, v); 
+          filterLog += `${k} eq ${v} `;
+        }
+      });
+      const { count, error } = await q; 
+      if (error) {
+        console.error(`🔴 Error in rowCount (Table: ${resolvedT}):`, error);
+      }
+      return count || 0;
+    };
+
     const helpers = {
       today: isoToday,
-      rowCount: async (t: string, f: Record<string, any> = {}) => {
-        const resolvedT = resolveTableName(t) || t; // 🔥 테이블명 확인 (가상테이블 대응)
-        let q = supabase.from(resolvedT).select("*", { count: "exact", head: true });
-        Object.entries(f).forEach(([k, v]) => { 
-          if (v === 'today' || v === isoToday || String(v).includes(isoToday)) {
-            q = q.gte(k, `${isoToday}T00:00:00`).lte(k, `${isoToday}T23:59:59`); 
-          } else {
-            q = q.eq(k, v); 
-          }
-        });
-        const { count, error } = await q; 
-        if (error) console.error(`Error in rowCount helper for table ${resolvedT}:`, error);
-        return count || 0;
-      },
-      count: async (t: string, f: Record<string, any>) => await helpers.rowCount(t, f),
+      tomorrow: isoTomorrow,
+      rowCount: rowCountFn,
+      count: rowCountFn,
       currentUser: () => userProfile,
-      isToday: (d: string) => {
+      isToday: (d: any) => {
         if (!d) return false;
-        const dt = new Date(d);
-        return dt.getFullYear() === now.getFullYear() && 
-               dt.getMonth() === now.getMonth() && 
-               dt.getDate() === now.getDate();
+        // KST 기반의 안전한 날짜 체크 (문자열인 경우 prefix 비교, Date/ISO인 경우 KST 변환 후 비교)
+        const dateStr = String(d);
+        if (dateStr.startsWith(isoToday)) return true;
+        try {
+          const kst = new Date(new Date(d).getTime() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
+          return kst === isoToday;
+        } catch { return false; }
       }
     };
     for (const v of appData.app_config.views) {
       if (v.visibilityExpr) {
         try {
           let awaitedExpr = v.visibilityExpr
-            .replace(/(?<!await\s+)\bcount\s*\(/g, 'await count(')
-            .replace(/(?<!await\s+)\ browCount\s*\(/g, 'await rowCount(');
+            .replace(/(?<!await\s+)\bcount\s*\(/gi, 'await count(')
+            .replace(/(?<!await\s+)\browCount\s*\(/gi, 'await rowCount(');
             
           const asyncFunc = new Function('helpers', `
             const { count, rowCount, currentUser, isToday } = helpers;
             return (async () => {
               try {
-                return ${awaitedExpr};
+                const res = await (${awaitedExpr});
+                return res;
               } catch (e) {
-                console.warn("Expression evaluation internal error:", e);
                 return false;
               }
             })();
           `);
           
           const isMet = await asyncFunc(helpers);
+          if (v.id === currentViewId || v.name.includes("감독시작")) {
+            console.log(`[상태평가] ${v.name}: ${isMet ? '조건일치(비활성화)' : '조건불일치(활성)'}`);
+          }
           newStates[v.id] = isMet ? { 
             hidden: v.visibilityBehavior === 'hide', 
             disabled: v.visibilityBehavior === 'disable', 
@@ -494,17 +510,17 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   const renderAggregations = (rows: any[], aggs?: GroupAggregation[]) => {
     if (!aggs || aggs.length === 0) return <span className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-0.5 rounded-full">{rows.length}건</span>;
     return (
-      <div className="flex items-center gap-2 flex-wrap">
-        {aggs.map(agg => {
+      <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto scrollbar-hide max-w-full pb-0.5 whitespace-nowrap">
+        {aggs.map((agg: GroupAggregation) => {
           let val: any = 0; if (agg.type === 'count') val = rows.length;
           else if (agg.column) {
-            const processed = rows.map(r => {
+            const processed = rows.map((r: any) => {
               if (!agg.conditionValue) return r[agg.column as string];
               try { return new Function('val', 'row', `return ${agg.conditionValue}`)(r[agg.column as string], r); } catch { return false; }
             });
             if (agg.type === 'sum') val = processed.reduce((acc, v) => acc + (Number(v) || 0), 0);
             else if (agg.type === 'avg') val = (processed.reduce((acc, v) => acc + (Number(v) || 0), 0) / (processed.length || 1)).toFixed(1);
-            else if (agg.type === 'count_if') val = processed.filter(v => !!v).length;
+            else if (agg.type === 'count_if') val = processed.filter((v: any) => !!v).length;
           }
           const fmt = !isNaN(Number(val)) ? Number(val).toLocaleString() : val;
           return <div key={agg.id} className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black border ${agg.displayStyle === 'text' ? 'text-slate-600' : (agg.color || 'bg-slate-100 text-slate-500 border-slate-200')}`}><span className="opacity-70">{agg.label}:</span><span>{fmt}</span></div>;
@@ -523,10 +539,10 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   if (currentView?.groupByColumn) {
     const deduplicate = (list: any[]) => {
       const map = new Map();
-      list.forEach(item => { const uid = item.id || JSON.stringify(item); map.set(uid, item); });
+      list.forEach((item: any) => { const uid = item.id || JSON.stringify(item); map.set(uid, item); });
       return Array.from(map.values());
     };
-    displayData.forEach(r => {
+    displayData.forEach((r: any) => {
       const g1 = r[currentView.groupByColumn as string];
       const k1 = (g1 === null || g1 === undefined || g1 === '') ? '미분류' : String(g1);
       if (currentView.groupByColumn2) {
@@ -540,9 +556,9 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
         groupedData[k1].push(r);
       }
     });
-    Object.keys(groupedData).forEach(k1 => {
+    Object.keys(groupedData).forEach((k1: string) => {
       if (currentView.groupByColumn2) {
-        Object.keys(groupedData[k1]).forEach(k2 => { groupedData[k1][k2] = deduplicate(groupedData[k1][k2]); });
+        Object.keys(groupedData[k1]).forEach((k2: string) => { groupedData[k1][k2] = deduplicate(groupedData[k1][k2]); });
       } else {
         groupedData[k1] = deduplicate(groupedData[k1]);
       }
@@ -555,10 +571,10 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     if (isAllExpanded) setExpandedGroups({});
     else {
       const next: any = {};
-      groupKeys.forEach(k => {
+      groupKeys.forEach((k: string) => {
         next[k] = true;
         if (currentView?.groupByColumn2 && typeof groupedData[k] === 'object') {
-          getSortedGroupKeys(groupedData[k], currentView.groupSortDirection2 || 'asc').forEach(sk => next[`${k}|${sk}`] = true);
+          getSortedGroupKeys(groupedData[k], currentView.groupSortDirection2 || 'asc').forEach((sk: string) => next[`${k}|${sk}`] = true);
         }
       });
       setExpandedGroups(next);
@@ -681,9 +697,9 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
         {showTopBar && (
           <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-slate-100 shrink-0">
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest shrink-0">{appData?.name}</span>
-              <span className="text-slate-300 text-xs shrink-0">/</span>
-              <h2 className="text-sm font-black text-slate-800 truncate">{currentView?.name || 'App'}</h2>
+              <h1 className="text-base font-black text-slate-800 tracking-tight flex items-center gap-2 truncate">
+                {appData.name} <span className="text-slate-300 font-thin mx-0.5">/</span> {viewStates[currentViewId]?.label || currentView.name}
+              </h1>
             </div>
             <button onClick={() => setIsMobileSidebarOpen(true)} className="shrink-0 p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
               <Menu size={20}/>
@@ -703,7 +719,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                    setSearchTerm(e.target.value); 
                    if (e.target.value !== '' && currentView?.groupByColumn) {
                      const allOpen: Record<string, boolean> = {}; 
-                     groupKeys.forEach(k => allOpen[k] = true); 
+                     groupKeys.forEach((k: string) => allOpen[k] = true); 
                      setExpandedGroups(allOpen); 
                    } 
                 }} 
@@ -722,7 +738,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
         <div className={`flex-1 overflow-y-scroll px-1 md:px-6 ${bottomPb} scrollbar-hide`}>
            {currentView?.groupByColumn ? (
              <div className="space-y-4">
-               {groupKeys.map(k => {
+               {groupKeys.map((k: string) => {
                  const isExp = !!expandedGroups[k];
                  const stickyClass = getStickyStyles(currentView?.groupHeaderSticky, showTopBar, 1);
                  const subRows = currentView.groupByColumn2 ? groupedData[k] : {};
@@ -735,11 +751,11 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                    <div key={k} className="bg-white rounded-none border border-slate-200 overflow-visible">
                      <button 
                         onClick={() => toggleGroup(k)} 
-                        className={`w-full flex items-start justify-between py-2.5 px-3 hover:bg-slate-50 transition-all ${stickyClass}`}
+                        className={`w-full flex items-center justify-between py-2 px-3 min-h-[64px] hover:bg-slate-50 transition-all ${stickyClass}`}
                       >
-                       <div className="flex items-start gap-3 flex-wrap">
+                       <div className="flex items-start gap-3">
                          <Icon1 size={18} className={`mt-0.5 ${isExp ? 'text-indigo-600' : 'text-slate-300'}`}/>
-                         <div className="flex flex-col items-start gap-1">
+                         <div className="flex flex-col items-start gap-1 min-w-0">
                            <span className={`text-[15px] font-bold text-left break-words ${isExp ? 'text-slate-900' : 'text-slate-600'}`}>{lbl1}</span>
                            {renderAggregations(allInG1, currentView.groupAggregations)}
                          </div>
@@ -749,7 +765,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                      {isExp && (
                        <div className="bg-slate-50/50 border-t border-slate-100 p-2 overflow-visible">
                          {currentView.groupByColumn2 ? (
-                           sks.map(sk => {
+                           sks.map((sk: string) => {
                              const rs = subRows[sk]; const fk = `${k}|${sk}`; const isSkExp = !!expandedGroups[fk];
                              const Icon2 = IconMap[currentView.groupHeaderIcon2] || Folder;
                              const lbl2 = currentView.groupHeaderExpression2 ? String(new Function('val','rowCount', `return ${currentView.groupHeaderExpression2}`)(sk, rs.length)) : sk;
@@ -758,11 +774,11 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                                <div key={fk} className="ml-1 md:ml-4 border-l-2 border-indigo-100 mb-2 last:mb-0 overflow-visible">
                                  <button 
                                     onClick={() => toggleGroup(fk)} 
-                                    className={`w-full flex items-start justify-between py-2 px-4 hover:bg-white rounded-none transition-all ${stickyClass2}`}
+                                    className={`w-full flex items-center justify-between py-1.5 px-4 hover:bg-white rounded-none transition-all ${stickyClass2}`}
                                  >
                                    <div className="flex items-start gap-3 text-left">
                                      <Icon2 size={16} className={`mt-0.5 shrink-0 ${isSkExp ? 'text-indigo-500' : 'text-slate-300'}`}/>
-                                     <div className="flex flex-col items-start gap-1">
+                                     <div className="flex flex-col items-start gap-1 min-w-0">
                                        <span className="text-sm font-black text-slate-600 break-words line-clamp-2 md:line-clamp-none">{lbl2}</span>
                                        {renderAggregations(rs, currentView.groupAggregations2)}
                                      </div>

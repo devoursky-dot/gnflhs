@@ -23,29 +23,54 @@ export const processMappingValue = (value: string, rowData: any): any => {
 };
 
 /**
+ * 서울 시간(KST, UTC+9) 기준으로 Date 객체를 반환합니다.
+ */
+export const getKSTDate = (): Date => {
+  const curr = new Date();
+  const utc = curr.getTime() + (curr.getTimezoneOffset() * 60 * 1000);
+  const KR_TIME_DIFF = 9 * 60 * 60 * 1000;
+  return new Date(utc + KR_TIME_DIFF);
+};
+
+/**
+ * 서울 시간 기준의 날짜/시간 헬퍼 객체를 반환합니다.
+ */
+export const getKSTHelpers = () => {
+  const d = getKSTDate();
+  const Y = d.getFullYear();
+  const M = String(d.getMonth() + 1).padStart(2, '0');
+  const DD = String(d.getDate()).padStart(2, '0');
+  const HH = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+
+  const dateStr = `${Y}-${M}-${DD}`;
+  const timeStr = `${HH}:${mm}:${ss}`;
+
+  // 내일 날짜 계산 (범위 쿼리용)
+  const tm = new Date(d.getTime() + 24 * 60 * 60 * 1000);
+  const tomorrowStr = `${tm.getFullYear()}-${String(tm.getMonth() + 1).padStart(2, '0')}-${String(tm.getDate()).padStart(2, '0')}`;
+
+  return {
+    now: `${dateStr} ${timeStr}`,
+    today: dateStr,
+    tomorrow: tomorrowStr,
+    year: String(Y),
+    month: `${Y}-${M}`,
+    date: dateStr,
+    day: DD,
+    time: timeStr,
+  };
+};
+
+/**
  * 스마트 수식 평가 엔진
  */
 export const evaluateExpression = (expr: string, rowData: any): any => {
   if (!expr) return '';
 
   try {
-    const d = new Date();
-    const Y = d.getFullYear();
-    const M = String(d.getMonth() + 1).padStart(2, '0');
-    const DD = String(d.getDate()).padStart(2, '0');
-    const HH = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    const ss = String(d.getSeconds()).padStart(2, '0');
-
-    const dateHelpers = {
-      now: d,
-      today: `${Y}-${M}-${DD}`,
-      year: Y,
-      month: d.getMonth() + 1,
-      date: d.getDate(),
-      day: d.getDate(),
-      time: `${HH}:${mm}:${ss}`,
-    };
+    const dateHelpers = getKSTHelpers();
 
     // {{컬럼명}} 패턴 치환
     let processedExpr = expr.replace(/\{\{(.*?)\}\}/g, (_, key) => {
@@ -119,21 +144,22 @@ const applySingleFilter = (q: any, col: string, op: string, val: any, userProfil
   if (v === '{{currentUser.name}}') v = userProfile?.name;
 
   // 오늘/어제 등 특수 상구 처리
-  const now = new Date();
-  const isoToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const { today: isoToday, tomorrow: isoTomorrow } = getKSTHelpers();
   
   if (v === 'today' || v === '오늘') {
-    return q.gte(col, isoToday).lte(col, `${isoToday}T23:59:59`);
+    return q.gte(col, isoToday).lt(col, isoTomorrow);
   } else if (v === 'yesterday' || v === '어제') {
-    const yestDate = new Date();
-    yestDate.setDate(now.getDate() - 1);
+    const yestDate = getKSTDate();
+    yestDate.setDate(yestDate.getDate() - 1);
     const isoYesterday = `${yestDate.getFullYear()}-${String(yestDate.getMonth() + 1).padStart(2, '0')}-${String(yestDate.getDate()).padStart(2, '0')}`;
-    return q.gte(col, isoYesterday).lte(col, `${isoYesterday}T23:59:59`);
+    return q.gte(col, isoYesterday).lt(col, isoToday);
   } else if (v === 'this_month' || v === '이번 달') {
-    const firstDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-    const lastDayDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const lastDay = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`;
-    return q.gte(col, firstDay).lte(col, `${lastDay}T23:59:59`);
+    const now = getKSTDate();
+    const isoMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const firstDay = `${isoMonth}-01`;
+    const nextMonthDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const nextMonth = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}-01`;
+    return q.gte(col, firstDay).lt(col, nextMonth);
   }
 
   switch (op) {
@@ -147,12 +173,12 @@ const applySingleFilter = (q: any, col: string, op: string, val: any, userProfil
     case 'like': return q.ilike(col, `%${v}%`);
     case 'starts': return q.ilike(col, `${v}%`);
     case 'ends': return q.ilike(col, `%${v}`);
-    case 'in': return q.in(col, String(v).split(',').map(s => s.trim()));
+    case 'in': return q.in(col, String(v).split(',').map((s: string) => s.trim()));
     case 'is_null': return q.is(col, null);
     case 'is_not_null': return q.not(col, 'is', null);
     case 'between':
       if (String(v).includes('..')) {
-        const [start, end] = String(v).split('..').map(s => s.trim());
+        const [start, end] = String(v).split('..').map((s: string) => s.trim());
         return q.gte(col, start).lte(col, end);
       }
       return q;
@@ -176,8 +202,7 @@ export const applyClientFilters = (data: any[], view: any, userProfile?: any): a
 
     // 날짜 특수처리
     if (v === 'today' || v === '오늘') {
-      const now = new Date();
-      const isoToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const { today: isoToday } = getKSTHelpers();
       return String(rowVal).startsWith(isoToday);
     }
     // ... 어제/이번달 생략 가능 (필요시 추가)
@@ -198,10 +223,10 @@ export const applyClientFilters = (data: any[], view: any, userProfile?: any): a
       case 'ends': return rv.toLowerCase().endsWith(sv.toLowerCase());
       case 'is_null': return rowVal === null || rowVal === undefined || rowVal === '';
       case 'is_not_null': return rowVal !== null && rowVal !== undefined && rowVal !== '';
-      case 'in': return sv.split(',').map(s => s.trim()).includes(rv);
+      case 'in': return sv.split(',').map((s: string) => s.trim()).includes(rv);
       case 'between':
         if (sv.includes('..')) {
-          const [s, e] = sv.split('..').map(x => x.trim());
+          const [s, e] = sv.split('..').map((x: string) => x.trim());
           return Number(rowVal) >= Number(s) && Number(rowVal) <= Number(e);
         }
         return true;
@@ -211,13 +236,13 @@ export const applyClientFilters = (data: any[], view: any, userProfile?: any): a
 
   // 1. 단일 필터 적용
   if (view.filterColumn) {
-    result = result.filter(r => check(r, view.filterColumn, view.filterOperator || 'eq', view.filterValue));
+    result = result.filter((r: any) => check(r, view.filterColumn, view.filterOperator || 'eq', view.filterValue));
   }
 
   // 2. 복합 필터 리스트 적용
   if (view.filters && view.filters.length > 0) {
     view.filters.forEach((f: any) => {
-      result = result.filter(r => check(r, f.column, f.operator, f.value));
+      result = result.filter((r: any) => check(r, f.column, f.operator, f.value));
     });
   }
 
@@ -255,7 +280,7 @@ export const resolveVirtualData = async (baseData: any[], virtualTable: any): Pr
       const { targetTable, localKey, foreignKey, sourceColumn, aggregationType, separator } = col.joinConfig;
       if (!targetTable || !localKey || !foreignKey || !sourceColumn) continue;
 
-      const localValues = Array.from(new Set(resolvedData.map(row => row[localKey]).filter(val => val !== undefined && val !== null)));
+      const localValues = Array.from(new Set(resolvedData.map((row: any) => row[localKey]).filter((val: any) => val !== undefined && val !== null)));
       
       if (localValues.length > 0) {
         const { data: foreignData, error } = await (supabase as any)
@@ -272,7 +297,7 @@ export const resolveVirtualData = async (baseData: any[], virtualTable: any): Pr
             groupedForeign.get(k)?.push(fRow[sourceColumn]);
           });
 
-          resolvedData = resolvedData.map(row => {
+          resolvedData = resolvedData.map((row: any) => {
             const matchingValues = groupedForeign.get(String(row[localKey])) || [];
             let processedVal: any = null;
 
@@ -303,10 +328,10 @@ export const resolveVirtualData = async (baseData: any[], virtualTable: any): Pr
                   processedVal = matchingValues.reduce((acc, v) => acc + (Number(v) || 0), 0) / matchingValues.length; 
                   break;
                 case 'min': 
-                  processedVal = Math.min(...matchingValues.map(v => Number(v) || 0)); 
+                  processedVal = Math.min(...matchingValues.map((v: any) => Number(v) || 0)); 
                   break;
                 case 'max': 
-                  processedVal = Math.max(...matchingValues.map(v => Number(v) || 0)); 
+                  processedVal = Math.max(...matchingValues.map((v: any) => Number(v) || 0)); 
                   break;
               }
             }
@@ -315,7 +340,7 @@ export const resolveVirtualData = async (baseData: any[], virtualTable: any): Pr
           });
         }
       } else {
-        resolvedData = resolvedData.map(row => ({ ...row, [col.name]: null }));
+        resolvedData = resolvedData.map((row: any) => ({ ...row, [col.name]: null }));
       }
     }
 
@@ -326,7 +351,7 @@ export const resolveVirtualData = async (baseData: any[], virtualTable: any): Pr
       const expr = col.formulaConfig.expression;
       if (!expr) continue;
 
-      resolvedData = resolvedData.map(row => ({
+      resolvedData = resolvedData.map((row: any) => ({
         ...row,
         [col.name]: evaluateExpression(expr, row)
       }));

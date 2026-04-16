@@ -58,10 +58,12 @@ export default function RenderPreviewLayout({ rows, rowData, actions, onExecuteA
                 }
               } 
               
-              // 2단계: 정규식 적용
+              // 2단계: 정규식 적용 (디자인 보호를 위해 안전한 방식으로 원복 및 보강)
               if (displayText !== '-' && cell.textRegexPattern) {
                 try { 
-                  const regex = new RegExp(cell.textRegexPattern, 'g'); 
+                  let pattern = cell.textRegexPattern;
+                  // 단순 문자열 패턴인 경우 g 플래그 기본 적용
+                  const regex = new RegExp(pattern, 'g'); 
                   displayText = displayText.replace(regex, cell.textRegexReplace || ''); 
                 } catch (err) { }
               }

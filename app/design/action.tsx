@@ -81,7 +81,7 @@ export default function ActionEditor({
     }
   }, [action.id]);
 
-  const currentStep = action.steps?.find(s => s.id === selectedStepId) || (action.steps && action.steps.length > 0 ? action.steps[0] : (action as any));
+  const currentStep: ActionStep = action.steps?.find((s: ActionStep) => s.id === selectedStepId) || (action.steps && action.steps.length > 0 ? action.steps[0] : (action as ActionStep));
 
   // 현재 선택된 스텝의 값을 업데이트하는 헬퍼
   const updateCurrentStep = (updates: Partial<ActionStep>) => {
@@ -105,7 +105,7 @@ export default function ActionEditor({
     const mappingListKey = type === 'insert' ? 'insertMappings' : 'updateMappings';
     const list = (currentStep as any)[mappingListKey] || [];
     
-    const updatedList = list.map((m: any) => {
+    const updatedList = list.map((m: InsertMapping | UpdateMapping) => {
       if (m.id === id) {
         const val = m.sourceValue || '';
         const newVal = val.slice(0, pos) + snippet + val.slice(pos);
@@ -221,7 +221,7 @@ export default function ActionEditor({
           <div className="pt-4 border-t border-slate-200/50">
             <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">동작 시퀀스 (Sequential Steps)</label>
             <div className="flex flex-wrap gap-3 items-center">
-              {(action.steps || []).map((step, idx) => (
+              {(action.steps || []).map((step: ActionStep, idx: number) => (
                 <div key={step.id} className="relative group">
                   <button
                     onClick={() => setSelectedStepId(step.id)}
@@ -240,7 +240,7 @@ export default function ActionEditor({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        const newSteps = action.steps!.filter(s => s.id !== step.id);
+                        const newSteps = action.steps!.filter((s: ActionStep) => s.id !== step.id);
                         onUpdate({ ...action, steps: newSteps });
                         if (selectedStepId === step.id) setSelectedStepId(newSteps[0]?.id || null);
                       }}
@@ -407,7 +407,7 @@ export default function ActionEditor({
                     <div key={mapping.id} className="p-5 bg-white border-2 border-slate-100 rounded-2xl relative group shadow-sm">
                       <button
                         onClick={() => {
-                          const newArr = currentStep.insertMappings!.filter(m => m.id !== mapping.id);
+                          const newArr = currentStep.insertMappings!.filter((m: InsertMapping) => m.id !== mapping.id);
                           updateCurrentStep({ insertMappings: newArr });
                         }}
                         className="absolute -top-2 -right-2 bg-white text-rose-500 border border-rose-100 p-1.5 rounded-full opacity-0 group-hover:opacity-100 shadow-md transition-opacity"
@@ -634,7 +634,7 @@ export default function ActionEditor({
                     <div key={mapping.id} className="p-5 bg-white border-2 border-slate-100 rounded-2xl relative group shadow-sm">
                       <button
                         onClick={() => {
-                          const newArr = currentStep.updateMappings!.filter(m => m.id !== mapping.id);
+                          const newArr = currentStep.updateMappings!.filter((m: UpdateMapping) => m.id !== mapping.id);
                           updateCurrentStep({ updateMappings: newArr });
                         }}
                         className="absolute -top-2 -right-2 bg-white text-rose-500 border border-rose-100 p-1.5 rounded-full opacity-0 group-hover:opacity-100 shadow-md transition-opacity"
