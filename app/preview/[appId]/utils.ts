@@ -132,6 +132,11 @@ export const applyViewQuery = (query: any, view: any, userProfile?: any) => {
     q = q.order(view.sortColumn, { ascending: view.sortDirection !== 'desc' });
   }
 
+  // 🔥 [신규] 수동 선택(Lock) 유효성 검사 - 선택된 키들만 쿼리하도록 강제
+  if (view.isLocked && view.lockedKeyColumn && view.lockedRecordKeys?.length > 0) {
+    q = q.in(view.lockedKeyColumn, view.lockedRecordKeys);
+  }
+
   return q;
 };
 
@@ -244,6 +249,12 @@ export const applyClientFilters = (data: any[], view: any, userProfile?: any): a
     view.filters.forEach((f: any) => {
       result = result.filter((r: any) => check(r, f.column, f.operator, f.value));
     });
+  }
+
+  // 🔥 [신규] 수동 선택(Lock) 유효성 검사 - 선택된 키들만 최종 리스트에 남김
+  if (view.isLocked && view.lockedKeyColumn && view.lockedRecordKeys?.length > 0) {
+    const keys = view.lockedRecordKeys.map((k: any) => String(k));
+    result = result.filter((r: any) => keys.includes(String(r[view.lockedKeyColumn])));
   }
 
   return result;
