@@ -253,7 +253,7 @@ export default function ActionEditor({
               ))}
               <button
                 onClick={() => {
-                  const newStep = { id: `step_${Date.now()}`, type: 'alert', message: '새로운 동작' };
+                  const newStep: ActionStep = { id: `step_${Date.now()}`, type: 'alert', message: '새로운 동작' };
                   const newSteps = [...(action.steps || []), newStep];
                   onUpdate({ ...action, steps: newSteps });
                   setSelectedStepId(newStep.id);
