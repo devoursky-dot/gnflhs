@@ -154,6 +154,8 @@ export type InsertMapping = {
   isExpression?: boolean;      // 🔥 수식 모드 여부
 };
 
+export type UpdateMapping = InsertMapping;
+
 export type ActionStep = {
   id: string;
   type: 'navigate' | 'alert' | 'link' | 'insert_row' | 'delete_row' | 'update_row' | 'send_sms';
