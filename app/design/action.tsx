@@ -5,10 +5,10 @@ import React, { useState, useEffect } from 'react';
 import { Action, View, SchemaData, InsertMapping, UpdateMapping, VirtualTable, ActionStep } from './types';
 import { Trash2, Plus, DatabaseZap, HelpCircle, X, Code2, Layers, Settings2, Star, MessageSquare, Zap, Calculator, Navigation, Bell } from 'lucide-react';
 import { IconMap } from './picker';
-import { FORMULA_EXAMPLES } from './formulas';
+import { FORMULA_EXAMPLES, FormulaCategory, FormulaExample } from './formulas';
 
 // ── 내부 유틸: 자동 확장형 텍스트 영역 ──
-function AutoExpandingTextarea({ value, onChange, placeholder, onFocus, className }: any) {
+function AutoExpandingTextarea({ value, onChange, placeholder, onFocus, className }: { value: string, onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void, placeholder?: string, onFocus?: (e: React.FocusEvent<HTMLTextAreaElement>) => void, className?: string }) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -86,7 +86,7 @@ export default function ActionEditor({
   // 현재 선택된 스텝의 값을 업데이트하는 헬퍼
   const updateCurrentStep = (updates: Partial<ActionStep>) => {
     if (!selectedStepId) return;
-    const newSteps = action.steps?.map(s => s.id === selectedStepId ? { ...s, ...updates } : s);
+    const newSteps = action.steps?.map((s: ActionStep) => s.id === selectedStepId ? { ...s, ...updates } : s);
     onUpdate({ ...action, steps: newSteps });
   };
 
@@ -134,7 +134,7 @@ export default function ActionEditor({
         </div>
         <div className="flex-1 overflow-y-auto p-8 space-y-10 scrollbar-hide">
           
-          {FORMULA_EXAMPLES.map((cat, cIdx) => (
+          {FORMULA_EXAMPLES.map((cat: FormulaCategory, cIdx: number) => (
             <section key={cIdx}>
               <h4 className={`flex items-center gap-2 text-lg font-black text-slate-800 mb-4 border-l-4 pl-3 ${
                 cat.color === 'indigo' ? 'border-indigo-500' :
@@ -149,7 +149,7 @@ export default function ActionEditor({
                 cat.color === 'rose' ? 'bg-rose-50/30 border-rose-100' : 'bg-slate-100/50 border-slate-200'
               }`}>
                 <div className="grid grid-cols-2 gap-4">
-                  {cat.items.map((item, iIdx) => (
+                  {cat.items.map((item: FormulaExample, iIdx: number) => (
                     <button 
                       key={iIdx}
                       onClick={() => insertSnippet(item.code)}
@@ -278,11 +278,11 @@ export default function ActionEditor({
               >
                 <option value="">데이터를 가져올 테이블을 선택하세요</option>
                 <optgroup label="데이터베이스 테이블">
-                  {Object.keys(schemaData).sort().map(table => <option key={table} value={table}>{table}</option>)}
+                  {Object.keys(schemaData).sort().map((table: string) => <option key={table} value={table}>{table}</option>)}
                 </optgroup>
                 {virtualTables.length > 0 && (
                   <optgroup label="가상 테이블 (Virtual)">
-                    {virtualTables.map(vt => <option key={vt.id} value={vt.id}>🔑 {vt.name} (가상)</option>)}
+                    {virtualTables.map((vt: VirtualTable) => <option key={vt.id} value={vt.id}>🔑 {vt.name} (가상)</option>)}
                   </optgroup>
                 )}
               </select>
@@ -317,7 +317,7 @@ export default function ActionEditor({
                 className="w-full p-3 rounded-xl border border-slate-200 bg-white font-bold text-slate-900 outline-none"
               >
                 <option value="">뷰를 선택하세요</option>
-                {views?.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                {views?.map((v: View) => <option key={v.id} value={v.id}>{v.name}</option>)}
               </select>
             </div>
           )}
@@ -351,11 +351,11 @@ export default function ActionEditor({
               >
                 <option value="">테이블을 선택하세요</option>
                 <optgroup label="데이터베이스 테이블">
-                  {Object.keys(schemaData).sort().map(table => <option key={table} value={table}>{table}</option>)}
+                  {Object.keys(schemaData).sort().map((table: string) => <option key={table} value={table}>{table}</option>)}
                 </optgroup>
                 {virtualTables.length > 0 && (
                   <optgroup label="가상 테이블 (원본에 저장)">
-                    {virtualTables.map(vt => <option key={vt.id} value={vt.id}>💾 {vt.name} (가상)</option>)}
+                    {virtualTables.map((vt: VirtualTable) => <option key={vt.id} value={vt.id}>💾 {vt.name} (가상)</option>)}
                   </optgroup>
                 )}
               </select>
@@ -428,7 +428,7 @@ export default function ActionEditor({
                             className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg bg-slate-50 text-slate-900 min-w-[160px]"
                           >
                             <option value="">-- 컬럼 선택 --</option>
-                            {(schemaData[currentStep.insertTableName!] || []).map(col => <option key={col} value={col}>{col}</option>)}
+                            {(schemaData[currentStep.insertTableName!] || []).map((col: string) => <option key={col} value={col}>{col}</option>)}
                           </select>
                         </div>
                         <div>
@@ -484,7 +484,7 @@ export default function ActionEditor({
 
                                         if (cols.length === 0) return <div className="text-[10px] text-rose-500 font-bold py-1">⚠️ 상단에서 '소스 데이터 테이블'을 먼저 선택해야 컬럼 목록이 나타납니다.</div>;
                                         
-                                        return cols.map(col => (
+                                        return cols.map((col: string) => (
                                           <button key={col} onClick={() => {
                                             const newArr = [...currentStep.insertMappings!];
                                             newArr[idx].sourceValue = (newArr[idx].sourceValue || '') + `{{${col}}}`;
@@ -611,7 +611,7 @@ export default function ActionEditor({
                 className="w-full p-3 rounded-xl border border-rose-200 bg-rose-50 font-bold text-rose-800 outline-none min-w-[300px]"
               >
                 <option value="">테이블을 선택하세요</option>
-                {Object.keys(schemaData).map(table => <option key={table} value={table}>{table}</option>)}
+                {Object.keys(schemaData).map((table: string) => <option key={table} value={table}>{table}</option>)}
               </select>
               <p className="text-xs text-slate-500 font-bold whitespace-nowrap">* 클릭한 카드의 고유 <strong>'id'</strong> 값을 기준으로 데이터가 수정됩니다.</p>
 
@@ -655,7 +655,7 @@ export default function ActionEditor({
                             className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg bg-slate-50 text-slate-900 min-w-[160px]"
                           >
                             <option value="">-- 컬럼 선택 --</option>
-                            {(schemaData[currentStep.updateTableName!] || []).map(col => <option key={col} value={col}>{col}</option>)}
+                            {(schemaData[currentStep.updateTableName!] || []).map((col: string) => <option key={col} value={col}>{col}</option>)}
                           </select>
                         </div>
                         <div>
@@ -698,7 +698,7 @@ export default function ActionEditor({
                                       {(schemaData[currentStep.tableName || ''] || []).length === 0 && (
                                         <div className="text-[10px] text-rose-500 font-bold py-1">⚠️ 상단에서 '소스 데이터 테이블'을 먼저 선택해야 컬럼 목록이 나타납니다.</div>
                                       )}
-                                      {(schemaData[currentStep.tableName || ''] || []).map(col => (
+                                      {(schemaData[currentStep.tableName || ''] || []).map((col: string) => (
                                         <button key={col} onClick={() => {
                                            const newArr = [...currentStep.updateMappings!];
                                            newArr[idx].sourceValue = (newArr[idx].sourceValue || '') + (mapping.isExpression ? `{{${col}}}` : `{{${col}}}`);
@@ -842,7 +842,7 @@ export default function ActionEditor({
                      className="w-full p-3 rounded-xl border border-slate-200 bg-white font-bold text-slate-900 outline-none"
                    >
                      <option value="">번호가 담긴 컬럼을 선택하세요</option>
-                     {(schemaData[currentStep.tableName || ''] || []).map(col => <option key={col} value={col}>{col}</option>)}
+                     {(schemaData[currentStep.tableName || ''] || []).map((col: string) => <option key={col} value={col}>{col}</option>)}
                    </select>
                  </div>
 
@@ -851,7 +851,7 @@ export default function ActionEditor({
                    <div className="bg-white border-2 border-slate-100 rounded-2xl p-4 space-y-4">
                       <div className="flex flex-wrap gap-1.5 p-1 border-b border-indigo-100/50 pb-2 mb-1">
                         <span className="text-[9px] font-black text-indigo-400 w-full mb-1">클릭하여 컬럼 삽입:</span>
-                        {(schemaData[currentStep.tableName || ''] || []).map(col => (
+                        {(schemaData[currentStep.tableName || ''] || []).map((col: string) => (
                           <button key={col} onClick={() => {
                             const val = currentStep.smsMessageTemplate || '';
                             updateCurrentStep({ smsMessageTemplate: val + `{{${col}}}` });

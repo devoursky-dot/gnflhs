@@ -2,14 +2,14 @@
 "use client";
 
 import React, { useState } from 'react';
-import { View, SchemaData, LayoutRow, Action, LayoutCell, VirtualTable } from './types';
+import { View, SchemaData, LayoutRow, Action, LayoutCell, VirtualTable, GroupAggregation } from './types';
 import { 
   Database, LayoutTemplate, Plus, Columns, Rows, ChevronLeft, 
   ChevronRight, X, MousePointerClick, Star, Filter, Search, Smartphone, Eye, Loader2, TableProperties, ArrowUpDown, FolderTree, Trash2, Minus, Wand2, Image as ImageIcon, Type, Sparkles, AlignLeft, AlignCenter, AlignRight, Lock, Zap, Settings2, ArrowUpCircle
 } from 'lucide-react';
 import { supabase } from '@/app/supabaseClient';
 import IconPicker, { IconMap } from './picker';
-import { FORMULA_EXAMPLES } from './formulas';
+import { FORMULA_EXAMPLES, FormulaCategory, FormulaExample } from './formulas';
 import { resolveVirtualData } from '../preview/[appId]/utils';
 
 const REGEX_PRESETS = [
@@ -291,11 +291,11 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
                     </div>
 
                     <div className="space-y-5">
-                      {FORMULA_EXAMPLES.filter((cat: any) => cat.items.some((item: any) => item.code.includes('val') || item.code.includes('row'))).map((cat: any, idx: number) => (
+                      {FORMULA_EXAMPLES.filter((cat: FormulaCategory) => cat.items.some((item: FormulaExample) => item.code.includes('val') || item.code.includes('row'))).map((cat: FormulaCategory, idx: number) => (
                         <div key={idx} className="space-y-3">
                           <h5 className="text-[10px] font-black text-slate-400 border-l-2 border-indigo-200 pl-2 ml-1">{cat.category}</h5>
                           <div className="flex flex-wrap gap-2">
-                            {cat.items.map((ex, iIdx) => (
+                            {cat.items.map((ex: FormulaExample, iIdx: number) => (
                               <button 
                                 key={iIdx} 
                                 onClick={() => insertFormula(ex.code)}
@@ -342,7 +342,7 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
                       </button>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {REGEX_PRESETS.map((p, idx) => (
+                      {REGEX_PRESETS.map((p: {name: string, pattern: string, replace: string}, idx: number) => (
                         <button 
                           key={idx} 
                           onClick={() => setData({...data, textRegexPattern: p.pattern, textRegexReplace: p.replace})} 
@@ -426,7 +426,7 @@ const SortConfigSection = ({
       onChange={e => onColumnChange(e.target.value || null)}
     >
       <option value="">{isSecondary ? '(2차 정렬 없음)' : '기본 정렬 (DB 설정순)'}</option>
-      {availableColumns.map(col => <option key={col} value={col}>{col}</option>)}
+      {availableColumns.map((col: string) => <option key={col} value={col}>{col}</option>)}
     </select>
     {column && (
       <div className="mt-3 animate-in fade-in slide-in-from-top-2">
@@ -594,8 +594,8 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
             <div className="flex-1 flex items-center gap-2">
               <select className={`flex-1 p-3 text-xs font-black bg-slate-50 border-2 rounded-xl outline-none transition-all ${cell.contentType !== 'empty' ? 'text-indigo-700 border-indigo-200' : 'text-slate-500 border-slate-200 focus:border-indigo-500'}`} value={(cell.contentType === 'action' ? 'act_' : '') + (cell.contentValue || '')} onChange={e => { const val = e.target.value; mutate((rows: LayoutRow[]) => { const f = (arr: LayoutRow[]) => arr.forEach((r: LayoutRow) => r.cells.forEach((c: LayoutCell) => { if(c.id === cell.id) { if (val.startsWith('act_')) { c.contentType = 'action'; c.contentValue = val.replace('act_', ''); } else { c.contentType = val ? 'field' : 'empty'; c.contentValue = val; } } else if(c.nestedRows) f(c.nestedRows); })); f(rows); }); }}>
                 <option value="">-- 데이터/액션 선택 --</option>
-                <optgroup label="테이블 컬럼">{availableColumns.map(col => <option key={col} value={col}>{col}</option>)}</optgroup>
-                <optgroup label="액션(기능)">{actions.map(a => <option key={a.id} value={`act_${a.id}`}>⚡ {a.name}</option>)}</optgroup>
+                <optgroup label="테이블 컬럼">{availableColumns.map((col: string) => <option key={col} value={col}>{col}</option>)}</optgroup>
+                <optgroup label="액션(기능)">{actions.map((a: Action) => <option key={a.id} value={`act_${a.id}`}>⚡ {a.name}</option>)}</optgroup>
               </select>
               {(cell.contentType === 'field' || cell.contentType === 'action') && (
                 <button onClick={() => setFormatModalCell(cell)} className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center transition-all ${(cell.isImage || cell.textRegexPattern || cell.textSize || cell.buttonShape) ? 'bg-indigo-600 text-white shadow-md hover:bg-indigo-700' : 'bg-indigo-50 text-indigo-500 hover:bg-indigo-100 border border-indigo-100'}`} title="데이터 꾸미기"><Wand2 size={18} strokeWidth={2.5}/></button>
@@ -679,16 +679,16 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
               >
                 <option value="">테이블 선택</option>
                 <optgroup label="데이터베이스 테이블 (Supabase)">
-                  {Object.keys(schemaData).sort().map(t => <option key={t} value={t}>{t}</option>)}
+                  {Object.keys(schemaData).sort().map((t: string) => <option key={t} value={t}>{t}</option>)}
                 </optgroup>
                 {virtualTables.length > 0 && (
                   <optgroup label="가상 테이블 (Virtual)">
-                    {virtualTables.map(vt => <option key={vt.id} value={vt.id}>🔑 {vt.name} (가상)</option>)}
+                    {virtualTables.map((vt: VirtualTable) => <option key={vt.id} value={vt.id}>🔑 {vt.name} (가상)</option>)}
                   </optgroup>
                 )}
               </select>
             </div>
-            <div><label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5"><Filter size={14}/> 1단계 서버 필터 (선택사항)</label><select className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-black text-indigo-600 outline-none focus:border-indigo-500 transition-all cursor-pointer" value={view.filterColumn || ''} onChange={e => onUpdate({...view, filterColumn: e.target.value || null})}><option value="">필터 없음 (전체 데이터 가져오기)</option>{availableColumns.map(col => <option key={col} value={col}>{col}</option>)}</select></div>
+            <div><label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5"><Filter size={14}/> 1단계 서버 필터 (선택사항)</label><select className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-black text-indigo-600 outline-none focus:border-indigo-500 transition-all cursor-pointer" value={view.filterColumn || ''} onChange={e => onUpdate({...view, filterColumn: e.target.value || null})}><option value="">필터 없음 (전체 데이터 가져오기)</option>{availableColumns.map((col: string) => <option key={col} value={col}>{col}</option>)}</select></div>
           </div>
           <div className="bg-slate-50/50 rounded-3xl p-6 border-2 border-dashed border-slate-200 flex flex-col justify-center">
             {view.filterColumn ? (
@@ -735,7 +735,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                           { id: 'yesterday', label: '어제', color: 'bg-slate-50 text-slate-600 border-slate-200' },
                           { id: 'this_month', label: '이번 달', color: 'bg-blue-50 text-blue-600 border-blue-100' },
                           { id: 'me', label: '나(본인)', color: 'bg-indigo-50 text-indigo-600 border-indigo-100' }
-                        ].map(chip => (
+                        ].map((chip: {id: string, label: string, color: string}) => (
                           <button 
                             key={chip.id} type="button"
                             onClick={() => onUpdate({ ...view, filterValue: chip.id })}
@@ -772,7 +772,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                   onChange={e => onUpdate({...view, groupByColumn: e.target.value || null})}
                 >
                   <option value="">묶지 않음 (일반 리스트 형태)</option>
-                  {availableColumns.map(col => <option key={col} value={col}>{col} 칼럼 기준으로 묶기</option>)}
+                  {availableColumns.map((col: string) => <option key={col} value={col}>{col} 칼럼 기준으로 묶기</option>)}
                 </select>
                 {view.groupByColumn && (
                   <div className="flex bg-slate-100 p-1 rounded-2xl border-2 border-blue-200">
@@ -823,7 +823,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                               { id: 'left', icon: <AlignLeft size={14}/> },
                               { id: 'center', icon: <AlignCenter size={14}/> },
                               { id: 'right', icon: <AlignRight size={14}/> }
-                            ].map(a => (
+                            ].map((a: {id: string, icon: React.ReactNode}) => (
                               <button key={a.id} onClick={() => onUpdate({...view, groupHeaderAlign: a.id as any})} className={`p-2 rounded-lg transition-all ${view.groupHeaderAlign === a.id || (!view.groupHeaderAlign && a.id === 'left') ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>{a.icon}</button>
                             ))}
                           </div>
@@ -892,7 +892,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                     </div>
 
                     <div className="space-y-3">
-                      {(view.groupAggregations || []).map((agg, idx) => (
+                      {(view.groupAggregations || []).map((agg: GroupAggregation, idx: number) => (
                         <div key={agg.id} className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3 animate-in slide-in-from-right-2">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-black py-1 px-2.5 rounded-full bg-slate-100 text-slate-500 uppercase tracking-widest">Summary #{idx+1}</span>
@@ -989,7 +989,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                   onChange={e => onUpdate({...view, groupByColumn2: e.target.value || null})}
                 >
                   <option value="">(2차 그룹 없음)</option>
-                  {availableColumns.filter(c => c !== view.groupByColumn).map(col => <option key={col} value={col}>{col} 칼럼 기준으로 한 번 더 묶기</option>)}
+                  {availableColumns.filter((c: string) => c !== view.groupByColumn).map((col: string) => <option key={col} value={col}>{col} 칼럼 기준으로 한 번 더 묶기</option>)}
                 </select>
                 {view.groupByColumn2 && (
                   <div className="flex bg-slate-100 p-1 rounded-2xl border-2 border-indigo-200">
@@ -1039,7 +1039,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                               { id: 'left', icon: <AlignLeft size={14}/> },
                               { id: 'center', icon: <AlignCenter size={14}/> },
                               { id: 'right', icon: <AlignRight size={14}/> }
-                            ].map(a => (
+                            ].map((a: any) => (
                               <button key={a.id} onClick={() => onUpdate({...view, groupHeaderAlign2: a.id as any})} className={`p-2 rounded-lg transition-all ${view.groupHeaderAlign2 === a.id || (!view.groupHeaderAlign2 && a.id === 'left') ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>{a.icon}</button>
                             ))}
                           </div>
@@ -1106,11 +1106,11 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                     </div>
 
                     <div className="space-y-3">
-                      {(view.groupAggregations2 || []).map((agg, idx) => (
+                      {(view.groupAggregations2 || []).map((agg: GroupAggregation, idx: number) => (
                         <div key={agg.id} className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3 animate-in slide-in-from-right-2">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-black py-1 px-2.5 rounded-full bg-slate-100 text-slate-500 uppercase tracking-widest">Sub-Summary #{idx+1}</span>
-                            <button onClick={() => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.filter(a => a.id !== agg.id) })} className="text-rose-300 hover:text-rose-500 transition-colors"><Trash2 size={14}/></button>
+                            <button onClick={() => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.filter((a: GroupAggregation) => a.id !== agg.id) })} className="text-rose-300 hover:text-rose-500 transition-colors"><Trash2 size={14}/></button>
                           </div>
                           
                           <div className="grid grid-cols-3 gap-3">
@@ -1118,7 +1118,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                               <label className="text-[9px] font-black text-slate-400 pl-1">계산 방식</label>
                               <select 
                                 value={agg.type} 
-                                onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map(a => a.id === agg.id ? { ...a, type: e.target.value as any } : a) })}
+                                onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map((a: GroupAggregation) => a.id === agg.id ? { ...a, type: e.target.value as any } : a) })}
                                 className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-slate-50 outline-none"
                               >
                                 <option value="count">총 개수 (Count)</option>
@@ -1131,7 +1131,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                               <label className="text-[9px] font-black text-slate-400 pl-1">표시 라벨</label>
                               <input 
                                 value={agg.label} 
-                                onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map(a => a.id === agg.id ? { ...a, label: e.target.value } : a) })}
+                                onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map((a: GroupAggregation) => a.id === agg.id ? { ...a, label: e.target.value } : a) })}
                                 className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-white outline-none"
                                 placeholder="예: 소계"
                               />
@@ -1140,7 +1140,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                               <label className="text-[9px] font-black text-slate-400 pl-1">표시 형태</label>
                               <select 
                                 value={agg.displayStyle || 'button'} 
-                                onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map(a => a.id === agg.id ? { ...a, displayStyle: e.target.value as any } : a) })}
+                                onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map((a: GroupAggregation) => a.id === agg.id ? { ...a, displayStyle: e.target.value as any } : a) })}
                                 className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-white outline-none"
                               >
                                 <option value="button">알약형 (Button)</option>
@@ -1154,7 +1154,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                               <label className="text-[9px] font-black text-slate-400 pl-1">대상 컬럼</label>
                               <select 
                                 value={agg.column || ''} 
-                                onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map(a => a.id === agg.id ? { ...a, column: e.target.value } : a) })}
+                                onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map((a: GroupAggregation) => a.id === agg.id ? { ...a, column: e.target.value } : a) })}
                                 className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-white outline-none"
                               >
                                 <option value="">컬럼 선택</option>
@@ -1168,7 +1168,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                                 </label>
                                 <input 
                                   value={agg.conditionValue || ''} 
-                                  onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map(a => a.id === agg.id ? { ...a, conditionValue: e.target.value } : a) })}
+                                  onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map((a: GroupAggregation) => a.id === agg.id ? { ...a, conditionValue: e.target.value } : a) })}
                                   className="w-full p-2.5 text-[11px] rounded-xl border border-amber-200 font-mono font-bold bg-white outline-none focus:border-amber-400"
                                   placeholder={agg.type === 'count_if' ? "예: val === '완료'" : "예: val * 1.1"}
                                 />
@@ -1207,7 +1207,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
           <div className="space-y-6">
             <div className="space-y-3">
               <label className="text-[10px] font-black text-slate-400 block px-1 uppercase tracking-wider whitespace-nowrap">카드 가로 배치 (열 개수)</label>
-              <select className="w-full p-3 rounded-xl bg-white border-2 border-slate-100 font-black text-slate-800 cursor-pointer outline-none focus:border-indigo-200" value={view.columnCount || 1} onChange={e => onUpdate({...view, columnCount: Number(e.target.value)})}>{[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}열 {n === 1 ? '(리스트 형태)' : `(${n}단 격자 형태)`}</option>)}</select>
+              <select className="w-full p-3 rounded-xl bg-white border-2 border-slate-100 font-black text-slate-800 cursor-pointer outline-none focus:border-indigo-200" value={view.columnCount || 1} onChange={e => onUpdate({...view, columnCount: Number(e.target.value)})}>{[1, 2, 3, 4].map((n: number) => <option key={n} value={n}>{n}열 {n === 1 ? '(리스트 형태)' : `(${n}단 격자 형태)`}</option>)}</select>
             </div>
 
 
@@ -1216,14 +1216,14 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
               <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5 whitespace-nowrap"><MousePointerClick size={14} className="text-indigo-500"/> 카드 클릭 액션</label>
               <select className="w-full p-3 rounded-xl bg-white border-2 border-slate-100 font-black text-slate-800 cursor-pointer outline-none" value={view.onClickActionId || ''} onChange={e => onUpdate({...view, onClickActionId: e.target.value || null})}>
                 <option value="">(클릭 동작 없음)</option>
-                {actions.map(act => <option key={act.id} value={act.id}>⚡ {act.name}</option>)}
+                {actions.map((act: Action) => <option key={act.id} value={act.id}>⚡ {act.name}</option>)}
               </select>
             </div>
             <div>
               <label className="text-[10px] font-black text-rose-500 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5 whitespace-nowrap animate-pulse"><Zap size={14} /> 뷰 시작 시 자동 실행(Automation)</label>
               <select className="w-full p-3 rounded-xl bg-rose-50 border-2 border-rose-100 font-black text-rose-700 cursor-pointer outline-none focus:border-rose-300" value={view.onInitActionId || ''} onChange={e => onUpdate({...view, onInitActionId: e.target.value || null})}>
                 <option value="">(자동 실행 없음 - 일반 모드)</option>
-                {actions.map(act => <option key={act.id} value={act.id}>🚀 {act.name}</option>)}
+                {actions.map((act: Action) => <option key={act.id} value={act.id}>🚀 {act.name}</option>)}
               </select>
               <p className="text-[9px] font-bold text-rose-400 mt-1 px-1">* 뷰가 열리자마자 필터링된 데이터에 대해 위 액션을 수행합니다.</p>
             </div>
@@ -1342,7 +1342,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
           </div>
         </div>
         <div className="space-y-4 overflow-visible w-full min-w-fit mt-10">
-          {view.layoutRows.map(row => <RenderRowEditor key={row.id} row={row} depth={0} />)}
+          {view.layoutRows.map((row: LayoutRow) => <RenderRowEditor key={row.id} row={row} depth={0} />)}
           {view.layoutRows.length === 0 && (<div className="py-24 border-4 border-dashed border-slate-100 rounded-[2.5rem] flex flex-col items-center justify-center text-slate-300 gap-4 bg-slate-50/50"><Plus size={48} className="opacity-20"/><p className="font-black text-slate-400">우측 상단의 버튼을 눌러 카드 디자인을 시작하세요</p></div>)}
         </div>
       </section>
@@ -1389,7 +1389,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                       }
                   }} className="p-2.5 text-sm border-2 border-indigo-100 bg-white rounded-xl font-bold outline-none cursor-pointer text-indigo-700 focus:border-indigo-400">
                     <option value="">-- 고유 식별자 선택 필수 --</option>
-                    {availableColumns.map(c => <option key={c} value={c}>{c}</option>)}
+                    {availableColumns.map((c: string) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <button 
@@ -1419,14 +1419,14 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                          <th className="p-4 w-12 text-center border-b border-slate-700 bg-slate-800 cursor-pointer hover:bg-slate-700 transition-colors" onClick={() => {
                              if (selectedKeys.length === previewData.length && previewData.length > 0) setSelectedKeys([]);
                              else {
-                               const allKeys = previewData.map(r => String(r[tempKeyColumn])).filter(k => k && k !== 'null' && k !== 'undefined');
+                               const allKeys = previewData.map((r: any) => String(r[tempKeyColumn])).filter((k: string) => k && k !== 'null' && k !== 'undefined');
                                setSelectedKeys(allKeys);
                              }
                          }}>
                            <input type="checkbox" className="w-4 h-4 cursor-pointer accent-indigo-500 pointer-events-none" checked={selectedKeys.length === previewData.length && previewData.length > 0} readOnly />
                          </th>
                        )}
-                       {availableColumns.map(col => (
+                       {availableColumns.map((col: string) => (
                          <th key={col} 
                            className={`p-4 text-xs font-black uppercase tracking-wider border-b border-slate-700 whitespace-nowrap cursor-pointer hover:bg-slate-800 transition-colors ${col === tempKeyColumn ? 'bg-indigo-900 text-indigo-200' : ''}`}
                            onClick={() => {
@@ -1434,7 +1434,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                              if (previewSortConfig?.column === col && previewSortConfig.direction === 'asc') newDir = 'desc';
                              setPreviewSortConfig({ column: col, direction: newDir });
                              
-                             const sorted = [...previewData].sort((a, b) => {
+                             const sorted = [...previewData].sort((a: any, b: any) => {
                                const valA = a[col];
                                const valB = b[col];
                                if (valA === null || valA === undefined) return 1;
@@ -1451,7 +1451,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                              {previewSortConfig?.column === col && (
                                <span className="text-indigo-400 ml-1 text-[10px]">
                                  {previewSortConfig.direction === 'asc' ? '▲' : '▼'}
-                               </span>
+                                </span>
                              )}
                            </div>
                          </th>
@@ -1459,7 +1459,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                      </tr>
                    </thead>
                    <tbody>
-                     {previewData.map((row, idx) => {
+                     {previewData.map((row: any, idx: number) => {
                        const rowKey = tempKeyColumn ? String(row[tempKeyColumn]) : null;
                        const isChecked = rowKey ? selectedKeys.includes(rowKey) : false;
                        return (
@@ -1475,7 +1475,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                                <input type="checkbox" className="w-4 h-4 cursor-pointer accent-indigo-500 pointer-events-none" checked={isChecked} readOnly />
                              </td>
                            )}
-                           {availableColumns.map(col => <td key={col} className={`p-4 text-sm font-medium whitespace-nowrap max-w-[200px] truncate ${col === tempKeyColumn ? 'text-indigo-700 font-black bg-indigo-50/30' : 'text-slate-700'}`}>{row[col] !== null ? String(row[col]) : <span className="text-slate-300 italic">null</span>}</td>)}
+                           {availableColumns.map((col: string) => <td key={col} className={`p-4 text-sm font-medium whitespace-nowrap max-w-[200px] truncate ${col === tempKeyColumn ? 'text-indigo-700 font-black bg-indigo-50/30' : 'text-slate-700'}`}>{row[col] !== null ? String(row[col]) : <span className="text-slate-300 italic">null</span>}</td>)}
                          </tr>
                        );
                      })}
