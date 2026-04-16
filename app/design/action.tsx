@@ -2,8 +2,8 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Action, View, SchemaData, InsertMapping, VirtualTable } from './types';
-import { Trash2, Plus, DatabaseZap, HelpCircle, X, Code2, Layers, Settings2, Star, MessageSquare, Zap, Calculator } from 'lucide-react';
+import { Action, View, SchemaData, InsertMapping, UpdateMapping, VirtualTable, ActionStep } from './types';
+import { Trash2, Plus, DatabaseZap, HelpCircle, X, Code2, Layers, Settings2, Star, MessageSquare, Zap, Calculator, Navigation, Bell } from 'lucide-react';
 import { IconMap } from './picker';
 import { FORMULA_EXAMPLES } from './formulas';
 
@@ -33,6 +33,7 @@ function AutoExpandingTextarea({ value, onChange, placeholder, onFocus, classNam
 
 interface ActionEditorProps {
   action: Action;
+  views: View[];
   schemaData: SchemaData;
   virtualTables?: VirtualTable[];
   onUpdate: (updated: Action) => void;
@@ -42,6 +43,7 @@ interface ActionEditorProps {
 
 export default function ActionEditor({ 
   action, 
+  views,
   schemaData, 
   virtualTables = [],
   onUpdate, 
@@ -50,6 +52,43 @@ export default function ActionEditor({
 }: ActionEditorProps) {
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [lastFocusedExpr, setLastFocusedExpr] = useState<{ id: string; pos: number; type: 'insert' | 'update' } | null>(null);
+  const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+
+  // 🔥 [신규] 다단계 동작 초기화 및 레거시 데이터 마이그레이션
+  useEffect(() => {
+    if (!action.steps || action.steps.length === 0) {
+      // 레거시 데이터를 기반으로 첫 번째 스텝 생성 (디자인 유지)
+      const initialStep: ActionStep = {
+        id: `step_${Date.now()}`,
+        type: action.type,
+        tableName: action.tableName,
+        insertTableName: action.insertTableName,
+        updateTableName: action.updateTableName,
+        deleteTableName: action.deleteTableName,
+        smsTableName: action.smsTableName,
+        insertMappings: action.insertMappings,
+        updateMappings: action.updateMappings,
+        requireConfirmation: action.requireConfirmation,
+        batchMode: action.batchMode,
+        smsMessageTemplate: action.smsMessageTemplate,
+        targetViewId: action.targetViewId,
+        message: action.message,
+      };
+      onUpdate({ ...action, steps: [initialStep] });
+      setSelectedStepId(initialStep.id);
+    } else if (!selectedStepId && action.steps.length > 0) {
+      setSelectedStepId(action.steps[0].id);
+    }
+  }, [action.id]);
+
+  const currentStep = action.steps?.find(s => s.id === selectedStepId) || (action.steps && action.steps.length > 0 ? action.steps[0] : (action as any));
+
+  // 현재 선택된 스텝의 값을 업데이트하는 헬퍼
+  const updateCurrentStep = (updates: Partial<ActionStep>) => {
+    if (!selectedStepId) return;
+    const newSteps = action.steps?.map(s => s.id === selectedStepId ? { ...s, ...updates } : s);
+    onUpdate({ ...action, steps: newSteps });
+  };
 
   // 🖱️ 커서 위치 추적 핸들러
   const handleInputInteraction = (mappingId: string, e: any, type: 'insert' | 'update') => {
@@ -64,20 +103,19 @@ export default function ActionEditor({
     }
     const { id, pos, type } = lastFocusedExpr;
     const mappingListKey = type === 'insert' ? 'insertMappings' : 'updateMappings';
-    const list = (action as any)[mappingListKey] || [];
+    const list = (currentStep as any)[mappingListKey] || [];
     
     const updatedList = list.map((m: any) => {
       if (m.id === id) {
         const val = m.sourceValue || '';
         const newVal = val.slice(0, pos) + snippet + val.slice(pos);
-        // 삽입 후 커서 위치 조정
         setLastFocusedExpr({ ...lastFocusedExpr, pos: pos + snippet.length });
         return { ...m, sourceValue: newVal };
       }
       return m;
     });
 
-    onUpdate({ ...action, [mappingListKey]: updatedList });
+    updateCurrentStep({ [mappingListKey]: updatedList });
   };
 
   // 💡 가이드 모달 컴포넌트 (동적 처리)
@@ -135,10 +173,11 @@ export default function ActionEditor({
       </div>
     </div>
   );
+
   return (
-    // 🔥 [핵심 래퍼] min-w-fit 적용
     <div className="w-full min-w-fit mx-auto bg-white rounded-3xl shadow-sm border border-slate-200 relative p-8 lg:p-12">
       <div className="w-full mx-auto space-y-8">
+        {isHelpModalOpen && <FormulaHelpModal />}
         
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 min-w-max">
           <div>
@@ -174,58 +213,140 @@ export default function ActionEditor({
                 value={action.name}
                 onChange={(e) => onUpdate({ ...action, name: e.target.value })}
                 className="flex-1 p-3 rounded-xl border border-slate-200 outline-none font-bold text-slate-900 min-w-[300px]"
-                style={{ color: 'var(--text-primary)' }}
               />
             </div>
           </div>
-          
-          <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl">
-            <label className="flex items-center gap-2 text-sm font-bold text-indigo-700 mb-2 whitespace-nowrap">
-              <Layers size={16}/> 소스 데이터 테이블 (현재 카드 데이터의 출처)
-            </label>
-            <select
-              value={action.tableName || ''}
-              onChange={(e) => onUpdate({ ...action, tableName: e.target.value })}
-              className="w-full p-3 rounded-xl border border-indigo-200 bg-white font-bold text-indigo-900 outline-none min-w-[300px]"
-            >
-              <option value="">데이터를 가져올 테이블을 선택하세요</option>
-              <optgroup label="데이터베이스 테이블">
-                {Object.keys(schemaData).sort().map(table => <option key={table} value={table}>{table}</option>)}
-              </optgroup>
-              {virtualTables.length > 0 && (
-                <optgroup label="가상 테이블 (Virtual)">
-                  {virtualTables.map(vt => <option key={vt.id} value={vt.id}>🔑 {vt.name} (가상)</option>)}
-                </optgroup>
-              )}
-            </select>
-            <p className="mt-2 text-[10px] text-indigo-400 font-bold whitespace-nowrap">* '현재 카드 데이터 재사용' 시 아래 선택한 테이블의 컬럼들이 목록에 나타납니다.</p>
+
+          {/* 🔥 [신규] 동작 시퀀스 관리 UI */}
+          <div className="pt-4 border-t border-slate-200/50">
+            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">동작 시퀀스 (Sequential Steps)</label>
+            <div className="flex flex-wrap gap-3 items-center">
+              {(action.steps || []).map((step, idx) => (
+                <div key={step.id} className="relative group">
+                  <button
+                    onClick={() => setSelectedStepId(step.id)}
+                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl border-2 transition-all font-black text-sm ${
+                      selectedStepId === step.id 
+                        ? 'bg-rose-50 border-rose-500 text-rose-700 shadow-lg -translate-y-0.5' 
+                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                    }`}
+                  >
+                    <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] ${selectedStepId === step.id ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                      {idx + 1}
+                    </span>
+                    {step.type === 'navigate' ? '이동' : step.type === 'alert' ? '알림' : step.type === 'insert_row' ? '저장' : step.type === 'update_row' ? '수정' : step.type === 'delete_row' ? '삭제' : step.type === 'send_sms' ? '문자' : '동작'}
+                  </button>
+                  {action.steps!.length > 1 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const newSteps = action.steps!.filter(s => s.id !== step.id);
+                        onUpdate({ ...action, steps: newSteps });
+                        if (selectedStepId === step.id) setSelectedStepId(newSteps[0]?.id || null);
+                      }}
+                      className="absolute -top-2 -right-2 bg-white text-rose-500 border border-rose-100 p-1 rounded-full opacity-0 group-hover:opacity-100 shadow-md transition-all hover:scale-110"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={() => {
+                  const newStep = { id: `step_${Date.now()}`, type: 'alert', message: '새로운 동작' };
+                  const newSteps = [...(action.steps || []), newStep];
+                  onUpdate({ ...action, steps: newSteps });
+                  setSelectedStepId(newStep.id);
+                }}
+                className="w-11 h-11 flex items-center justify-center bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-600 rounded-2xl transition-all border-2 border-dashed border-slate-200"
+              >
+                <Plus size={20} />
+              </button>
+            </div>
           </div>
+          
+          {/* 소스 테이블 선택: navigate나 alert 같은 단순 동작일 때는 숨겨서 복잡도 낮춤 */}
+          {!(currentStep.type === 'navigate' || currentStep.type === 'alert') && (
+            <div className="p-5 bg-indigo-50/50 border border-indigo-100 rounded-2xl">
+              <label className="flex items-center gap-2 text-[11px] font-black text-indigo-700 mb-3 tracking-wider uppercase">
+                <Layers size={14}/> 1. 소스 데이터 테이블 (카드 데이터의 출처)
+              </label>
+              <select
+                value={currentStep.tableName || ''}
+                onChange={(e) => updateCurrentStep({ tableName: e.target.value })}
+                className="w-full p-3 rounded-xl border border-indigo-200 bg-white font-bold text-indigo-900 outline-none min-w-[300px]"
+              >
+                <option value="">데이터를 가져올 테이블을 선택하세요</option>
+                <optgroup label="데이터베이스 테이블">
+                  {Object.keys(schemaData).sort().map(table => <option key={table} value={table}>{table}</option>)}
+                </optgroup>
+                {virtualTables.length > 0 && (
+                  <optgroup label="가상 테이블 (Virtual)">
+                    {virtualTables.map(vt => <option key={vt.id} value={vt.id}>🔑 {vt.name} (가상)</option>)}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+          )}
 
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2 whitespace-nowrap">동작 유형</label>
+            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">2. 동작 유형 설정</label>
             <select
-              value={action.type}
-              onChange={(e) => onUpdate({ ...action, type: e.target.value as Action['type'] })}
+              value={currentStep.type}
+              onChange={(e) => updateCurrentStep({ type: e.target.value as Action['type'] })}
               className="w-full p-3 rounded-xl border border-slate-200 bg-white font-black text-rose-600 min-w-[300px]"
             >
               <option value="navigate">다른 뷰로 이동</option>
-              <option value="alert">알림 메시지</option>
-              <option value="insert_row">데이터 추가 (Insert)</option>
+              <option value="alert">알림 메시지 (Alert)</option>
+              <option value="insert_row">데이터 추가 (Insert Row)</option>
               <option value="update_row">데이터 수정 (Update Modal)</option>
               <option value="delete_row">선택한 데이터 삭제 (Delete)</option>
               <option value="send_sms">📱 문자 발송 (SMS 단축)</option>
             </select>
           </div>
 
+          {/* 이동 (Navigate) UI */}
+          {currentStep.type === 'navigate' && (
+            <div className="space-y-4 border-t border-slate-200 pt-5 mt-5">
+              <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                <Navigation size={16} className="text-rose-500"/> 이동할 뷰(View) 선택
+              </label>
+              <select
+                value={currentStep.targetViewId || ''}
+                onChange={(e) => updateCurrentStep({ targetViewId: e.target.value })}
+                className="w-full p-3 rounded-xl border border-slate-200 bg-white font-bold text-slate-900 outline-none"
+              >
+                <option value="">뷰를 선택하세요</option>
+                {views?.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* 알림 (Alert) UI */}
+          {currentStep.type === 'alert' && (
+            <div className="space-y-4 border-t border-slate-200 pt-5 mt-5">
+              <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                <Bell size={16} className="text-rose-500"/> 알림 메시지 입력
+              </label>
+              <input
+                type="text"
+                value={currentStep.message || ''}
+                onChange={(e) => updateCurrentStep({ message: e.target.value })}
+                className="w-full p-3 rounded-xl border border-slate-200 bg-white font-bold text-slate-900 outline-none"
+                placeholder="사용자에게 보여줄 메시지를 입력하세요"
+              />
+            </div>
+          )}
+
           {/* 데이터 추가 (Insert) UI */}
-          {action.type === 'insert_row' && (
+          {currentStep.type === 'insert_row' && (
             <div className="space-y-5 border-t border-slate-200 pt-5 mt-5">
               <label className="flex items-center gap-2 text-sm font-bold text-slate-700 whitespace-nowrap">
                 <DatabaseZap size={16} className="text-rose-500"/> 추가할 대상 테이블
               </label>
               <select
-                value={action.insertTableName || ''}
-                onChange={(e) => onUpdate({ ...action, insertTableName: e.target.value, insertMappings: [] })}
+                value={currentStep.insertTableName || ''}
+                onChange={(e) => updateCurrentStep({ insertTableName: e.target.value, insertMappings: [] })}
                 className="w-full p-3 rounded-xl border border-rose-200 bg-rose-50 font-bold text-rose-800 outline-none min-w-[300px]"
               >
                 <option value="">테이블을 선택하세요</option>
@@ -243,8 +364,8 @@ export default function ActionEditor({
                 <input
                   type="checkbox"
                   id="quick-save-toggle"
-                  checked={action.requireConfirmation === false}
-                  onChange={(e) => onUpdate({ ...action, requireConfirmation: !e.target.checked })}
+                  checked={currentStep.requireConfirmation === false}
+                  onChange={(e) => updateCurrentStep({ requireConfirmation: !e.target.checked })}
                   className="w-5 h-5 accent-amber-600"
                 />
                 <label htmlFor="quick-save-toggle" className="text-sm font-black text-amber-900 cursor-pointer flex items-center gap-2">
@@ -257,8 +378,8 @@ export default function ActionEditor({
                 <input
                   type="checkbox"
                   id="batch-mode-toggle"
-                  checked={!!action.batchMode}
-                  onChange={(e) => onUpdate({ ...action, batchMode: e.target.checked })}
+                  checked={!!currentStep.batchMode}
+                  onChange={(e) => updateCurrentStep({ batchMode: e.target.checked })}
                   className="w-5 h-5 accent-rose-600"
                 />
                 <label htmlFor="batch-mode-toggle" className="text-sm font-black text-rose-900 cursor-pointer flex flex-col">
@@ -267,14 +388,14 @@ export default function ActionEditor({
                 </label>
               </div>
 
-              {action.insertTableName && (
+              {currentStep.insertTableName && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="block text-sm font-bold text-slate-700 whitespace-nowrap">필드 매핑 및 타입 설정</label>
                     <button
                       onClick={() => {
                         const nm: InsertMapping = { id: `m_${Date.now()}`, targetColumn: '', mappingType: 'prompt', sourceValue: '', valueType: 'string' };
-                        onUpdate({ ...action, insertMappings: [...(action.insertMappings || []), nm] });
+                        updateCurrentStep({ insertMappings: [...(currentStep.insertMappings || []), nm] });
                       }}
                       className="text-xs bg-slate-800 text-white px-3 py-2 rounded-lg font-bold flex items-center gap-1 whitespace-nowrap shrink-0"
                     >
@@ -282,31 +403,32 @@ export default function ActionEditor({
                     </button>
                   </div>
 
-                  {(action.insertMappings || []).map((mapping, idx) => (
+                  {(currentStep.insertMappings || []).map((mapping: InsertMapping, idx: number) => (
                     <div key={mapping.id} className="p-5 bg-white border-2 border-slate-100 rounded-2xl relative group shadow-sm">
                       <button
-                        onClick={() => onUpdate({ ...action, insertMappings: action.insertMappings!.filter(m => m.id !== mapping.id) })}
+                        onClick={() => {
+                          const newArr = currentStep.insertMappings!.filter(m => m.id !== mapping.id);
+                          updateCurrentStep({ insertMappings: newArr });
+                        }}
                         className="absolute -top-2 -right-2 bg-white text-rose-500 border border-rose-100 p-1.5 rounded-full opacity-0 group-hover:opacity-100 shadow-md transition-opacity"
                       >
                         <Trash2 size={14} />
                       </button>
                       
-                      {/* 🔥 4단 그리드가 축소되지 않도록 본연의 크기(min-w-max)를 계산하게 만듭니다. */}
                       <div className="grid grid-cols-4 gap-4 w-full min-w-max">
                         <div>
                           <span className="text-[10px] font-black text-slate-400 uppercase mb-1 block tracking-wider whitespace-nowrap">1. 저장할 컬럼</span>
                           <select
                             value={mapping.targetColumn}
                             onChange={(e) => {
-                              const newArr = [...action.insertMappings!];
+                              const newArr = [...currentStep.insertMappings!];
                               newArr[idx].targetColumn = e.target.value;
-                              onUpdate({ ...action, insertMappings: newArr });
+                              updateCurrentStep({ insertMappings: newArr });
                             }}
                             className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg bg-slate-50 text-slate-900 min-w-[160px]"
-                            style={{ color: 'var(--text-primary)' }}
                           >
                             <option value="">-- 컬럼 선택 --</option>
-                            {(schemaData[action.insertTableName!] || []).map(col => <option key={col} value={col}>{col}</option>)}
+                            {(schemaData[currentStep.insertTableName!] || []).map(col => <option key={col} value={col}>{col}</option>)}
                           </select>
                         </div>
                         <div>
@@ -315,9 +437,9 @@ export default function ActionEditor({
                             <select
                               value={mapping.mappingType}
                               onChange={(e) => {
-                                const newArr = [...action.insertMappings!];
+                                const newArr = [...currentStep.insertMappings!];
                                 newArr[idx].mappingType = e.target.value as any;
-                                onUpdate({ ...action, insertMappings: newArr });
+                                updateCurrentStep({ insertMappings: newArr });
                               }}
                               className="flex-1 p-2.5 text-sm font-bold border border-indigo-100 rounded-lg bg-indigo-50 text-indigo-700 min-w-[180px]"
                             >
@@ -351,7 +473,7 @@ export default function ActionEditor({
                                     <div className="flex flex-wrap gap-1.5 p-1 border-b border-indigo-100/50 pb-2 mb-1">
                                       <span className="text-[9px] font-black text-indigo-400 w-full mb-1">클릭하여 컬럼 삽입:</span>
                                       {(() => {
-                                        const sourceTableId = action.tableName || '';
+                                        const sourceTableId = currentStep.tableName || '';
                                         const isVt = sourceTableId.startsWith('vt_');
                                         const vt = isVt ? virtualTables.find(v => v.id === sourceTableId) : null;
                                         const baseName = vt ? vt.baseTableName : sourceTableId;
@@ -364,9 +486,9 @@ export default function ActionEditor({
                                         
                                         return cols.map(col => (
                                           <button key={col} onClick={() => {
-                                            const newArr = [...action.insertMappings!];
+                                            const newArr = [...currentStep.insertMappings!];
                                             newArr[idx].sourceValue = (newArr[idx].sourceValue || '') + `{{${col}}}`;
-                                            onUpdate({ ...action, insertMappings: newArr });
+                                            updateCurrentStep({ insertMappings: newArr });
                                           }} className="px-2 py-1 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-indigo-600 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all shadow-sm">
                                             {col}
                                           </button>
@@ -380,9 +502,9 @@ export default function ActionEditor({
                                       value={mapping.sourceValue || ''}
                                       onFocus={(e: any) => handleInputInteraction(mapping.id, e, 'insert')}
                                       onChange={(e: any) => {
-                                        const newArr = [...action.insertMappings!];
+                                        const newArr = [...currentStep.insertMappings!];
                                         newArr[idx].sourceValue = e.target.value;
-                                        onUpdate({ ...action, insertMappings: newArr });
+                                        updateCurrentStep({ insertMappings: newArr });
                                         handleInputInteraction(mapping.id, e, 'insert');
                                       }}
                                       placeholder="컬럼을 클릭하거나 수식을 입력하세요 (예: {{성}} + {{이름}})"
@@ -394,20 +516,19 @@ export default function ActionEditor({
                                         type="text"
                                         value={mapping.sourceValue || ''}
                                         onChange={(e) => {
-                                          const newArr = [...action.insertMappings!];
+                                          const newArr = [...currentStep.insertMappings!];
                                           newArr[idx].sourceValue = e.target.value;
-                                          onUpdate({ ...action, insertMappings: newArr });
+                                          updateCurrentStep({ insertMappings: newArr });
                                         }}
                                         placeholder="값을 입력하세요"
                                         className="flex-1 p-2.5 text-sm font-bold border border-slate-200 rounded-lg focus:border-indigo-500 outline-none text-slate-900 bg-white"
-                                        style={{ color: 'var(--text-primary)' }}
                                       />
                                       <select
                                         value={mapping.valueType || 'string'}
                                         onChange={(e) => {
-                                          const newArr = [...action.insertMappings!];
+                                          const newArr = [...currentStep.insertMappings!];
                                           newArr[idx].valueType = e.target.value as 'string' | 'number';
-                                          onUpdate({ ...action, insertMappings: newArr });
+                                          updateCurrentStep({ insertMappings: newArr });
                                         }}
                                         className="p-2.5 text-xs font-bold border border-slate-200 rounded-lg text-slate-600 bg-white min-w-[100px]"
                                       >
@@ -435,17 +556,17 @@ export default function ActionEditor({
                               <div className="flex-1 min-w-[120px]">
                                 <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">입력 폼 기본값</label>
                                 <input type="number" value={mapping.defaultNumberValue ?? 1} onChange={(e) => {
-                                  const newArr = [...action.insertMappings!];
+                                  const newArr = [...currentStep.insertMappings!];
                                   newArr[idx].defaultNumberValue = Number(e.target.value);
-                                  onUpdate({ ...action, insertMappings: newArr });
+                                  updateCurrentStep({ insertMappings: newArr });
                                 }} className="w-full p-2 text-sm font-bold border rounded-lg" />
                               </div>
                               <div className="flex-1 min-w-[120px]">
                                 <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">증감폭 (+/- Step)</label>
                                 <input type="number" value={mapping.numberStep ?? 1} onChange={(e) => {
-                                  const newArr = [...action.insertMappings!];
+                                  const newArr = [...currentStep.insertMappings!];
                                   newArr[idx].numberStep = Number(e.target.value);
-                                  onUpdate({ ...action, insertMappings: newArr });
+                                  updateCurrentStep({ insertMappings: newArr });
                                 }} className="w-full p-2 text-sm font-bold border rounded-lg" />
                               </div>
                             </>
@@ -454,16 +575,16 @@ export default function ActionEditor({
                               <div className="flex-[2] min-w-[240px]">
                                 <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">버튼형 선택지 (콤마구분 ENUM)</label>
                                 <input type="text" placeholder="예: 출석, 지각, 조퇴, 결석" value={mapping.promptOptions || ''} onChange={(e) => {
-                                  const newArr = [...action.insertMappings!];
+                                  const newArr = [...currentStep.insertMappings!];
                                   newArr[idx].promptOptions = e.target.value;
-                                  onUpdate({ ...action, insertMappings: newArr });
+                                  updateCurrentStep({ insertMappings: newArr });
                                 }} className="w-full p-2 text-sm font-bold border rounded-lg" />
                               </div>
                               <div className="flex items-center gap-2 pb-2">
                                 <input type="checkbox" id={`custom-${mapping.id}`} checked={!!mapping.allowCustomPrompt} onChange={(e) => {
-                                  const newArr = [...action.insertMappings!];
+                                  const newArr = [...currentStep.insertMappings!];
                                   newArr[idx].allowCustomPrompt = e.target.checked;
-                                  onUpdate({ ...action, insertMappings: newArr });
+                                  updateCurrentStep({ insertMappings: newArr });
                                 }} className="w-4 h-4 accent-rose-500" />
                                 <label htmlFor={`custom-${mapping.id}`} className="text-xs font-bold text-slate-600 cursor-pointer">기타 직접 입력 허용</label>
                               </div>
@@ -479,14 +600,14 @@ export default function ActionEditor({
           )}
 
           {/* 데이터 수정 (Update) UI */}
-          {action.type === 'update_row' && (
+          {currentStep.type === 'update_row' && (
             <div className="space-y-5 border-t border-slate-200 pt-5 mt-5">
               <label className="flex items-center gap-2 text-sm font-bold text-slate-700 whitespace-nowrap">
                 <DatabaseZap size={16} className="text-rose-500"/> 수정할 대상 테이블
               </label>
               <select
-                value={action.updateTableName || ''}
-                onChange={(e) => onUpdate({ ...action, updateTableName: e.target.value, updateMappings: [] })}
+                value={currentStep.updateTableName || ''}
+                onChange={(e) => updateCurrentStep({ updateTableName: e.target.value, updateMappings: [] })}
                 className="w-full p-3 rounded-xl border border-rose-200 bg-rose-50 font-bold text-rose-800 outline-none min-w-[300px]"
               >
                 <option value="">테이블을 선택하세요</option>
@@ -494,14 +615,14 @@ export default function ActionEditor({
               </select>
               <p className="text-xs text-slate-500 font-bold whitespace-nowrap">* 클릭한 카드의 고유 <strong>'id'</strong> 값을 기준으로 데이터가 수정됩니다.</p>
 
-              {action.updateTableName && (
+              {currentStep.updateTableName && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="block text-sm font-bold text-slate-700 whitespace-nowrap">수정할 필드 매핑 및 타입 설정</label>
                     <button
                       onClick={() => {
-                        const nm: InsertMapping = { id: `m_${Date.now()}`, targetColumn: '', mappingType: 'prompt', sourceValue: '', valueType: 'string' };
-                        onUpdate({ ...action, updateMappings: [...(action.updateMappings || []), nm] });
+                        const nm: UpdateMapping = { id: `m_${Date.now()}`, targetColumn: '', mappingType: 'prompt', sourceValue: '', valueType: 'string' };
+                        updateCurrentStep({ updateMappings: [...(currentStep.updateMappings || []), nm] });
                       }}
                       className="text-xs bg-slate-800 text-white px-3 py-2 rounded-lg font-bold flex items-center gap-1 whitespace-nowrap shrink-0"
                     >
@@ -509,10 +630,13 @@ export default function ActionEditor({
                     </button>
                   </div>
 
-                  {(action.updateMappings || []).map((mapping, idx) => (
+                  {(currentStep.updateMappings || []).map((mapping: UpdateMapping, idx: number) => (
                     <div key={mapping.id} className="p-5 bg-white border-2 border-slate-100 rounded-2xl relative group shadow-sm">
                       <button
-                        onClick={() => onUpdate({ ...action, updateMappings: action.updateMappings!.filter(m => m.id !== mapping.id) })}
+                        onClick={() => {
+                          const newArr = currentStep.updateMappings!.filter(m => m.id !== mapping.id);
+                          updateCurrentStep({ updateMappings: newArr });
+                        }}
                         className="absolute -top-2 -right-2 bg-white text-rose-500 border border-rose-100 p-1.5 rounded-full opacity-0 group-hover:opacity-100 shadow-md transition-opacity"
                       >
                         <Trash2 size={14} />
@@ -524,15 +648,14 @@ export default function ActionEditor({
                           <select
                             value={mapping.targetColumn}
                             onChange={(e) => {
-                              const newArr = [...action.updateMappings!];
+                              const newArr = [...currentStep.updateMappings!];
                               newArr[idx].targetColumn = e.target.value;
-                              onUpdate({ ...action, updateMappings: newArr });
+                              updateCurrentStep({ updateMappings: newArr });
                             }}
                             className="w-full p-2.5 text-sm font-bold border border-slate-200 rounded-lg bg-slate-50 text-slate-900 min-w-[160px]"
-                            style={{ color: 'var(--text-primary)' }}
                           >
                             <option value="">-- 컬럼 선택 --</option>
-                            {(schemaData[action.updateTableName!] || []).map(col => <option key={col} value={col}>{col}</option>)}
+                            {(schemaData[currentStep.updateTableName!] || []).map(col => <option key={col} value={col}>{col}</option>)}
                           </select>
                         </div>
                         <div>
@@ -541,9 +664,9 @@ export default function ActionEditor({
                             <select
                               value={mapping.mappingType}
                               onChange={(e) => {
-                                const newArr = [...action.updateMappings!];
+                                const newArr = [...currentStep.updateMappings!];
                                 newArr[idx].mappingType = e.target.value as any;
-                                onUpdate({ ...action, updateMappings: newArr });
+                                updateCurrentStep({ updateMappings: newArr });
                               }}
                               className="flex-1 p-2.5 text-sm font-bold border border-indigo-100 rounded-lg bg-indigo-50 text-indigo-700 min-w-[180px]"
                             >
@@ -572,15 +695,14 @@ export default function ActionEditor({
                                   {mapping.mappingType === 'card_data' && (
                                     <div className="flex flex-wrap gap-1.5 p-1 border-b border-indigo-100/50 pb-2 mb-1">
                                       <span className="text-[9px] font-black text-indigo-400 w-full mb-1">클릭하여 컬럼 삽입:</span>
-                                      {(schemaData[action.tableName || ''] || []).length === 0 && (
+                                      {(schemaData[currentStep.tableName || ''] || []).length === 0 && (
                                         <div className="text-[10px] text-rose-500 font-bold py-1">⚠️ 상단에서 '소스 데이터 테이블'을 먼저 선택해야 컬럼 목록이 나타납니다.</div>
                                       )}
-                                      {(schemaData[action.tableName || ''] || []).map(col => (
+                                      {(schemaData[currentStep.tableName || ''] || []).map(col => (
                                         <button key={col} onClick={() => {
-                                           const newArr = [...action.updateMappings!];
-                                           // Basic 모드여도 조합 가능한 {{}} 형태로 삽입
+                                           const newArr = [...currentStep.updateMappings!];
                                            newArr[idx].sourceValue = (newArr[idx].sourceValue || '') + (mapping.isExpression ? `{{${col}}}` : `{{${col}}}`);
-                                           onUpdate({ ...action, updateMappings: newArr });
+                                           updateCurrentStep({ updateMappings: newArr });
                                         }} className="px-2 py-1 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-indigo-600 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all shadow-sm">
                                           {col}
                                         </button>
@@ -593,9 +715,9 @@ export default function ActionEditor({
                                       value={mapping.sourceValue || ''}
                                       onFocus={(e: any) => handleInputInteraction(mapping.id, e, 'update')}
                                       onChange={(e: any) => {
-                                        const newArr = [...action.updateMappings!];
+                                        const newArr = [...currentStep.updateMappings!];
                                         newArr[idx].sourceValue = e.target.value;
-                                        onUpdate({ ...action, updateMappings: newArr });
+                                        updateCurrentStep({ updateMappings: newArr });
                                         handleInputInteraction(mapping.id, e, 'update');
                                       }}
                                       placeholder="컬럼을 클릭하거나 수식을 입력하세요 (예: {{성}} + {{이름}})"
@@ -607,20 +729,19 @@ export default function ActionEditor({
                                         type="text"
                                         value={mapping.sourceValue || ''}
                                         onChange={(e) => {
-                                          const newArr = [...action.updateMappings!];
+                                          const newArr = [...currentStep.updateMappings!];
                                           newArr[idx].sourceValue = e.target.value;
-                                          onUpdate({ ...action, updateMappings: newArr });
+                                          updateCurrentStep({ updateMappings: newArr });
                                         }}
                                         placeholder="값을 입력하세요"
                                         className="flex-1 p-2.5 text-sm font-bold border border-slate-200 rounded-lg focus:border-indigo-500 outline-none text-slate-900 bg-white"
-                                        style={{ color: 'var(--text-primary)' }}
                                       />
                                       <select
                                         value={mapping.valueType || 'string'}
                                         onChange={(e) => {
-                                          const newArr = [...action.updateMappings!];
+                                          const newArr = [...currentStep.updateMappings!];
                                           newArr[idx].valueType = e.target.value as 'string' | 'number';
-                                          onUpdate({ ...action, updateMappings: newArr });
+                                          updateCurrentStep({ updateMappings: newArr });
                                         }}
                                         className="p-2.5 text-xs font-bold border border-slate-200 rounded-lg text-slate-600 bg-white min-w-[100px]"
                                       >
@@ -648,17 +769,17 @@ export default function ActionEditor({
                               <div className="flex-1 min-w-[120px]">
                                 <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">입력 폼 기본값 (시작값)</label>
                                 <input type="number" value={mapping.defaultNumberValue ?? 0} onChange={(e) => {
-                                  const newArr = [...action.updateMappings!];
+                                  const newArr = [...currentStep.updateMappings!];
                                   newArr[idx].defaultNumberValue = Number(e.target.value);
-                                  onUpdate({ ...action, updateMappings: newArr });
+                                  updateCurrentStep({ updateMappings: newArr });
                                 }} className="w-full p-2 text-sm font-bold border rounded-lg" />
                               </div>
                               <div className="flex-1 min-w-[120px]">
                                 <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">증감폭 (+/- Step)</label>
                                 <input type="number" value={mapping.numberStep ?? 1} onChange={(e) => {
-                                  const newArr = [...action.updateMappings!];
+                                  const newArr = [...currentStep.updateMappings!];
                                   newArr[idx].numberStep = Number(e.target.value);
-                                  onUpdate({ ...action, updateMappings: newArr });
+                                  updateCurrentStep({ updateMappings: newArr });
                                 }} className="w-full p-2 text-sm font-bold border rounded-lg" />
                               </div>
                             </>
@@ -667,16 +788,16 @@ export default function ActionEditor({
                               <div className="flex-[2] min-w-[240px]">
                                 <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">버튼형 선택지 (콤마구분 ENUM)</label>
                                 <input type="text" placeholder="예: 출석, 지각, 조퇴, 결석" value={mapping.promptOptions || ''} onChange={(e) => {
-                                  const newArr = [...action.updateMappings!];
+                                  const newArr = [...currentStep.updateMappings!];
                                   newArr[idx].promptOptions = e.target.value;
-                                  onUpdate({ ...action, updateMappings: newArr });
+                                  updateCurrentStep({ updateMappings: newArr });
                                 }} className="w-full p-2 text-sm font-bold border rounded-lg" />
                               </div>
                               <div className="flex items-center gap-2 pb-2">
                                 <input type="checkbox" id={`update-custom-${mapping.id}`} checked={!!mapping.allowCustomPrompt} onChange={(e) => {
-                                  const newArr = [...action.updateMappings!];
+                                  const newArr = [...currentStep.updateMappings!];
                                   newArr[idx].allowCustomPrompt = e.target.checked;
-                                  onUpdate({ ...action, updateMappings: newArr });
+                                  updateCurrentStep({ updateMappings: newArr });
                                 }} className="w-4 h-4 accent-rose-500" />
                                 <label htmlFor={`update-custom-${mapping.id}`} className="text-xs font-bold text-slate-600 cursor-pointer">기타 직접 입력 허용</label>
                               </div>
@@ -691,96 +812,67 @@ export default function ActionEditor({
             </div>
           )}
 
-          {/* 데이터 삭제 (Delete) UI */}
-          {action.type === 'delete_row' && (
-            <div className="space-y-5 border-t border-slate-200 pt-5 mt-5">
-              <label className="flex items-center gap-2 text-sm font-bold text-slate-700 whitespace-nowrap">
-                <DatabaseZap size={16} className="text-rose-500"/> 삭제할 대상 테이블
+          {/* 선택 데이터 삭제 (Delete) UI */}
+          {currentStep.type === 'delete_row' && (
+            <div className="space-y-4 border-t border-slate-200 pt-5 mt-5">
+              <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                <Trash2 size={16} className="text-rose-500"/> 삭제 대상 설정
               </label>
-              <select
-                value={action.deleteTableName || ''}
-                onChange={(e) => onUpdate({ ...action, deleteTableName: e.target.value })}
-                className="w-full p-3 rounded-xl border border-rose-200 bg-rose-50 font-bold text-rose-800 outline-none min-w-[300px]"
-              >
-                <option value="">테이블을 선택하세요</option>
-                {Object.keys(schemaData).map(table => <option key={table} value={table}>{table}</option>)}
-              </select>
-              <div className="p-4 bg-rose-50 text-rose-600 rounded-xl text-xs font-bold leading-relaxed border border-rose-100 whitespace-nowrap">
-                * 사용자가 클릭한 카드의 고유 <strong>'id'</strong> 값을 기준으로 데이터가 즉시 삭제됩니다.<br/>
-                * 연결된 테이블에 반드시 'id' 컬럼이 존재해야 안전하게 작동합니다.
+              <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl">
+                 <p className="text-xs font-bold text-rose-800">
+                   삭제 동작을 추가하면 해당 카드의 데이터를 즉시 삭제합니다. (삭제 전 재확인 팝업이 표시됩니다)
+                 </p>
               </div>
             </div>
           )}
 
           {/* 문자 발송 (SMS) UI */}
-          {action.type === 'send_sms' && (
+          {currentStep.type === 'send_sms' && (
             <div className="space-y-5 border-t border-slate-200 pt-5 mt-5">
-              <div className="p-4 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-xl break-keep leading-relaxed border border-emerald-100 shadow-sm">
-                💡 대상자의 전화번호는 <strong>students</strong> 테이블의 <strong>PHONE</strong> 컬럼에서 자동으로 찾아서 발송합니다! <br/>
-                (이름, 학번, 또는 student_id 정보를 기준으로 자동 검색)
-              </div>
               <label className="flex items-center gap-2 text-sm font-bold text-slate-700 whitespace-nowrap">
-                <MessageSquare size={16} className="text-emerald-500"/> 문자 내용 구성 테이블 선택
+                <MessageSquare size={16} className="text-rose-500"/> SMS 발송 설정
               </label>
-              <select
-                value={action.smsTableName || ''}
-                onChange={(e) => onUpdate({ ...action, smsTableName: e.target.value })}
-                className="w-full p-3 rounded-xl border border-emerald-200 bg-white font-bold text-slate-800 outline-none min-w-[300px]"
-              >
-                <option value="">-- 컬럼 목록을 불러올 테이블 선택 --</option>
-                {Object.keys(schemaData).map(table => <option key={table} value={table}>{table}</option>)}
-              </select>
+              
+              <div className="space-y-4">
+                 <div>
+                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">1. 수신자 번호 (컬럼 선택)</label>
+                   <select
+                     value={currentStep.smsTargetColumn || ''}
+                     onChange={(e) => updateCurrentStep({ smsTargetColumn: e.target.value })}
+                     className="w-full p-3 rounded-xl border border-slate-200 bg-white font-bold text-slate-900 outline-none"
+                   >
+                     <option value="">번호가 담긴 컬럼을 선택하세요</option>
+                     {(schemaData[currentStep.tableName || ''] || []).map(col => <option key={col} value={col}>{col}</option>)}
+                   </select>
+                 </div>
 
-              {action.smsTableName && (
-                <div className="space-y-5 mt-4 p-5 bg-white border-2 border-slate-100 rounded-2xl shadow-sm">
-                  <div>
-                    <label className="block text-sm font-black text-slate-700 mb-1">전송할 문자 메시지 (치환 템플릿)</label>
-                    <p className="text-[11px] font-bold text-slate-400 mb-3 block break-keep">
-                      아래 변수 버튼을 클릭하면 문구에 쏙 들어갑니다! 실제 발송 시 해당 데이터로 변경됩니다.
-                    </p>
-                    
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {(schemaData[action.smsTableName] || []).map(col => (
-                        <button 
-                          key={col} 
-                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-emerald-50 hover:border-emerald-200 border border-transparent text-slate-600 hover:text-emerald-600 text-[11px] font-black rounded-lg cursor-pointer transition-all shadow-sm active:scale-95"
-                          onClick={() => {
-                            const ta = document.getElementById('sms-textarea') as HTMLTextAreaElement;
-                            const newText = action.smsMessageTemplate ? action.smsMessageTemplate + `{{${col}}}` : `{{${col}}}`;
-                            onUpdate({ ...action, smsMessageTemplate: newText });
-                          }}
-                        >
-                          {`{{${col}}}`}
-                        </button>
-                      ))}
-                    </div>
-
-                    <textarea
-                      id="sms-textarea"
-                      value={action.smsMessageTemplate || ''}
-                      onChange={(e) => onUpdate({ ...action, smsMessageTemplate: e.target.value })}
-                      className="w-full p-4 rounded-xl border-2 border-slate-200 focus:border-emerald-500 font-mono text-sm leading-relaxed text-slate-900 outline-none transition-colors"
-                      rows={6}
-                      placeholder={`[공지]\n{{NAME}}님, 안녕하세요.\n{{BUN}}반 생활 기록 안내입니다.`}
-                    />
-                  </div>
-                </div>
-              )}
+                 <div>
+                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">2. 메시지 템플릿 (수식 지원)</label>
+                   <div className="bg-white border-2 border-slate-100 rounded-2xl p-4 space-y-4">
+                      <div className="flex flex-wrap gap-1.5 p-1 border-b border-indigo-100/50 pb-2 mb-1">
+                        <span className="text-[9px] font-black text-indigo-400 w-full mb-1">클릭하여 컬럼 삽입:</span>
+                        {(schemaData[currentStep.tableName || ''] || []).map(col => (
+                          <button key={col} onClick={() => {
+                            const val = currentStep.smsMessageTemplate || '';
+                            updateCurrentStep({ smsMessageTemplate: val + `{{${col}}}` });
+                          }} className="px-2 py-1 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
+                            {col}
+                          </button>
+                        ))}
+                      </div>
+                      <AutoExpandingTextarea
+                        value={currentStep.smsMessageTemplate || ''}
+                        onChange={(e: any) => updateCurrentStep({ smsMessageTemplate: e.target.value })}
+                        placeholder="메시지 내용을 입력하세요. {{이름}} 형태로 컬럼값을 넣을 수 있습니다."
+                        className="w-full p-3 text-sm font-bold bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-indigo-400 min-h-[100px]"
+                      />
+                   </div>
+                 </div>
+              </div>
             </div>
           )}
-
         </div>
-
-        <style jsx global>{`
-          input, select, textarea {
-            color: var(--text-primary, #0f172a) !important;
-          }
-          input::placeholder {
-            color: var(--text-secondary, #64748b) !important;
-          }
-        `}</style>
       </div>
-      {isHelpModalOpen && <FormulaHelpModal />}
     </div>
   );
 }

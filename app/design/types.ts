@@ -48,7 +48,7 @@ export type View = {
   name: string;
   icon?: string | null;
   tableName: string | null;
-  navPosition?: 'both' | 'bottom' | 'menu' | 'hidden';
+  navPosition?: 'both' | 'bottom' | 'top' | 'hidden';
   
   filterColumn?: string | null;  
   filterOperator?: 'eq' | 'neq' | 'like' | 'contains' | 'starts' | 'ends' | 'gt' | 'lt' | 'gte' | 'lte' | 'in' | 'between' | 'is_null' | 'is_not_null'; 
@@ -93,6 +93,8 @@ export type View = {
   groupSortDirection?: 'asc' | 'desc'; // 🔥 [신규] 1차 그룹 정렬
   groupSortDirection2?: 'asc' | 'desc'; // 🔥 [신규] 2차 그룹 정렬
   groupAccordionMode?: 'single' | 'multiple'; // 🔥 [신규] 아코디언 열림 방식
+  groupHeaderSticky?: boolean;   // 🔥 [신규] 1차 헤더 상단 고정 여부
+  groupHeaderSticky2?: boolean;  // 🔥 [신규] 2차 헤더 상단 고정 여부
   
   // 🔥 [신규] 어댑티브 메뉴 제어 (노출 조건 및 상태)
   visibilityExpr?: string;        // 노출/활성화 조건 (JS Expression)
@@ -152,13 +154,11 @@ export type InsertMapping = {
   isExpression?: boolean;      // 🔥 수식 모드 여부
 };
 
-export type Action = {
+export type ActionStep = {
   id: string;
-  name: string;
-  icon?: string | null;
   type: 'navigate' | 'alert' | 'link' | 'insert_row' | 'delete_row' | 'update_row' | 'send_sms';
-  targetViewId: string | null;
-  message: string | null;
+  targetViewId?: string | null;
+  message?: string | null;
   insertTableName?: string | null;
   insertMappings?: InsertMapping[];
   deleteTableName?: string | null;
@@ -169,8 +169,14 @@ export type Action = {
   smsTableName?: string | null;
   smsPhoneColumn?: string | null;
   smsMessageTemplate?: string | null;
-  tableName?: string | null; // 🔥 [신규] 소스 데이터 테이블 (카드 데이터 출처)
-  batchMode?: boolean; // 🔥 [신규] 다중 데이터 일괄 처리 모드
+  tableName?: string | null; // 소스 데이터 테이블
+  batchMode?: boolean; // 다중 데이터 일괄 처리 모드
+};
+
+export type Action = ActionStep & {
+  name: string;
+  icon?: string | null;
+  steps?: ActionStep[]; // 🔥 [신규] 다단계 동작 시퀀스
 };
 
 export type SchemaData = Record<string, string[]>;

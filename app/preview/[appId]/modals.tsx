@@ -19,7 +19,7 @@ export function InsertModal({ isOpen, onClose, action, formData, setFormData, on
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0">
+    <div className="fixed inset-0 z-[1500] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0">
       <div className="bg-white w-full max-w-md rounded-none shadow-xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
         <div className="p-4 border-b flex justify-between items-center bg-white">
           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><CheckCircle2 className="text-indigo-600" size={18} /> 데이터 추가</h3>
@@ -134,17 +134,18 @@ interface UpdateModalProps {
   isOpen: boolean;
   onClose: () => void;
   action: any;
+  rowData?: any; // 🔥 데이터 원본 객체 (ID 및 참조용)
   formData: Record<string, any>;
   setFormData: (data: Record<string, any>) => void;
   onSubmit: (forcedData?: any) => void;
   isUpdating: boolean;
 }
 
-export function UpdateModal({ isOpen, onClose, action, formData, setFormData, onSubmit, isUpdating }: UpdateModalProps) {
+export function UpdateModal({ isOpen, onClose, action, rowData, formData, setFormData, onSubmit, isUpdating }: UpdateModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0">
+    <div className="fixed inset-0 z-[1500] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0">
       <div className="bg-white w-full max-w-md rounded-none shadow-xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
         <div className="p-4 border-b flex justify-between items-center bg-white">
           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Zap className="text-rose-500" size={18} /> 데이터 수정</h3>

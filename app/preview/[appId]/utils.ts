@@ -29,6 +29,24 @@ export const evaluateExpression = (expr: string, rowData: any): any => {
   if (!expr) return '';
 
   try {
+    const d = new Date();
+    const Y = d.getFullYear();
+    const M = String(d.getMonth() + 1).padStart(2, '0');
+    const DD = String(d.getDate()).padStart(2, '0');
+    const HH = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+
+    const dateHelpers = {
+      now: d,
+      today: `${Y}-${M}-${DD}`,
+      year: Y,
+      month: d.getMonth() + 1,
+      date: d.getDate(),
+      day: d.getDate(),
+      time: `${HH}:${mm}:${ss}`,
+    };
+
     // {{컬럼명}} 패턴 치환
     let processedExpr = expr.replace(/\{\{(.*?)\}\}/g, (_, key) => {
       const k = key.trim();
@@ -39,8 +57,9 @@ export const evaluateExpression = (expr: string, rowData: any): any => {
       return JSON.stringify(val);
     });
 
-    // 샌드박스화된 실행 (간단한 수식용)
-    // context를 통해 rowData에 직접 접근도 가능하게 함
+    // 샌드박스화된 실행
+    // context를 통해 rowData 및 dateHelpers에 직접 접근 가능하게 함
+    const context = { ...(rowData || {}), ...dateHelpers };
     const func = new Function('context', `
       with(context) {
         try {
@@ -50,7 +69,7 @@ export const evaluateExpression = (expr: string, rowData: any): any => {
         }
       }
     `);
-    return func(rowData || {});
+    return func(context);
   } catch (err) {
     // 수식이 아니거나 평가 실패 시 원본 혹은 에러 메시지 반환
     return expr;

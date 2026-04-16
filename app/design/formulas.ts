@@ -30,10 +30,11 @@ export const FORMULA_EXAMPLES: FormulaCategory[] = [
     iconType: 'math',
     color: 'emerald',
     items: [
-      { title: "현재 년도 (4자리)", code: "new Date().getFullYear()", desc: "결과: 2024" },
-      { title: "현재 월 (1-12)", code: "new Date().getMonth() + 1", desc: "결과: 4" },
-      { title: "현재 일 (1-31)", code: "new Date().getDate()", desc: "결과: 11" },
-      { title: "표준 날짜 (YYYY-MM-DD)", code: "new Date().toISOString().split('T')[0]", desc: "결과: 2024-04-11" },
+      { title: "오늘 (YYYY-MM-DD)", code: "today", desc: "결과: 2026-04-14 (현재 날짜)" },
+      { title: "현재 년도 (4자리)", code: "year", desc: "결과: 2026" },
+      { title: "현재 월 (1-12)", code: "month", desc: "결과: 4" },
+      { title: "현재 일 (1-31)", code: "date", desc: "결과: 14" },
+      { title: "현재 시간 (HH:mm:ss)", code: "time", desc: "결과: 15:30:45" },
     ]
   },
   {

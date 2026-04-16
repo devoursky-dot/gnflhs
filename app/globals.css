@@ -1,8 +1,23 @@
 @import "tailwindcss";
 
+/* ============================================================
+   🎨 입력 요소 전용 대비 보장 프리셋 (Input Contrast Preset)
+   배경색과 글자색이 항상 서로 대비되도록 CSS 변수로 고정합니다.
+   OS 다크모드와 무관하게 입력란은 항상 밝은 배경 + 진한 글자로
+   표시되어 가시성을 보장합니다.
+============================================================ */
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* 입력 요소 대비 프리셋 — 절대로 다크모드 미디어 쿼리가 덮어쓰지 않도록 :root에 고정 */
+  --input-bg:          #ffffff;   /* 항상 흰색 배경 */
+  --input-text:        #0f172a;   /* slate-900: 항상 진한 글자 */
+  --input-placeholder: #94a3b8;   /* slate-400: 희미한 힌트 */
+  --input-border:      #e2e8f0;   /* slate-200: 테두리 */
+  --input-border-focus:#6366f1;   /* indigo-500: 포커스 테두리 */
+  --input-selection-bg:#e0e7ff;   /* indigo-100: 텍스트 선택 배경 */
+  --input-selection-text:#1e1b4b; /* indigo-950: 텍스트 선택 글자 */
 }
 
 @theme inline {
@@ -16,6 +31,12 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    /* 입력 요소는 다크모드에서도 동일한 밝은 프리셋 유지 */
+    --input-bg:          #ffffff;
+    --input-text:        #0f172a;
+    --input-placeholder: #94a3b8;
+    --input-border:      #e2e8f0;
+    --input-border-focus:#6366f1;
   }
 }
 
@@ -23,4 +44,41 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ============================================================
+   🔒 전역 입력 요소 색상 강제 고정
+   Tailwind 유틸리티 클래스가 누락되거나 충돌하더라도
+   입력란의 배경-글자 대비가 항상 보장됩니다.
+============================================================ */
+input,
+textarea,
+select {
+  background-color: var(--input-bg)       !important;
+  color:            var(--input-text)      !important;
+  -webkit-text-fill-color: var(--input-text) !important; /* Safari/WebKit 추가 보장 */
+  caret-color:      var(--input-text)      !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color:            var(--input-placeholder) !important;
+  -webkit-text-fill-color: var(--input-placeholder) !important;
+  opacity: 1;
+}
+
+input::selection,
+textarea::selection {
+  background-color: var(--input-selection-bg)   !important;
+  color:            var(--input-selection-text)  !important;
+  -webkit-text-fill-color: var(--input-selection-text) !important;
+}
+
+/* 오토필 배경색 덮어쓰기 (브라우저 기본 노란 배경 방지) */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--input-bg) inset !important;
+  -webkit-text-fill-color: var(--input-text) !important;
 }

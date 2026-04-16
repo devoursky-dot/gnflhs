@@ -1,11 +1,11 @@
-// 파일 경로: app/design/view.tsx
+﻿// ?뚯씪 寃쎈줈: app/design/view.tsx
 "use client";
 
 import React, { useState } from 'react';
 import { View, SchemaData, LayoutRow, Action, LayoutCell, VirtualTable } from './types';
 import { 
   Database, LayoutTemplate, Plus, Columns, Rows, ChevronLeft, 
-  ChevronRight, X, MousePointerClick, Star, Filter, Search, Smartphone, Eye, Loader2, TableProperties, ArrowUpDown, FolderTree, Trash2, Minus, Wand2, Image as ImageIcon, Type, Sparkles, AlignLeft, AlignCenter, AlignRight, Lock, Zap, Settings2, ArrowUpCircle
+  ChevronRight, X, MousePointerClick, Star, Filter, Search, Smartphone, Eye, Loader2, TableProperties, ArrowUpDown, FolderTree, Trash2, Minus, Wand2, Image as ImageIcon, Type, Sparkles, AlignLeft, AlignCenter, AlignRight, Lock, Zap, Settings2
 } from 'lucide-react';
 import { supabase } from '@/app/supabaseClient';
 import IconPicker, { IconMap } from './picker';
@@ -13,11 +13,11 @@ import { FORMULA_EXAMPLES } from './formulas';
 import { resolveVirtualData } from '../preview/[appId]/utils';
 
 const REGEX_PRESETS = [
-  { name: '전화번호 하이픈 (-)', pattern: '(\\d{3})(\\d{3,4})(\\d{4})', replace: '$1-$2-$3' },
-  { name: '천단위 콤마 (₩)', pattern: '\\B(?=(\\d{3})+(?!\\d))', replace: ',' },
-  { name: '앞 2글자 요약 (...)', pattern: '^(.{2}).*$', replace: '$1...' },
-  { name: '이름 마스킹 (김*수)', pattern: '^(.)(.*)(.)$', replace: '$1*$3' },
-  { name: '모든 숫자 가리기', pattern: '\\d', replace: '*' }
+  { name: '?꾪솕踰덊샇 ?섏씠??(-)', pattern: '(\\d{3})(\\d{3,4})(\\d{4})', replace: '$1-$2-$3' },
+  { name: '泥쒕떒??肄ㅻ쭏 (??', pattern: '\\B(?=(\\d{3})+(?!\\d))', replace: ',' },
+  { name: '??2湲???붿빟 (...)', pattern: '^(.{2}).*$', replace: '$1...' },
+  { name: '?대쫫 留덉뒪??(源*??', pattern: '^(.)(.*)(.)$', replace: '$1*$3' },
+  { name: '紐⑤뱺 ?レ옄 媛由ш린', pattern: '\\d', replace: '*' }
 ];
 
 const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () => void, onSave: (data: LayoutCell) => void }) => {
@@ -34,7 +34,7 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
     
     setData({ ...data, textExpression: newVal });
     
-    // 삽입 후 포커스 유지 및 커서 위치 조정
+    // ?쎌엯 ???ъ빱???좎? 諛?而ㅼ꽌 ?꾩튂 議곗젙
     setTimeout(() => {
       textarea.focus();
       textarea.setSelectionRange(start + snippet.length, start + snippet.length);
@@ -47,47 +47,47 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
         <div className="p-6 border-b flex justify-between items-center bg-slate-50">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-600 text-white rounded-xl"><Wand2 size={20}/></div>
-            <h3 className="text-xl font-black text-slate-800">데이터 꾸미기 옵션</h3>
+            <h3 className="text-xl font-black text-slate-800">?곗씠??袁몃?湲??듭뀡</h3>
           </div>
           <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition-colors"><X size={20}/></button>
         </div>
 
         <div className="p-8 space-y-8 overflow-y-auto max-h-[75vh] bg-slate-50/50">
-          {/* ── 공통 텍스트 스타일링 (액션/필드 공통) ── */}
+          {/* ?? 怨듯넻 ?띿뒪???ㅽ??쇰쭅 (?≪뀡/?꾨뱶 怨듯넻) ?? */}
           <div className="bg-white p-6 rounded-3xl border-2 border-slate-100 shadow-sm space-y-6 animate-in slide-in-from-top-2">
             <div className="flex items-center gap-2 text-slate-800 mb-2 border-b border-slate-50 pb-3">
-              <Type size={18}/><h4 className="text-sm font-black tracking-tight">글꼴 및 텍스트 스타일</h4>
+              <Type size={18}/><h4 className="text-sm font-black tracking-tight">湲瑗?諛??띿뒪???ㅽ???/h4>
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 pl-1 uppercase tracking-wider">글자 크기 (Size)</label>
+                <label className="text-[10px] font-black text-slate-500 pl-1 uppercase tracking-wider">湲???ш린 (Size)</label>
                 <select value={data.textSize || ''} onChange={e => setData({...data, textSize: e.target.value})} className="w-full p-3 text-xs rounded-xl border-2 border-slate-50 font-black text-slate-800 focus:border-indigo-500 outline-none cursor-pointer bg-slate-50/50">
-                  <option value="">기본 (14px)</option>
-                  <option value="text-[10px]">초소형 (10px)</option>
-                  <option value="text-xs">아주 작게 (12px)</option>
-                  <option value="text-sm">작게 (14px)</option>
-                  <option value="text-base">보통 (16px)</option>
-                  <option value="text-lg">크게 (18px)</option>
-                  <option value="text-xl">매우 크게 (20px)</option>
-                  <option value="text-2xl">특대 (24px)</option>
+                  <option value="">湲곕낯 (14px)</option>
+                  <option value="text-[10px]">珥덉냼??(10px)</option>
+                  <option value="text-xs">?꾩＜ ?묎쾶 (12px)</option>
+                  <option value="text-sm">?묎쾶 (14px)</option>
+                  <option value="text-base">蹂댄넻 (16px)</option>
+                  <option value="text-lg">?ш쾶 (18px)</option>
+                  <option value="text-xl">留ㅼ슦 ?ш쾶 (20px)</option>
+                  <option value="text-2xl">?밸? (24px)</option>
                 </select>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 pl-1 uppercase tracking-wider">글자 굵기 (Weight)</label>
+                <label className="text-[10px] font-black text-slate-500 pl-1 uppercase tracking-wider">湲??援듦린 (Weight)</label>
                 <select value={data.textWeight || ''} onChange={e => setData({...data, textWeight: e.target.value})} className="w-full p-3 text-xs rounded-xl border-2 border-slate-50 font-black text-slate-800 focus:border-indigo-500 outline-none cursor-pointer bg-slate-50/50">
-                  <option value="">기본 (Black)</option>
-                  <option value="font-normal">얇게 (Normal)</option>
-                  <option value="font-medium">중간 (Medium)</option>
-                  <option value="font-bold">굵게 (Bold)</option>
-                  <option value="font-black">매우 굵게 (Black)</option>
+                  <option value="">湲곕낯 (Black)</option>
+                  <option value="font-normal">?뉕쾶 (Normal)</option>
+                  <option value="font-medium">以묎컙 (Medium)</option>
+                  <option value="font-bold">援듦쾶 (Bold)</option>
+                  <option value="font-black">留ㅼ슦 援듦쾶 (Black)</option>
                 </select>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 pl-1 uppercase tracking-wider">글자 정렬 (Align)</label>
+                <label className="text-[10px] font-black text-slate-500 pl-1 uppercase tracking-wider">湲???뺣젹 (Align)</label>
                 <div className="flex bg-slate-50 rounded-xl border-2 border-slate-50 p-1">
                   <button onClick={() => setData({...data, textAlign: 'left'})} className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all ${(!data.textAlign || data.textAlign === 'left') ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400'}`}><AlignLeft size={16}/></button>
                   <button onClick={() => setData({...data, textAlign: 'center'})} className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all ${data.textAlign === 'center' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400'}`}><AlignCenter size={16}/></button>
@@ -95,7 +95,7 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 pl-1 uppercase tracking-wider">커스텀 색상 (Color)</label>
+                <label className="text-[10px] font-black text-slate-500 pl-1 uppercase tracking-wider">而ㅼ뒪? ?됱긽 (Color)</label>
                 <input 
                   type="color" 
                   value={data.textColor || '#1e293b'} 
@@ -110,19 +110,19 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
               <div className="bg-white p-6 rounded-3xl border-2 border-indigo-100 shadow-sm space-y-8">
                 <div className="flex items-center gap-2 text-indigo-700 mb-2 border-b border-indigo-50 pb-3">
-                  <MousePointerClick size={18}/><h4 className="text-sm font-black tracking-tight">액션 버튼 고급 스타일링</h4>
+                  <MousePointerClick size={18}/><h4 className="text-sm font-black tracking-tight">?≪뀡 踰꾪듉 怨좉툒 ?ㅽ??쇰쭅</h4>
                 </div>
 
-                {/* 1. 버튼 모양 및 정렬 */}
+                {/* 1. 踰꾪듉 紐⑥뼇 諛??뺣젹 */}
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-3">
-                    <label className="text-[11px] font-black text-slate-500 pl-1 uppercase tracking-wider">버튼 모양 (Shape)</label>
+                    <label className="text-[11px] font-black text-slate-500 pl-1 uppercase tracking-wider">踰꾪듉 紐⑥뼇 (Shape)</label>
                     <div className="flex bg-slate-50 p-1 rounded-2xl border border-slate-100">
                       {[
-                        { id: 'square', label: '사각형' },
-                        { id: 'rounded', label: '둥근 사각' },
-                        { id: 'pill', label: '알약형' },
-                        { id: 'none', label: '모양없음' }
+                        { id: 'square', label: '?ш컖?? },
+                        { id: 'rounded', label: '?κ렐 ?ш컖' },
+                        { id: 'pill', label: '?뚯빟?? },
+                        { id: 'none', label: '紐⑥뼇?놁쓬' }
                       ].map(s => (
                         <button 
                           key={s.id} 
@@ -135,30 +135,30 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <label className="text-[11px] font-black text-slate-500 pl-1 uppercase tracking-wider">버튼 배치 (Align) & 구성</label>
+                    <label className="text-[11px] font-black text-slate-500 pl-1 uppercase tracking-wider">踰꾪듉 諛곗튂 (Align) & 援ъ꽦</label>
                     <div className="grid grid-cols-2 gap-2">
                       <select value={data.buttonAlign || 'full'} onChange={e => setData({...data, buttonAlign: e.target.value as any})} className="w-full p-2.5 text-xs rounded-xl border-2 border-slate-100 font-bold text-slate-700 outline-none focus:border-indigo-500">
-                        <option value="full">꽉 채우기 (Full)</option><option value="left">왼쪽</option><option value="center">가운데</option><option value="right">오른쪽</option>
+                        <option value="full">苑?梨꾩슦湲?(Full)</option><option value="left">?쇱そ</option><option value="center">媛?대뜲</option><option value="right">?ㅻⅨ履?/option>
                       </select>
                       <select value={data.buttonStyle || 'both'} onChange={e => setData({...data, buttonStyle: e.target.value as any})} className="w-full p-2.5 text-xs rounded-xl border-2 border-slate-100 font-bold text-slate-700 outline-none focus:border-indigo-500">
-                        <option value="both">아이콘+글자</option><option value="icon">아이콘만</option><option value="text">글자만</option>
+                        <option value="both">?꾩씠肄?湲??/option><option value="icon">?꾩씠肄섎쭔</option><option value="text">湲?먮쭔</option>
                       </select>
                     </div>
                   </div>
                 </div>
 
-                {/* 2. 최신 트렌드 스타일 (Variant) */}
+                {/* 2. 理쒖떊 ?몃젋???ㅽ???(Variant) */}
                 <div className="space-y-3">
-                  <label className="text-[11px] font-black text-slate-500 pl-1 uppercase tracking-wider">최신 트렌드 스타일 (Variant)</label>
+                  <label className="text-[11px] font-black text-slate-500 pl-1 uppercase tracking-wider">理쒖떊 ?몃젋???ㅽ???(Variant)</label>
                   <div className="grid grid-cols-4 gap-3">
                     {[
-                      { id: 'default', name: '기본형', icon: '✨' },
-                      { id: 'raised', name: '돌출형', icon: '🔼' },
-                      { id: 'inset', name: '움푹패인형', icon: '🔽' },
-                      { id: 'outline', name: '테두리형', icon: '⬜' },
-                      { id: '3d', name: '입체형(3D)', icon: '🧊' },
-                      { id: 'shadow', name: '그림자형', icon: '🌫️' },
-                      { id: 'glass', name: '유리광택(Glass)', icon: '💎' }
+                      { id: 'default', name: '湲곕낯??, icon: '?? },
+                      { id: 'raised', name: '?뚯텧??, icon: '?뵾' },
+                      { id: 'inset', name: '??뱁뙣?명삎', icon: '?뵿' },
+                      { id: 'outline', name: '?뚮몢由ы삎', icon: '燧? },
+                      { id: '3d', name: '?낆껜??3D)', icon: '?쭒' },
+                      { id: 'shadow', name: '洹몃┝?먰삎', icon: '?뙧截? },
+                      { id: 'glass', name: '?좊━愿묓깮(Glass)', icon: '?뭿' }
                     ].map(v => (
                       <button 
                         key={v.id}
@@ -172,9 +172,9 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
                   </div>
                 </div>
 
-                {/* 3. 버튼 컬러 (Color) */}
+                {/* 3. 踰꾪듉 而щ윭 (Color) */}
                 <div className="space-y-3">
-                  <label className="text-[11px] font-black text-slate-500 pl-1 uppercase tracking-wider">버튼 컬러 팔레트 (Color)</label>
+                  <label className="text-[11px] font-black text-slate-500 pl-1 uppercase tracking-wider">踰꾪듉 而щ윭 ?붾젅??(Color)</label>
                   <div className="flex flex-wrap gap-3">
                     {[
                       { id: 'slate', color: 'bg-slate-900' },
@@ -191,7 +191,7 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
                         onClick={() => setData({...data, buttonColor: c.id})}
                         className={`w-10 h-10 rounded-full ${c.color} transition-all relative ${data.buttonColor === c.id || (!data.buttonColor && c.id === 'slate') ? 'ring-4 ring-indigo-200 scale-110' : 'hover:scale-110'}`}
                       >
-                        {(data.buttonColor === c.id || (!data.buttonColor && c.id === 'slate')) && <div className="absolute inset-0 flex items-center justify-center text-white text-[10px]">✓</div>}
+                        {(data.buttonColor === c.id || (!data.buttonColor && c.id === 'slate')) && <div className="absolute inset-0 flex items-center justify-center text-white text-[10px]">??/div>}
                       </button>
                     ))}
                   </div>
@@ -204,8 +204,8 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
                 <div className="flex items-center gap-3">
                   <ImageIcon className={data.isImage ? "text-indigo-600" : "text-slate-400"} />
                   <div>
-                    <p className="font-black text-slate-800">이 데이터를 이미지로 표시할까요?</p>
-                    <p className="text-[11px] font-bold text-slate-400 mt-1">DB에 저장된 텍스트가 사진 URL일 경우 켜주세요.</p>
+                    <p className="font-black text-slate-800">???곗씠?곕? ?대?吏濡??쒖떆?좉퉴??</p>
+                    <p className="text-[11px] font-bold text-slate-400 mt-1">DB????λ맂 ?띿뒪?멸? ?ъ쭊 URL??寃쎌슦 耳쒖＜?몄슂.</p>
                   </div>
                 </div>
                 <button onClick={() => setData({ ...data, isImage: !data.isImage })} className={`w-14 h-8 rounded-full transition-colors relative ${data.isImage ? 'bg-indigo-600' : 'bg-slate-300'}`}>
@@ -215,79 +215,79 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
 
               {data.isImage ? (
                 <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                  <label className="text-xs font-black text-indigo-600 uppercase tracking-widest pl-1">이미지 모양 선택</label>
+                  <label className="text-xs font-black text-indigo-600 uppercase tracking-widest pl-1">?대?吏 紐⑥뼇 ?좏깮</label>
                   <div className="grid grid-cols-3 gap-4">
-                    <button onClick={() => setData({...data, imageShape: 'square'})} className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all ${(!data.imageShape || data.imageShape === 'square') ? 'border-indigo-600 bg-indigo-50 shadow-md' : 'border-slate-200 bg-white hover:border-indigo-300'}`}><div className="w-12 h-12 bg-slate-300"></div><span className="text-xs font-black text-slate-700">기본 사각형</span></button>
-                    <button onClick={() => setData({...data, imageShape: 'rounded'})} className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all ${data.imageShape === 'rounded' ? 'border-indigo-600 bg-indigo-50 shadow-md' : 'border-slate-200 bg-white hover:border-indigo-300'}`}><div className="w-12 h-12 bg-slate-300 rounded-xl"></div><span className="text-xs font-black text-slate-700">둥근 사각형</span></button>
-                    <button onClick={() => setData({...data, imageShape: 'circle'})} className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all ${data.imageShape === 'circle' ? 'border-indigo-600 bg-indigo-50 shadow-md' : 'border-slate-200 bg-white hover:border-indigo-300'}`}><div className="w-12 h-12 bg-slate-300 rounded-full flex items-start justify-center overflow-hidden"><div className="w-6 h-6 bg-slate-400 rounded-full mt-1"></div></div><span className="text-xs font-black text-slate-700">증명사진 원형</span></button>
+                    <button onClick={() => setData({...data, imageShape: 'square'})} className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all ${(!data.imageShape || data.imageShape === 'square') ? 'border-indigo-600 bg-indigo-50 shadow-md' : 'border-slate-200 bg-white hover:border-indigo-300'}`}><div className="w-12 h-12 bg-slate-300"></div><span className="text-xs font-black text-slate-700">湲곕낯 ?ш컖??/span></button>
+                    <button onClick={() => setData({...data, imageShape: 'rounded'})} className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all ${data.imageShape === 'rounded' ? 'border-indigo-600 bg-indigo-50 shadow-md' : 'border-slate-200 bg-white hover:border-indigo-300'}`}><div className="w-12 h-12 bg-slate-300 rounded-xl"></div><span className="text-xs font-black text-slate-700">?κ렐 ?ш컖??/span></button>
+                    <button onClick={() => setData({...data, imageShape: 'circle'})} className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all ${data.imageShape === 'circle' ? 'border-indigo-600 bg-indigo-50 shadow-md' : 'border-slate-200 bg-white hover:border-indigo-300'}`}><div className="w-12 h-12 bg-slate-300 rounded-full flex items-start justify-center overflow-hidden"><div className="w-6 h-6 bg-slate-400 rounded-full mt-1"></div></div><span className="text-xs font-black text-slate-700">利앸챸?ъ쭊 ?먰삎</span></button>
                   </div>
-                  <p className="text-[10px] text-slate-400 font-bold px-2 text-center">* 원형은 인물 사진을 고려하여 자동으로 '위쪽(Top)'을 기준으로 둥글게 잘라냅니다.</p>
+                  <p className="text-[10px] text-slate-400 font-bold px-2 text-center">* ?먰삎? ?몃Ъ ?ъ쭊??怨좊젮?섏뿬 ?먮룞?쇰줈 '?꾩そ(Top)'??湲곗??쇰줈 ?κ?寃??섎씪?낅땲??</p>
                 </div>
               ) : (
                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 pt-2">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 pl-1">글자 색상 (Color)</label>
+                    <label className="text-[10px] font-black text-slate-500 pl-1">湲???됱긽 (Color)</label>
                     <select value={data.textColor || ''} onChange={e => setData({...data, textColor: e.target.value})} className="w-full p-3 text-sm rounded-xl border-2 border-slate-100 font-bold text-slate-900 focus:border-indigo-500 outline-none cursor-pointer" style={{ color: 'var(--text-primary)' }}>
-                      <option value="">기본 색상</option>
-                      <option value="text-slate-500">회색 (Slate)</option>
-                      <option value="text-indigo-600">청보라 (Indigo)</option>
-                      <option value="text-blue-600">파랑 (Blue)</option>
-                      <option value="text-emerald-600">초록 (Emerald)</option>
-                      <option value="text-rose-600">빨강 (Rose)</option>
-                      <option value="text-amber-600">주황 (Amber)</option>
-                      <option value="text-white">흰색 (White - 어두운 배경용)</option>
+                      <option value="">湲곕낯 ?됱긽</option>
+                      <option value="text-slate-500">?뚯깋 (Slate)</option>
+                      <option value="text-indigo-600">泥?낫??(Indigo)</option>
+                      <option value="text-blue-600">?뚮옉 (Blue)</option>
+                      <option value="text-emerald-600">珥덈줉 (Emerald)</option>
+                      <option value="text-rose-600">鍮④컯 (Rose)</option>
+                      <option value="text-amber-600">二쇳솴 (Amber)</option>
+                      <option value="text-white">?곗깋 (White - ?대몢??諛곌꼍??</option>
                     </select>
                   </div>
 
-                  {/* ⚡ 데이터 가공 파이프라인 가이드 UI */}
+                  {/* ???곗씠??媛怨??뚯씠?꾨씪??媛?대뱶 UI */}
                   <div className="py-6 flex flex-col items-center">
                     <div className="w-full h-px bg-slate-200 relative mb-8">
                        <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-4 text-[11px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Data Transformation Pipeline</span>
                     </div>
                     
                     <div className="flex items-center justify-between w-full max-w-sm relative">
-                      {/* 파이프라인 선 */}
+                      {/* ?뚯씠?꾨씪????*/}
                       <div className="absolute top-1/2 left-0 w-full h-0.5 bg-indigo-100 -translate-y-1/2 -z-10"></div>
                       
                       <div className="flex flex-col items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-black shadow-lg">1</div>
-                        <span className="text-[10px] font-black text-indigo-600">수식 계산</span>
+                        <span className="text-[10px] font-black text-indigo-600">?섏떇 怨꾩궛</span>
                       </div>
                       
                       <div className="flex flex-col items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-black shadow-lg">2</div>
-                        <span className="text-[10px] font-black text-blue-500">정규식 패턴</span>
+                        <span className="text-[10px] font-black text-blue-500">?뺢퇋???⑦꽩</span>
                       </div>
                       
                       <div className="flex flex-col items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-black shadow-lg">3</div>
-                        <span className="text-[10px] font-black text-emerald-500">앞/뒷말 추가</span>
+                        <span className="text-[10px] font-black text-emerald-500">???룸쭚 異붽?</span>
                       </div>
                     </div>
                     <p className="mt-6 text-[11px] font-bold text-slate-400 bg-slate-50 px-4 py-2 rounded-full border border-slate-100 italic">
-                      💡 위 순서대로 데이터가 차례대로 가공됩니다. (조합 가능!)
+                      ?뮕 ???쒖꽌?濡??곗씠?곌? 李⑤??濡?媛怨듬맗?덈떎. (議고빀 媛??)
                     </p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 pb-4">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-emerald-600 pl-1 uppercase tracking-tighter flex items-center gap-1"><span className="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center">3</span> 데이터 앞글자 추가 (Prefix)</label>
-                      <input value={data.textPrefix || ''} onChange={e => setData({...data, textPrefix: e.target.value})} className="w-full p-4 rounded-xl border-2 border-slate-100 font-bold text-slate-900 focus:border-emerald-500 outline-none transition-colors" style={{ color: 'var(--text-primary)' }} placeholder="예: [ " />
+                      <label className="text-[10px] font-black text-emerald-600 pl-1 uppercase tracking-tighter flex items-center gap-1"><span className="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center">3</span> ?곗씠???욊???異붽? (Prefix)</label>
+                      <input value={data.textPrefix || ''} onChange={e => setData({...data, textPrefix: e.target.value})} className="w-full p-4 rounded-xl border-2 border-slate-100 font-bold text-slate-900 focus:border-emerald-500 outline-none transition-colors" style={{ color: 'var(--text-primary)' }} placeholder="?? [ " />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-emerald-600 pl-1 uppercase tracking-tighter flex items-center gap-1"><span className="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center">3</span> 데이터 뒷글자 추가 (Suffix)</label>
-                      <input value={data.textSuffix || ''} onChange={e => setData({...data, textSuffix: e.target.value})} className="w-full p-4 rounded-xl border-2 border-slate-100 font-bold text-slate-900 focus:border-emerald-500 outline-none transition-colors" style={{ color: 'var(--text-primary)' }} placeholder="예: ] 원" />
+                      <label className="text-[10px] font-black text-emerald-600 pl-1 uppercase tracking-tighter flex items-center gap-1"><span className="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center">3</span> ?곗씠???룰???異붽? (Suffix)</label>
+                      <input value={data.textSuffix || ''} onChange={e => setData({...data, textSuffix: e.target.value})} className="w-full p-4 rounded-xl border-2 border-slate-100 font-bold text-slate-900 focus:border-emerald-500 outline-none transition-colors" style={{ color: 'var(--text-primary)' }} placeholder="?? ] ?? />
                     </div>
                   </div>
                   
-                  {/* 1단계: 마법의 수식 엔진 */}
+                  {/* 1?④퀎: 留덈쾿???섏떇 ?붿쭊 */}
                   <div className="p-6 bg-indigo-50/50 rounded-[2.5rem] border-2 border-indigo-100 space-y-6">
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-black text-indigo-700 uppercase tracking-widest flex items-center gap-1.5">
                         <span className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-black">1</span> 
-                        <Sparkles size={16}/> 마법의 수식 라이브러리 (Formula)
+                        <Sparkles size={16}/> 留덈쾿???섏떇 ?쇱씠釉뚮윭由?(Formula)
                       </label>
-                      <button onClick={() => setData({...data, textExpression: ''})} className="text-[10px] font-black text-rose-500 bg-rose-50 px-2 py-1 rounded-lg hover:bg-rose-100 transition-colors">초기화</button>
+                      <button onClick={() => setData({...data, textExpression: ''})} className="text-[10px] font-black text-rose-500 bg-rose-50 px-2 py-1 rounded-lg hover:bg-rose-100 transition-colors">珥덇린??/button>
                     </div>
 
                     <div className="space-y-5">
@@ -311,35 +311,33 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
                     </div>
 
                     <div className="space-y-2 pt-2 border-t border-indigo-100">
-                      <label className="text-[10px] font-black text-indigo-500 pl-1">수식 에디터 (Javascript)</label>
+                      <label className="text-[10px] font-black text-indigo-500 pl-1">?섏떇 ?먮뵒??(Javascript)</label>
                       <textarea 
                         ref={formulaRef}
                         value={data.textExpression || ''} 
                         onChange={e => setData({...data, textExpression: e.target.value})}
                         rows={4}
-                        className="w-full p-4 border-4 border-slate-900 rounded-3xl font-mono text-sm text-white focus:border-indigo-500 outline-none bg-slate-900 leading-relaxed resize-none shadow-2xl"
-                        placeholder="예: val === 'Y' ? '완료' : '대기'"
-                        style={{ color: '#ffffff', backgroundColor: '#0f172a' }}
+                        className="w-full p-4 border-2 border-indigo-100 rounded-3xl font-mono text-xs text-slate-900 focus:border-indigo-500 outline-none bg-white leading-relaxed resize-none shadow-inner"
+                        placeholder="?? val === 'Y' ? '?꾨즺' : '?湲?"
                       />
                       <div className="flex justify-between items-center px-1">
-                        <p className="text-[9px] text-slate-400 font-bold italic">* 사용 가능한 변수: val (현재값), row (행 전체 데이터)</p>
+                        <p className="text-[9px] text-slate-400 font-bold italic">* ?ъ슜 媛?ν븳 蹂?? val (?꾩옱媛?, row (???꾩껜 ?곗씠??</p>
                       </div>
                     </div>
                   </div>
 
-                  {/* 2단계: 마법의 정규식 */}
+                  {/* 2?④퀎: 留덈쾿???뺢퇋??*/}
                   <div className="p-6 bg-blue-50/50 rounded-2xl border-2 border-blue-100 space-y-6">
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-black text-blue-700 uppercase tracking-widest flex items-center gap-1.5">
                         <span className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] font-black">2</span>
-                        <Sparkles size={16}/> 마법의 정규식 (Regex)
+                        <Sparkles size={16}/> 留덈쾿???뺢퇋??(Regex)
                       </label>
                       <button 
                         onClick={() => setData({...data, textRegexPattern: '', textRegexReplace: ''})} 
                         className="text-[10px] font-black text-rose-500 bg-rose-50 px-2 py-1 rounded-lg hover:bg-rose-100 transition-colors"
                       >
-                        초기화
-                      </button>
+                        珥덇린??                      </button>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {REGEX_PRESETS.map((p, idx) => (
@@ -354,23 +352,23 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
                     </div>
                     <div className="grid grid-cols-2 gap-4 pt-2">
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black text-blue-500 pl-1">정규식 패턴 (Pattern)</label>
+                        <label className="text-[10px] font-black text-blue-500 pl-1">?뺢퇋???⑦꽩 (Pattern)</label>
                         <input 
                           value={data.textRegexPattern || ''} 
                           onChange={e => setData({...data, textRegexPattern: e.target.value})} 
-                          className="w-full p-3 text-sm rounded-xl border-2 border-slate-900 font-mono text-white focus:border-blue-500 outline-none bg-slate-800 shadow-inner" 
-                          style={{ color: '#ffffff', backgroundColor: '#1e293b' }} 
-                          placeholder="예: ^(.{2}).*$" 
+                          className="w-full p-3 text-sm rounded-xl border border-blue-200 font-mono text-slate-900 focus:border-blue-500 outline-none bg-white" 
+                          style={{ color: 'var(--text-primary)' }} 
+                          placeholder="?? ^(.{2}).*$" 
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black text-blue-500 pl-1">변환 결과 (Replace)</label>
+                        <label className="text-[10px] font-black text-blue-500 pl-1">蹂??寃곌낵 (Replace)</label>
                         <input 
                           value={data.textRegexReplace || ''} 
                           onChange={e => setData({...data, textRegexReplace: e.target.value})} 
-                          className="w-full p-3 text-sm rounded-xl border-2 border-slate-900 font-mono text-white focus:border-blue-500 outline-none bg-slate-800 shadow-inner" 
-                          style={{ color: '#ffffff', backgroundColor: '#1e293b' }} 
-                          placeholder="예: $1..." 
+                          className="w-full p-3 text-sm rounded-xl border border-blue-200 font-mono text-slate-900 focus:border-blue-500 outline-none bg-white" 
+                          style={{ color: 'var(--text-primary)' }} 
+                          placeholder="?? $1..." 
                         />
                       </div>
                     </div>
@@ -382,8 +380,8 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
         </div>
 
       <div className="p-6 bg-white border-t flex gap-3">
-        <button onClick={onClose} className="flex-1 py-4 text-slate-500 font-black rounded-2xl hover:bg-slate-100 transition-all">취소</button>
-        <button onClick={() => onSave(data)} className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all">설정 완료</button>
+        <button onClick={onClose} className="flex-1 py-4 text-slate-500 font-black rounded-2xl hover:bg-slate-100 transition-all">痍⑥냼</button>
+        <button onClick={() => onSave(data)} className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all">?ㅼ젙 ?꾨즺</button>
       </div>
     </div>
   </div>
@@ -398,7 +396,7 @@ interface ViewEditorProps {
   onUpdate: (updated: View) => void;
 }
 
-// ── [신규] 정렬 설정 서브 컴포넌트 (모듈화) ──
+// ?? [?좉퇋] ?뺣젹 ?ㅼ젙 ?쒕툕 而댄룷?뚰듃 (紐⑤뱢?? ??
 const SortConfigSection = ({ 
   label, 
   column, 
@@ -425,7 +423,7 @@ const SortConfigSection = ({
       value={column || ''} 
       onChange={e => onColumnChange(e.target.value || null)}
     >
-      <option value="">{isSecondary ? '(2차 정렬 없음)' : '기본 정렬 (DB 설정순)'}</option>
+      <option value="">{isSecondary ? '(2李??뺣젹 ?놁쓬)' : '湲곕낯 ?뺣젹 (DB ?ㅼ젙??'}</option>
       {availableColumns.map(col => <option key={col} value={col}>{col}</option>)}
     </select>
     {column && (
@@ -435,8 +433,8 @@ const SortConfigSection = ({
           value={direction || 'desc'} 
           onChange={e => onDirectionChange(e.target.value as any)}
         >
-          <option value="desc">내림차순 (가장 큰/최신 값부터)</option>
-          <option value="asc">오름차순 (가장 작은/과거 값부터)</option>
+          <option value="desc">?대┝李⑥닚 (媛????理쒖떊 媛믩???</option>
+          <option value="asc">?ㅻ쫫李⑥닚 (媛???묒?/怨쇨굅 媛믩???</option>
         </select>
       </div>
     )}
@@ -447,7 +445,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
   const [formatModalCell, setFormatModalCell] = useState<LayoutCell | null>(null);
 
-  // --- [신규] 가상 테이블 및 컬럼 계산 로직 ---
+  // --- [?좉퇋] 媛???뚯씠釉?諛?而щ읆 怨꾩궛 濡쒖쭅 ---
   const isVirtual = view.tableName?.startsWith('vt_');
   const virtualTable = isVirtual ? virtualTables.find(vt => vt.id === view.tableName) : null;
   const baseTableName = virtualTable ? virtualTable.baseTableName : view.tableName;
@@ -464,10 +462,9 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
   const [previewSortConfig, setPreviewSortConfig] = useState<{column: string, direction: 'asc'|'desc'} | null>(null);
 
   const fetchPreviewData = async () => {
-    if (!view.tableName) return alert("먼저 테이블을 선택해주세요.");
+    if (!view.tableName) return alert("癒쇱? ?뚯씠釉붿쓣 ?좏깮?댁＜?몄슂.");
     
-    // [스마트 기본값] id가 있으면 자동으로 선택, 이미 저장된게 있으면 그것을 우선함
-    const defaultKey = view.lockedKeyColumn || (availableColumns.includes('id') ? 'id' : '');
+    // [?ㅻ쭏??湲곕낯媛? id媛 ?덉쑝硫??먮룞?쇰줈 ?좏깮, ?대? ??λ맂寃??덉쑝硫?洹멸쾬???곗꽑??    const defaultKey = view.lockedKeyColumn || (availableColumns.includes('id') ? 'id' : '');
     setTempKeyColumn(defaultKey);
     setSelectedKeys(view.lockedRecordKeys || []);
 
@@ -475,28 +472,27 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
     setIsLoadingPreview(true);
 
     try {
-      // 1. 데이터 가져오기 (가상이면 베이스 테이블에서 가져옴)
+      // 1. ?곗씠??媛?몄삤湲?(媛?곸씠硫?踰좎씠???뚯씠釉붿뿉??媛?몄샂)
       let query = supabase.from(baseTableName!).select('*').limit(30000); 
       
-      // 🧠 [신규] 노코딩 스타일 지능형 필터 동기화
-      if (view.filterColumn && (view.filterValue || view.filterOperator?.includes('null'))) {
+      // ?쭬 [?좉퇋] ?몄퐫???ㅽ???吏?ν삎 ?꾪꽣 ?숆린??      if (view.filterColumn && (view.filterValue || view.filterOperator?.includes('null'))) {
         const op = view.filterOperator || 'eq';
         const val = String(view.filterValue || '').trim();
         const col = view.filterColumn;
 
-        // 원본 테이블에 있는 컬럼인 경우에만 쿼리단에서 필터링 (가상 컬럼 필터는 나중에 클라이언트 처리)
+        // ?먮낯 ?뚯씠釉붿뿉 ?덈뒗 而щ읆??寃쎌슦?먮쭔 荑쇰━?⑥뿉???꾪꽣留?(媛??而щ읆 ?꾪꽣???섏쨷???대씪?댁뼵??泥섎━)
         if (schemaData[baseTableName!]?.includes(col)) {
           const now = new Date();
           const isoToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-          if (val === 'today' || val === '오늘') {
+          if (val === 'today' || val === '?ㅻ뒛') {
             query = query.gte(col, isoToday).lte(col, `${isoToday}T23:59:59`);
-          } else if (val === 'yesterday' || val === '어제') {
+          } else if (val === 'yesterday' || val === '?댁젣') {
             const yestDate = new Date();
             yestDate.setDate(now.getDate() - 1);
             const isoYesterday = `${yestDate.getFullYear()}-${String(yestDate.getMonth() + 1).padStart(2, '0')}-${String(yestDate.getDate()).padStart(2, '0')}`;
             query = query.gte(col, isoYesterday).lte(col, `${isoYesterday}T23:59:59`);
-          } else if (val === 'this_month' || val === '이번 달') {
+          } else if (val === 'this_month' || val === '?대쾲 ??) {
             const firstDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
             const lastDayDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
             const lastDay = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`;
@@ -527,7 +523,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
         }
       }
 
-      // 정렬 적용
+      // ?뺣젹 ?곸슜
       if (view.sortColumn && schemaData[baseTableName!]?.includes(view.sortColumn)) {
         query = query.order(view.sortColumn, { ascending: view.sortDirection === 'asc' });
       }
@@ -535,14 +531,14 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
       const { data, error } = await query;
       if (error) throw error;
 
-      // 2. 가상 데이터 리졸빙 (Join & Formula 적용)
+      // 2. 媛???곗씠??由ъ「鍮?(Join & Formula ?곸슜)
       let finalData = data || [];
       if (virtualTable) {
         finalData = await resolveVirtualData(finalData, virtualTable);
       }
 
       setPreviewData(finalData);
-    } catch (err: any) { alert("데이터 로드 실패: " + err.message); } 
+    } catch (err: any) { alert("?곗씠??濡쒕뱶 ?ㅽ뙣: " + err.message); } 
     finally { setIsLoadingPreview(false); }
   };
 
@@ -554,7 +550,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
   const addRootRow = () => onUpdate({ ...view, layoutRows: [...view.layoutRows, { id: `r_${Date.now()}`, flex: 1, cells: [{ id: `c_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }] });
 
   const RenderRowEditor = ({ row, depth = 0 }: { row: LayoutRow, depth: number }) => {
-    // 깊이에 따른 스타일 차별화 (부모일수록 더 크고 뚜렷하게)
+    // 源딆씠???곕Ⅸ ?ㅽ???李⑤퀎??(遺紐⑥씪?섎줉 ???ш퀬 ?쒕졆?섍쾶)
     const rowPadding = depth === 0 ? 'p-6' : depth === 1 ? 'p-4' : 'p-2';
     const rowGap = depth === 0 ? 'gap-5' : 'gap-3';
     const bgColor = depth === 0 ? 'bg-slate-100/50' : depth === 1 ? 'bg-slate-50' : 'bg-white';
@@ -564,7 +560,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
     <div className={`flex ${rowGap} ${rowPadding} rounded-[2rem] ${borderWeight} border-slate-300 ${bgColor} relative mb-4 group/row transition-all w-fit shadow-sm`}>
       <div className="absolute -left-3 -top-3 flex items-center bg-indigo-600 text-white rounded-full shadow-lg opacity-0 group-hover/row:opacity-100 z-40 overflow-hidden transition-all border-2 border-white">
         <button onClick={(e) => { e.stopPropagation(); mutate(rows => { const f = (arr: any[]) => { for (const r of arr) { if (r.id === row.id) { r.flex = Math.max(1, (r.flex || 1) - 1); return true; } for (const c of r.cells) if (c.nestedRows && f(c.nestedRows)) return true; } return false; }; f(rows); }); }} className="p-1 hover:bg-indigo-700"><Minus size={14} strokeWidth={3}/></button>
-        <span className="text-[10px] font-black px-1 whitespace-nowrap">{depth + 1}층 세로비율 : {row.flex || 1}</span>
+        <span className="text-[10px] font-black px-1 whitespace-nowrap">{depth + 1}痢??몃줈鍮꾩쑉 : {row.flex || 1}</span>
         <button onClick={(e) => { e.stopPropagation(); mutate(rows => { const f = (arr: any[]) => { for (const r of arr) { if (r.id === row.id) { r.flex = (r.flex || 1) + 1; return true; } for (const c of r.cells) if (c.nestedRows && f(c.nestedRows)) return true; } return false; }; f(rows); }); }} className="p-1 hover:bg-indigo-700"><Plus size={14} strokeWidth={3}/></button>
       </div>
       <button onClick={() => mutate(rows => { const remove = (arr: LayoutRow[]) => { const idx = arr.findIndex(r => r.id === row.id); if (idx > -1) arr.splice(idx, 1); else arr.forEach(r => r.cells.forEach(c => { if(c.nestedRows) remove(c.nestedRows); })); }; remove(rows); })} className="absolute -right-3 -top-3 w-7 h-7 bg-slate-800 text-white rounded-full flex items-center justify-center opacity-0 group-hover/row:opacity-100 z-30 transition-all shadow-lg"><X size={14} strokeWidth={3} /></button>
@@ -572,11 +568,11 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
       {row.cells.map(cell => (
         <div key={cell.id} className={`flex flex-col gap-2 border-2 ${cell.contentType === 'field' ? 'border-indigo-300' : cell.contentType === 'action' ? 'border-rose-300' : 'border-slate-200'} bg-white rounded-2xl p-4 min-h-[120px] shadow-sm relative transition-all shrink-0 ${cell.contentType === 'nested' ? 'w-fit' : 'w-[280px]'}`}>
           <div className="flex justify-between items-center bg-indigo-50 px-2 py-1 rounded-xl">
-            <div className="flex items-center gap-1.5"><button onClick={() => mutate(rows => { const f = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => { if(c.id === cell.id) c.flex = Math.max(1, c.flex - 1); if(c.nestedRows) f(c.nestedRows); })); f(rows); })} className="text-indigo-700 hover:scale-125 transition-transform p-1"><ChevronLeft size={16}/></button><span className="text-[11px] font-black text-indigo-700 tracking-tighter">가로:{cell.flex}</span><button onClick={() => mutate(rows => { const f = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => { if(c.id === cell.id) c.flex += 1; if(c.nestedRows) f(c.nestedRows); })); f(rows); })} className="text-indigo-700 hover:scale-125 transition-transform p-1"><ChevronRight size={16}/></button></div>
+            <div className="flex items-center gap-1.5"><button onClick={() => mutate(rows => { const f = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => { if(c.id === cell.id) c.flex = Math.max(1, c.flex - 1); if(c.nestedRows) f(c.nestedRows); })); f(rows); })} className="text-indigo-700 hover:scale-125 transition-transform p-1"><ChevronLeft size={16}/></button><span className="text-[11px] font-black text-indigo-700 tracking-tighter">媛濡?{cell.flex}</span><button onClick={() => mutate(rows => { const f = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => { if(c.id === cell.id) c.flex += 1; if(c.nestedRows) f(c.nestedRows); })); f(rows); })} className="text-indigo-700 hover:scale-125 transition-transform p-1"><ChevronRight size={16}/></button></div>
             <div className="flex items-center gap-1">
-              {/* 3단계 제한 로직: depth가 2 미만일 때만 중첩 버튼 노출 */}
+              {/* 3?④퀎 ?쒗븳 濡쒖쭅: depth媛 2 誘몃쭔???뚮쭔 以묒꺽 踰꾪듉 ?몄텧 */}
               {depth < 2 && (
-                <button onClick={() => mutate(rows => { const f = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => { if(c.id === cell.id) { c.contentType = 'nested'; c.nestedRows = [{ id: `nr_${Date.now()}`, flex: 1, cells: [{ id: `nc_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }]; } else if(c.nestedRows) f(c.nestedRows); })); f(rows); })} className="text-indigo-400 hover:text-indigo-700 p-1" title="내부에 세로 레이아웃 추가"><Rows size={18}/></button>
+                <button onClick={() => mutate(rows => { const f = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => { if(c.id === cell.id) { c.contentType = 'nested'; c.nestedRows = [{ id: `nr_${Date.now()}`, flex: 1, cells: [{ id: `nc_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }]; } else if(c.nestedRows) f(c.nestedRows); })); f(rows); })} className="text-indigo-400 hover:text-indigo-700 p-1" title="?대????몃줈 ?덉씠?꾩썐 異붽?"><Rows size={18}/></button>
               )}
               {row.cells.length > 1 && <button onClick={() => mutate(rows => { const f = (arr: any[]) => arr.forEach(r => { const idx = r.cells.findIndex((c: any) => c.id === cell.id); if (idx > -1) r.cells.splice(idx, 1); else r.cells.forEach((c: any) => { if(c.nestedRows) f(c.nestedRows); }); }); f(rows); })} className="text-rose-300 hover:text-rose-600 p-1 transition-colors"><Trash2 size={16}/></button>}
             </div>
@@ -585,20 +581,20 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
           {cell.contentType === 'nested' ? (
             <div className="space-y-3 pt-2 h-full">
               {cell.nestedRows?.map(nr => <RenderRowEditor key={nr.id} row={nr} depth={depth + 1} />)}
-              {/* 자식 Row 추가 시에도 3단계 검증 (이미 depth+1이 렌더링되므로 여기서도 depth 체크) */}
+              {/* ?먯떇 Row 異붽? ?쒖뿉??3?④퀎 寃利?(?대? depth+1???뚮뜑留곷릺誘濡??ш린?쒕룄 depth 泥댄겕) */}
               {depth < 2 && (
-                <button onClick={() => mutate(rows => { const f = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => { if(c.id === cell.id) c.nestedRows?.push({ id: `nr_${Date.now()}`, flex: 1, cells: [{ id: `nc_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }); if(c.nestedRows) f(c.nestedRows); })); f(rows); })} className="w-full py-3 border-2 border-dashed border-slate-200 text-[10px] font-black text-slate-400 rounded-xl hover:bg-slate-50 transition-colors">+ 세로 분할 추가</button>
+                <button onClick={() => mutate(rows => { const f = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => { if(c.id === cell.id) c.nestedRows?.push({ id: `nr_${Date.now()}`, flex: 1, cells: [{ id: `nc_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }); if(c.nestedRows) f(c.nestedRows); })); f(rows); })} className="w-full py-3 border-2 border-dashed border-slate-200 text-[10px] font-black text-slate-400 rounded-xl hover:bg-slate-50 transition-colors">+ ?몃줈 遺꾪븷 異붽?</button>
               )}
             </div>
           ) : (
             <div className="flex-1 flex items-center gap-2">
               <select className={`flex-1 p-3 text-xs font-black bg-slate-50 border-2 rounded-xl outline-none transition-all ${cell.contentType !== 'empty' ? 'text-indigo-700 border-indigo-200' : 'text-slate-500 border-slate-200 focus:border-indigo-500'}`} value={(cell.contentType === 'action' ? 'act_' : '') + (cell.contentValue || '')} onChange={e => { const val = e.target.value; mutate(rows => { const f = (arr: any[]) => arr.forEach(r => r.cells.forEach((c: any) => { if(c.id === cell.id) { if (val.startsWith('act_')) { c.contentType = 'action'; c.contentValue = val.replace('act_', ''); } else { c.contentType = val ? 'field' : 'empty'; c.contentValue = val; } } else if(c.nestedRows) f(c.nestedRows); })); f(rows); }); }}>
-                <option value="">-- 데이터/액션 선택 --</option>
-                <optgroup label="테이블 컬럼">{availableColumns.map(col => <option key={col} value={col}>{col}</option>)}</optgroup>
-                <optgroup label="액션(기능)">{actions.map(a => <option key={a.id} value={`act_${a.id}`}>⚡ {a.name}</option>)}</optgroup>
+                <option value="">-- ?곗씠???≪뀡 ?좏깮 --</option>
+                <optgroup label="?뚯씠釉?而щ읆">{availableColumns.map(col => <option key={col} value={col}>{col}</option>)}</optgroup>
+                <optgroup label="?≪뀡(湲곕뒫)">{actions.map(a => <option key={a.id} value={`act_${a.id}`}>??{a.name}</option>)}</optgroup>
               </select>
               {(cell.contentType === 'field' || cell.contentType === 'action') && (
-                <button onClick={() => setFormatModalCell(cell)} className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center transition-all ${(cell.isImage || cell.textRegexPattern || cell.textSize || cell.buttonShape) ? 'bg-indigo-600 text-white shadow-md hover:bg-indigo-700' : 'bg-indigo-50 text-indigo-500 hover:bg-indigo-100 border border-indigo-100'}`} title="데이터 꾸미기"><Wand2 size={18} strokeWidth={2.5}/></button>
+                <button onClick={() => setFormatModalCell(cell)} className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center transition-all ${(cell.isImage || cell.textRegexPattern || cell.textSize || cell.buttonShape) ? 'bg-indigo-600 text-white shadow-md hover:bg-indigo-700' : 'bg-indigo-50 text-indigo-500 hover:bg-indigo-100 border border-indigo-100'}`} title="?곗씠??袁몃?湲?><Wand2 size={18} strokeWidth={2.5}/></button>
               )}
             </div>
           )}
@@ -612,22 +608,22 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
   return (
     <div className="w-full min-w-fit mx-auto space-y-10 pb-32">
       <section className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-500 min-w-max">
-        <label className="text-[11px] font-black text-slate-400 block mb-4 uppercase tracking-widest px-2">현재 화면(View) 기본 정보</label>
+        <label className="text-[11px] font-black text-slate-400 block mb-4 uppercase tracking-widest px-2">?꾩옱 ?붾㈃(View) 湲곕낯 ?뺣낫</label>
         <div className="flex items-center gap-6">
           <button onClick={() => setIsIconPickerOpen(true)} className="w-16 h-16 shrink-0 bg-indigo-50 border-2 border-indigo-100 rounded-[1.5rem] flex items-center justify-center text-indigo-600 hover:border-indigo-400 hover:shadow-md transition-all group">
             {view.icon && IconMap[view.icon] ? React.createElement(IconMap[view.icon], { size: 32, className: "group-hover:scale-110 transition-transform" }) : <Star size={32} className="text-indigo-200 group-hover:text-indigo-400"/>}
           </button>
-          <input className="flex-1 p-5 rounded-[1.5rem] border-2 border-slate-100 text-3xl font-black outline-none focus:border-indigo-500 transition-all text-slate-900 min-w-[300px]" value={view.name} onChange={e => onUpdate({...view, name: e.target.value})} placeholder="화면 이름을 입력하세요" />
+          <input className="flex-1 p-5 rounded-[1.5rem] border-2 border-slate-100 text-3xl font-black outline-none focus:border-indigo-500 transition-all text-slate-900 min-w-[300px]" value={view.name} onChange={e => onUpdate({...view, name: e.target.value})} placeholder="?붾㈃ ?대쫫???낅젰?섏꽭?? />
         </div>
         <div className="mt-8 pt-6 border-t border-slate-100 whitespace-normal">
-          <label className="text-[12px] font-black text-slate-600 block px-2 mb-3 tracking-tight">메뉴 버튼 표시 위치 (Nav Position)</label>
+          <label className="text-[12px] font-black text-slate-600 block px-2 mb-3 tracking-tight">硫붾돱 踰꾪듉 ?쒖떆 ?꾩튂 (Nav Position)</label>
           <div className="flex gap-3 px-2 flex-wrap min-w-[400px]">
-            <button onClick={() => onUpdate({ ...view, navPosition: 'both' })} className={`flex-1 min-w-[140px] py-3 px-4 rounded-2xl text-[13px] font-bold border-2 transition-all ${(!view.navPosition || view.navPosition === 'both') ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-indigo-200'}`}>🔸 모두 노출 (상단/하단)</button>
-            <button onClick={() => onUpdate({ ...view, navPosition: 'top' })} className={`flex-1 min-w-[140px] py-3 px-4 rounded-2xl text-[13px] font-bold border-2 transition-all ${(view.navPosition === 'top') ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-indigo-200'}`}>🔹 상단 숨김버튼 전용</button>
-            <button onClick={() => onUpdate({ ...view, navPosition: 'bottom' })} className={`flex-1 min-w-[140px] py-3 px-4 rounded-2xl text-[13px] font-bold border-2 transition-all ${(view.navPosition === 'bottom') ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-indigo-200'}`}>🔹 하단 메뉴바 전용</button>
-            <button onClick={() => onUpdate({ ...view, navPosition: 'hidden' })} className={`flex-1 min-w-[140px] py-3 px-4 rounded-2xl text-[13px] font-bold border-2 transition-all ${(view.navPosition === 'hidden') ? 'border-amber-500 bg-amber-50 text-amber-700 shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-indigo-200'}`}>🚫 모두 숨김</button>
+            <button onClick={() => onUpdate({ ...view, navPosition: 'both' })} className={`flex-1 min-w-[140px] py-3 px-4 rounded-2xl text-[13px] font-bold border-2 transition-all ${(!view.navPosition || view.navPosition === 'both') ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-indigo-200'}`}>?뵺 紐⑤몢 ?몄텧</button>
+            <button onClick={() => onUpdate({ ...view, navPosition: 'bottom' })} className={`flex-1 min-w-[140px] py-3 px-4 rounded-2xl text-[13px] font-bold border-2 transition-all ${(view.navPosition === 'bottom') ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-indigo-200'}`}>?뵻 ?섎떒/?ъ씠?쒕쭔</button>
+            <button onClick={() => onUpdate({ ...view, navPosition: 'menu' })} className={`flex-1 min-w-[140px] py-3 px-4 rounded-2xl text-[13px] font-bold border-2 transition-all ${(view.navPosition === 'menu') ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-indigo-200'}`}>?뵻 ?곗륫 ?④?踰꾪듉留?/button>
+            <button onClick={() => onUpdate({ ...view, navPosition: 'hidden' })} className={`flex-1 min-w-[140px] py-3 px-4 rounded-2xl text-[13px] font-bold border-2 transition-all ${(view.navPosition === 'hidden') ? 'border-amber-500 bg-amber-50 text-amber-700 shadow-sm' : 'border-slate-100 bg-white text-slate-500 hover:border-indigo-200'}`}>?슟 硫붾돱?먯꽌 ?④?</button>
           </div>
-          <p className="text-[11px] font-bold text-slate-400 px-3 mt-3 w-full max-w-[800px] whitespace-normal">※ 이 화면으로 진입할 수 있는 바로가기 메뉴가 어디에 표시될지 결정합니다. 다른 화면에서 이동 액션으로 연결하려면 '숨김'으로 설정하세요.</p>
+          <p className="text-[11px] font-bold text-slate-400 px-3 mt-3 w-full max-w-[800px] whitespace-normal">?????붾㈃?쇰줈 吏꾩엯?????덈뒗 諛붾줈媛湲?硫붾돱媛 ?대뵒???쒖떆?좎? 寃곗젙?⑸땲?? ?ㅻⅨ ?붾㈃?먯꽌 ?대룞 ?≪뀡?쇰줈 ?곌껐?섎젮硫?'?④?'?쇰줈 ?ㅼ젙?섏꽭??</p>
         </div>
       </section>
 
@@ -639,22 +635,22 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
               <Database size={24}/>
             </div>
             <div>
-              <h2 className="text-xl font-black text-slate-900 whitespace-nowrap">1. 데이터 조회 규칙 설정</h2>
+              <h2 className="text-xl font-black text-slate-900 whitespace-nowrap">1. ?곗씠??議고쉶 洹쒖튃 ?ㅼ젙</h2>
               <div className="flex items-center gap-2 mt-0.5">
                 {view.lockedRecordKeys?.length ? (
                   <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2">
                     <span className="text-xs font-black text-rose-600 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-100 flex items-center gap-1.5 shadow-sm">
-                      <Lock size={12}/> 수동 선택 모드 활성화 ({view.lockedRecordKeys.length}개 고정됨)
+                      <Lock size={12}/> ?섎룞 ?좏깮 紐⑤뱶 ?쒖꽦??({view.lockedRecordKeys.length}媛?怨좎젙??
                     </span>
                     <button 
                       onClick={() => onUpdate({ ...view, lockedRecordKeys: [], lockedKeyColumn: undefined, isLocked: false })}
                       className="text-[10px] font-black text-slate-400 hover:text-rose-500 hover:bg-rose-50 px-2 py-1 rounded-lg transition-all border border-transparent hover:border-rose-100"
                     >
-                      [전체 조회로 복구]
+                      [?꾩껜 議고쉶濡?蹂듦뎄]
                     </button>
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-500 font-bold whitespace-nowrap">어떤 데이터를 어떻게 보여줄지(필터링/정렬/그룹화) 설정하세요.</p>
+                  <p className="text-sm text-slate-500 font-bold whitespace-nowrap">?대뼡 ?곗씠?곕? ?대뼸寃?蹂댁뿬以꾩?(?꾪꽣留??뺣젹/洹몃９?? ?ㅼ젙?섏꽭??</p>
                 )}
               </div>
             </div>
@@ -664,38 +660,38 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
               onClick={fetchPreviewData} 
               className={`px-6 py-3 rounded-xl font-black text-sm flex items-center gap-2 transition-all border whitespace-nowrap ${view.lockedRecordKeys?.length ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'}`}
             >
-              <Eye size={18} /> {view.lockedRecordKeys?.length ? '수동 선택(Pick) 수정하기' : '설정 확인 및 데이터 수동 픽(Pick)'}
+              <Eye size={18} /> {view.lockedRecordKeys?.length ? '?섎룞 ?좏깮(Pick) ?섏젙?섍린' : '?ㅼ젙 ?뺤씤 諛??곗씠???섎룞 ??Pick)'}
             </button>
           )}
         </div>
         <div className="grid grid-cols-2 gap-8 min-w-max w-full">
           <div className="space-y-4">
             <div>
-              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1">연결 테이블</label>
+              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1">?곌껐 ?뚯씠釉?/label>
               <select 
                 className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-black text-slate-800 outline-none focus:border-indigo-500 transition-all cursor-pointer" 
                 value={view.tableName || ''} 
                 onChange={e => onUpdate({...view, tableName: e.target.value, filterColumn: null, sortColumn: null, groupByColumn: null, layoutRows: []})}
               >
-                <option value="">테이블 선택</option>
-                <optgroup label="데이터베이스 테이블 (Supabase)">
+                <option value="">?뚯씠釉??좏깮</option>
+                <optgroup label="?곗씠?곕쿋?댁뒪 ?뚯씠釉?(Supabase)">
                   {Object.keys(schemaData).sort().map(t => <option key={t} value={t}>{t}</option>)}
                 </optgroup>
                 {virtualTables.length > 0 && (
-                  <optgroup label="가상 테이블 (Virtual)">
-                    {virtualTables.map(vt => <option key={vt.id} value={vt.id}>🔑 {vt.name} (가상)</option>)}
+                  <optgroup label="媛???뚯씠釉?(Virtual)">
+                    {virtualTables.map(vt => <option key={vt.id} value={vt.id}>?뵎 {vt.name} (媛??</option>)}
                   </optgroup>
                 )}
               </select>
             </div>
-            <div><label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5"><Filter size={14}/> 1단계 서버 필터 (선택사항)</label><select className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-black text-indigo-600 outline-none focus:border-indigo-500 transition-all cursor-pointer" value={view.filterColumn || ''} onChange={e => onUpdate({...view, filterColumn: e.target.value || null})}><option value="">필터 없음 (전체 데이터 가져오기)</option>{availableColumns.map(col => <option key={col} value={col}>{col}</option>)}</select></div>
+            <div><label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5"><Filter size={14}/> 1?④퀎 ?쒕쾭 ?꾪꽣 (?좏깮?ы빆)</label><select className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-black text-indigo-600 outline-none focus:border-indigo-500 transition-all cursor-pointer" value={view.filterColumn || ''} onChange={e => onUpdate({...view, filterColumn: e.target.value || null})}><option value="">?꾪꽣 ?놁쓬 (?꾩껜 ?곗씠??媛?몄삤湲?</option>{availableColumns.map(col => <option key={col} value={col}>{col}</option>)}</select></div>
           </div>
           <div className="bg-slate-50/50 rounded-3xl p-6 border-2 border-dashed border-slate-200 flex flex-col justify-center">
             {view.filterColumn ? (
               <div className="space-y-5 animate-in zoom-in-95 duration-300">
                 <div className="flex items-center justify-between">
                   <div className="flex gap-2 items-center text-indigo-600 font-black text-sm whitespace-nowrap">
-                    <Sparkles size={16} className="text-amber-500 animate-pulse"/> 스마트 조건 빌더
+                    <Sparkles size={16} className="text-amber-500 animate-pulse"/> ?ㅻ쭏??議곌굔 鍮뚮뜑
                   </div>
                 </div>
                 
@@ -705,19 +701,19 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                     value={view.filterOperator || 'eq'} 
                     onChange={e => onUpdate({...view, filterOperator: e.target.value as any})}
                   >
-                    <option value="eq">일치함 (=)</option>
-                    <option value="neq">일치하지 않음 (!=)</option>
-                    <option value="contains">포함함 (Contains)</option>
-                    <option value="starts">로 시작함</option>
-                    <option value="ends">로 끝남</option>
-                    <option value="gt">보다 이후/큼 (&gt;)</option>
-                    <option value="lt">보다 이전/작음 (&lt;)</option>
-                    <option value="gte">이후/크거나 같음 (&gt;=)</option>
-                    <option value="lte">이전/작거나 같음 (&lt;=)</option>
-                    <option value="in">목록에 포함 (A, B, C)</option>
-                    <option value="between">범위 내 (A..B)</option>
-                    <option value="is_null">비어 있음</option>
-                    <option value="is_not_null">값이 있음</option>
+                    <option value="eq">?쇱튂??(=)</option>
+                    <option value="neq">?쇱튂?섏? ?딆쓬 (!=)</option>
+                    <option value="contains">?ы븿??(Contains)</option>
+                    <option value="starts">濡??쒖옉??/option>
+                    <option value="ends">濡??앸궓</option>
+                    <option value="gt">蹂대떎 ?댄썑/??(&gt;)</option>
+                    <option value="lt">蹂대떎 ?댁쟾/?묒쓬 (&lt;)</option>
+                    <option value="gte">?댄썑/?ш굅??媛숈쓬 (&gt;=)</option>
+                    <option value="lte">?댁쟾/?묎굅??媛숈쓬 (&lt;=)</option>
+                    <option value="in">紐⑸줉???ы븿 (A, B, C)</option>
+                    <option value="between">踰붿쐞 ??(A..B)</option>
+                    <option value="is_null">鍮꾩뼱 ?덉쓬</option>
+                    <option value="is_not_null">媛믪씠 ?덉쓬</option>
                   </select>
 
                   {!view.filterOperator?.includes('null') && (
@@ -726,15 +722,15 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                         className="w-full p-3.5 rounded-xl border-2 border-indigo-100 font-bold text-sm text-slate-900 outline-none bg-white focus:border-indigo-500 transition-all shadow-sm" 
                         value={view.filterValue || ''} 
                         onChange={e => onUpdate({...view, filterValue: e.target.value})} 
-                        placeholder={view.filterOperator === 'between' ? "예: 10..50 또는 2024-01-01..2024-01-31" : "비교할 값을 입력하세요..."} 
+                        placeholder={view.filterOperator === 'between' ? "?? 10..50 ?먮뒗 2024-01-01..2024-01-31" : "鍮꾧탳??媛믪쓣 ?낅젰?섏꽭??.."} 
                       />
                       
                       <div className="flex flex-wrap gap-2 pt-1">
                         {[
-                          { id: 'today', label: '오늘', color: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
-                          { id: 'yesterday', label: '어제', color: 'bg-slate-50 text-slate-600 border-slate-200' },
-                          { id: 'this_month', label: '이번 달', color: 'bg-blue-50 text-blue-600 border-blue-100' },
-                          { id: 'me', label: '나(본인)', color: 'bg-indigo-50 text-indigo-600 border-indigo-100' }
+                          { id: 'today', label: '?ㅻ뒛', color: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+                          { id: 'yesterday', label: '?댁젣', color: 'bg-slate-50 text-slate-600 border-slate-200' },
+                          { id: 'this_month', label: '?대쾲 ??, color: 'bg-blue-50 text-blue-600 border-blue-100' },
+                          { id: 'me', label: '??蹂몄씤)', color: 'bg-indigo-50 text-indigo-600 border-indigo-100' }
                         ].map(chip => (
                           <button 
                             key={chip.id} type="button"
@@ -750,7 +746,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                 </div>
               </div>
             ) : (
-<div className="text-center space-y-3"><Smartphone className="mx-auto text-slate-300" size={40}/><p className="text-xs text-slate-400 font-bold leading-relaxed whitespace-nowrap">필요한 경우 좌측에서 칼럼을<br/>선택해 데이터를 필터링하세요.</p></div>)}
+<div className="text-center space-y-3"><Smartphone className="mx-auto text-slate-300" size={40}/><p className="text-xs text-slate-400 font-bold leading-relaxed whitespace-nowrap">?꾩슂??寃쎌슦 醫뚯륫?먯꽌 移쇰읆??br/>?좏깮???곗씠?곕? ?꾪꽣留곹븯?몄슂.</p></div>)}
           </div>
         </div>
         <div className="grid grid-cols-2 gap-8 mt-8 pt-8 border-t border-slate-50 min-w-max w-full">
@@ -758,11 +754,11 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
             <div className={`bg-blue-50/50 p-6 rounded-[2.5rem] border-2 border-blue-100 space-y-6 transition-all duration-500 ${!view.groupByColumn ? 'opacity-100' : 'bg-white shadow-xl border-blue-200 scale-105'}`}>
               <div className="flex items-center justify-between mb-2 px-1">
                 <label className="text-[11px] font-black text-blue-600 block uppercase tracking-widest flex items-center gap-2">
-                  <FolderTree size={16}/> 1차 데이터 묶어주기 (Primary Grouping)
+                  <FolderTree size={16}/> 1李??곗씠??臾띠뼱二쇨린 (Primary Grouping)
                 </label>
                 <div className="flex bg-slate-100 p-0.5 rounded-xl border border-blue-100 scale-90 origin-right">
-                  <button onClick={() => onUpdate({...view, groupAccordionMode: 'multiple'})} className={`px-3 py-1 rounded-lg text-[9px] font-black transition-all ${view.groupAccordionMode === 'multiple' || !view.groupAccordionMode ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>다중 열림</button>
-                  <button onClick={() => onUpdate({...view, groupAccordionMode: 'single'})} className={`px-3 py-1 rounded-lg text-[9px] font-black transition-all ${view.groupAccordionMode === 'single' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>하나만 열림</button>
+                  <button onClick={() => onUpdate({...view, groupAccordionMode: 'multiple'})} className={`px-3 py-1 rounded-lg text-[9px] font-black transition-all ${view.groupAccordionMode === 'multiple' || !view.groupAccordionMode ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>?ㅼ쨷 ?대┝</button>
+                  <button onClick={() => onUpdate({...view, groupAccordionMode: 'single'})} className={`px-3 py-1 rounded-lg text-[9px] font-black transition-all ${view.groupAccordionMode === 'single' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>?섎굹留??대┝</button>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -771,8 +767,8 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                   value={view.groupByColumn || ''} 
                   onChange={e => onUpdate({...view, groupByColumn: e.target.value || null})}
                 >
-                  <option value="">묶지 않음 (일반 리스트 형태)</option>
-                  {availableColumns.map(col => <option key={col} value={col}>{col} 칼럼 기준으로 묶기</option>)}
+                  <option value="">臾띠? ?딆쓬 (?쇰컲 由ъ뒪???뺥깭)</option>
+                  {availableColumns.map(col => <option key={col} value={col}>{col} 移쇰읆 湲곗??쇰줈 臾띔린</option>)}
                 </select>
                 {view.groupByColumn && (
                   <div className="flex bg-slate-100 p-1 rounded-2xl border-2 border-blue-200">
@@ -784,39 +780,38 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
 
               {view.groupByColumn && (
                 <div className="space-y-6 pt-4 border-t border-blue-200 animate-in fade-in slide-in-from-top-4 duration-500">
-                  {/* 그룹 바 디자인 */}
+                  {/* 洹몃９ 諛??붿옄??*/}
                   <div className="space-y-4">
                     <div className="flex items-center justify-between px-1">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">헤더 디자인 및 가공</label>
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">?ㅻ뜑 ?붿옄??諛?媛怨?/label>
                       <button 
                         onClick={() => onUpdate({ ...view, groupHeaderIcon: 'Folder', groupHeaderAlign: 'left', groupHeaderColor: 'text-indigo-900', groupHeaderTextSize: 'text-[15px]', groupHeaderExpression: '' })}
                         className="text-[9px] font-black text-indigo-500 hover:text-indigo-700 transition-colors"
                       >
-                        디자인 초기화
-                      </button>
+                        ?붿옄??珥덇린??                      </button>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-400 pl-1">헤더 아이콘</label>
+                        <label className="text-[9px] font-black text-slate-400 pl-1">?ㅻ뜑 ?꾩씠肄?/label>
                         <select value={view.groupHeaderIcon || 'Folder'} onChange={e => onUpdate({...view, groupHeaderIcon: e.target.value})} className="w-full p-3 text-xs rounded-xl border border-slate-200 font-bold bg-white text-slate-700 outline-none">
-                          <option value="Folder">폴더</option><option value="Star">별</option><option value="Tag">태그</option><option value="User">사용자</option><option value="Circle">원형</option><option value="Hash">해시(#)</option><option value="Info">정보</option><option value="AlertCircle">경고</option>
+                          <option value="Folder">?대뜑</option><option value="Star">蹂?/option><option value="Tag">?쒓렇</option><option value="User">?ъ슜??/option><option value="Circle">?먰삎</option><option value="Hash">?댁떆(#)</option><option value="Info">?뺣낫</option><option value="AlertCircle">寃쎄퀬</option>
                         </select>
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-400 pl-1">헤더 색상</label>
+                        <label className="text-[9px] font-black text-slate-400 pl-1">?ㅻ뜑 ?됱긽</label>
                         <select value={view.groupHeaderColor || 'text-indigo-900'} onChange={e => onUpdate({...view, groupHeaderColor: e.target.value})} className="w-full p-3 text-xs rounded-xl border border-slate-200 font-bold bg-white text-slate-700 outline-none">
-                          <option value="text-indigo-900">남색 (기본)</option><option value="text-slate-700">진회색</option><option value="text-emerald-700">초록색</option><option value="text-blue-700">파랑색</option><option value="text-rose-700">빨강색</option><option value="text-amber-700">주황색</option><option value="text-violet-700">보라색</option>
+                          <option value="text-indigo-900">?⑥깋 (湲곕낯)</option><option value="text-slate-700">吏꾪쉶??/option><option value="text-emerald-700">珥덈줉??/option><option value="text-blue-700">?뚮옉??/option><option value="text-rose-700">鍮④컯??/option><option value="text-amber-700">二쇳솴??/option><option value="text-violet-700">蹂대씪??/option>
                         </select>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-400 pl-1">글자 크기 및 정렬</label>
+                        <label className="text-[9px] font-black text-slate-400 pl-1">湲???ш린 諛??뺣젹</label>
                         <div className="flex gap-1.5">
                           <select value={view.groupHeaderTextSize || 'text-[15px]'} onChange={e => onUpdate({...view, groupHeaderTextSize: e.target.value})} className="flex-1 p-3 text-xs rounded-xl border border-slate-200 font-bold bg-white text-slate-700 outline-none">
-                            <option value="text-xs">작게</option><option value="text-[14px]">보통</option><option value="text-[15px]">조금 크게</option><option value="text-lg">크게</option><option value="text-xl">매우 크게</option>
+                            <option value="text-xs">?묎쾶</option><option value="text-[14px]">蹂댄넻</option><option value="text-[15px]">議곌툑 ?ш쾶</option><option value="text-lg">?ш쾶</option><option value="text-xl">留ㅼ슦 ?ш쾶</option>
                           </select>
                           <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200">
                             {[
@@ -830,64 +825,43 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-400 pl-1">통계 표시 위치</label>
+                        <label className="text-[9px] font-black text-slate-400 pl-1">?듦퀎 ?쒖떆 ?꾩튂</label>
                         <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 h-[44px]">
                           <button 
                             onClick={() => onUpdate({...view, groupAggregationPosition: 'beside_label'})}
                             className={`flex-1 text-[9px] font-black rounded-lg transition-all ${view.groupAggregationPosition === 'beside_label' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
                           >
-                            이름 바로 옆
-                          </button>
+                            ?대쫫 諛붾줈 ??                          </button>
                           <button 
                             onClick={() => onUpdate({...view, groupAggregationPosition: 'right_end'})}
                             className={`flex-1 text-[9px] font-black rounded-lg transition-all ${view.groupAggregationPosition === 'right_end' || !view.groupAggregationPosition ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
                           >
-                            오른쪽 끝
-                          </button>
+                            ?ㅻⅨ履???                          </button>
                         </div>
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[9px] font-black text-indigo-500 pl-1 flex items-center gap-1"><Sparkles size={12}/> 헤더 가공 수식 (Expression)</label>
+                      <label className="text-[9px] font-black text-indigo-500 pl-1 flex items-center gap-1"><Sparkles size={12}/> ?ㅻ뜑 媛怨??섏떇 (Expression)</label>
                       <input 
                         className="w-full p-4 rounded-2xl bg-white border border-indigo-100 font-mono text-[11px] font-bold text-slate-800 outline-none focus:border-indigo-400 transition-all shadow-inner"
                         value={view.groupHeaderExpression || ''}
                         onChange={e => onUpdate({...view, groupHeaderExpression: e.target.value})}
-                        placeholder="예: val + ' (' + rowCount + '명)'"
+                        placeholder="?? val + ' (' + rowCount + '紐?'"
                       />
-                      <p className="text-[9px] font-bold text-slate-400 px-1 italic">※ 가용한 변수: val (그룹값), rowCount (그룹 데이터 개수)</p>
+                      <p className="text-[9px] font-bold text-slate-400 px-1 italic">??媛?⑺븳 蹂?? val (洹몃９媛?, rowCount (洹몃９ ?곗씠??媛쒖닔)</p>
                     </div>
                   </div>
 
-                  {/* 🔥 [신규] 상단 고정 옵션 (Sticky) */}
-                  <div className="pt-4 border-t border-indigo-100">
-                    <div className="flex items-center justify-between p-4 bg-slate-900 rounded-[1.5rem] border-2 border-amber-500 shadow-xl group hover:scale-[1.02] transition-all">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-amber-500 text-slate-900 rounded-lg shadow-inner"><ArrowUpCircle size={18}/></div>
-                        <div>
-                          <p className="text-xs font-black text-amber-400">그룹 헤더 상단 고정 (Sticky Mode)</p>
-                          <p className="text-[9px] font-bold text-slate-400">스크롤을 내려도 묶음바가 상단에 달라붙습니다.</p>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => onUpdate({...view, groupHeaderSticky: !view.groupHeaderSticky})}
-                        className={`w-14 h-7 rounded-full p-1 flex items-center transition-all duration-300 ${view.groupHeaderSticky ? 'bg-amber-500' : 'bg-slate-700'}`}
-                      >
-                        <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${view.groupHeaderSticky ? 'translate-x-7' : 'translate-x-0'}`} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 통계 요약 엔진 */}
+                  {/* ?듦퀎 ?붿빟 ?붿쭊 */}
                   <div className="space-y-4 pt-4 border-t border-blue-100">
                     <div className="flex items-center justify-between px-1">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">그룹 요약 통계 (Aggregations)</label>
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">洹몃９ ?붿빟 ?듦퀎 (Aggregations)</label>
                       <button 
-                        onClick={() => onUpdate({ ...view, groupAggregations: [...(view.groupAggregations || []), { id: `agg_${Date.now()}`, type: 'count', label: '합계', color: 'bg-indigo-50 text-indigo-600' }] })}
+                        onClick={() => onUpdate({ ...view, groupAggregations: [...(view.groupAggregations || []), { id: `agg_${Date.now()}`, type: 'count', label: '?⑷퀎', color: 'bg-indigo-50 text-indigo-600' }] })}
                         className="flex items-center gap-1 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black hover:bg-indigo-100 transition-all border border-indigo-100"
                       >
-                        <Plus size={12}/> 통계 추가
+                        <Plus size={12}/> ?듦퀎 異붽?
                       </button>
                     </div>
 
@@ -901,49 +875,49 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                           
                           <div className="grid grid-cols-3 gap-3">
                             <div className="space-y-1.5">
-                              <label className="text-[9px] font-black text-slate-400 pl-1">계산 방식</label>
+                              <label className="text-[9px] font-black text-slate-400 pl-1">怨꾩궛 諛⑹떇</label>
                               <select 
                                 value={agg.type} 
                                 onChange={e => onUpdate({ ...view, groupAggregations: view.groupAggregations?.map(a => a.id === agg.id ? { ...a, type: e.target.value as any } : a) })}
                                 className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-slate-50 outline-none"
                               >
-                                <option value="count">총 개수 (Count)</option>
-                                <option value="sum">합계 (Sum)</option>
-                                <option value="avg">평균 (Avg)</option>
-                                <option value="count_if">조건부 개수 (Count If)</option>
+                                <option value="count">珥?媛쒖닔 (Count)</option>
+                                <option value="sum">?⑷퀎 (Sum)</option>
+                                <option value="avg">?됯퇏 (Avg)</option>
+                                <option value="count_if">議곌굔遺 媛쒖닔 (Count If)</option>
                               </select>
                             </div>
                             <div className="space-y-1.5">
-                              <label className="text-[9px] font-black text-slate-400 pl-1">표시 라벨</label>
+                              <label className="text-[9px] font-black text-slate-400 pl-1">?쒖떆 ?쇰꺼</label>
                               <input 
                                 value={agg.label} 
                                 onChange={e => onUpdate({ ...view, groupAggregations: view.groupAggregations?.map(a => a.id === agg.id ? { ...a, label: e.target.value } : a) })}
                                 className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-white outline-none"
-                                placeholder="예: 참여인원"
+                                placeholder="?? 李몄뿬?몄썝"
                               />
                             </div>
                             <div className="space-y-1.5">
-                              <label className="text-[9px] font-black text-slate-400 pl-1">표시 형태</label>
+                              <label className="text-[9px] font-black text-slate-400 pl-1">?쒖떆 ?뺥깭</label>
                               <select 
                                 value={agg.displayStyle || 'button'} 
                                 onChange={e => onUpdate({ ...view, groupAggregations: view.groupAggregations?.map(a => a.id === agg.id ? { ...a, displayStyle: e.target.value as any } : a) })}
                                 className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-white outline-none"
                               >
-                                <option value="button">알약형 (Button)</option>
-                                <option value="text">글자만 (Text)</option>
+                                <option value="button">?뚯빟??(Button)</option>
+                                <option value="text">湲?먮쭔 (Text)</option>
                               </select>
                             </div>
                           </div>
 
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1.5">
-                              <label className="text-[9px] font-black text-slate-400 pl-1">대상 컬럼</label>
+                              <label className="text-[9px] font-black text-slate-400 pl-1">???而щ읆</label>
                               <select 
                                 value={agg.column || ''} 
                                 onChange={e => onUpdate({ ...view, groupAggregations: view.groupAggregations?.map(a => a.id === agg.id ? { ...a, column: e.target.value } : a) })}
                                 className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-white outline-none"
                               >
-                                <option value="">컬럼 선택</option>
+                                <option value="">而щ읆 ?좏깮</option>
                                 {availableColumns.map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
                             </div>
@@ -951,16 +925,16 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                             {(agg.type === 'sum' || agg.type === 'avg' || agg.type === 'count_if') && (
                               <div className="space-y-1.5 animate-in fade-in">
                                 <label className="text-[9px] font-black text-amber-600 pl-1 flex items-center gap-1">
-                                  <Sparkles size={10}/> {agg.type === 'count_if' ? '조건 수식 (JS)' : '가공 수식 (Target JS)'}
+                                  <Sparkles size={10}/> {agg.type === 'count_if' ? '議곌굔 ?섏떇 (JS)' : '媛怨??섏떇 (Target JS)'}
                                 </label>
                                 <input 
                                   value={agg.conditionValue || ''} 
                                   onChange={e => onUpdate({ ...view, groupAggregations: view.groupAggregations?.map(a => a.id === agg.id ? { ...a, conditionValue: e.target.value } : a) })}
                                   className="w-full p-2.5 text-[11px] rounded-xl border border-amber-200 font-mono font-bold bg-white outline-none focus:border-amber-400"
-                                  placeholder={agg.type === 'count_if' ? "예: val === '완료'" : "예: val * 1.1"}
+                                  placeholder={agg.type === 'count_if' ? "?? val === '?꾨즺'" : "?? val * 1.1"}
                                 />
                                 <p className="text-[8px] font-bold text-slate-400 px-1 leading-tight">
-                                  {agg.type === 'count_if' ? '* val이 true면 카운트' : '* 가공된 값을 더함 (미입력 시 원본)'}
+                                  {agg.type === 'count_if' ? '* val??true硫?移댁슫?? : '* 媛怨듬맂 媛믪쓣 ?뷀븿 (誘몄엯?????먮낯)'}
                                 </p>
                               </div>
                             )}
@@ -969,7 +943,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                       ))}
                       {(!view.groupAggregations || view.groupAggregations.length === 0) && (
                         <div className="py-6 border-2 border-dashed border-slate-100 rounded-2xl flex flex-col items-center justify-center text-slate-300 gap-2">
-                          <p className="text-[10px] font-black">추가된 요약 통계가 없습니다.</p>
+                          <p className="text-[10px] font-black">異붽????붿빟 ?듦퀎媛 ?놁뒿?덈떎.</p>
                         </div>
                       )}
                     </div>
@@ -980,7 +954,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
 
             <div className={`bg-indigo-50/50 p-6 rounded-[2.5rem] border-2 border-indigo-100 space-y-6 transition-all duration-500 ${!view.groupByColumn ? 'opacity-30 pointer-events-none grayscale' : !view.groupByColumn2 ? 'opacity-100' : 'bg-white shadow-xl border-indigo-200 scale-105'}`}>
               <label className="text-[11px] font-black text-indigo-600 block uppercase tracking-widest flex items-center gap-2 px-1">
-                <FolderTree size={16}/> 2차 데이터 묶어주기 (Sub Grouping)
+                <FolderTree size={16}/> 2李??곗씠??臾띠뼱二쇨린 (Sub Grouping)
               </label>
               <div className="flex gap-2">
                 <select 
@@ -988,8 +962,8 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                   value={view.groupByColumn2 || ''} 
                   onChange={e => onUpdate({...view, groupByColumn2: e.target.value || null})}
                 >
-                  <option value="">(2차 그룹 없음)</option>
-                  {availableColumns.filter(c => c !== view.groupByColumn).map(col => <option key={col} value={col}>{col} 칼럼 기준으로 한 번 더 묶기</option>)}
+                  <option value="">(2李?洹몃９ ?놁쓬)</option>
+                  {availableColumns.filter(c => c !== view.groupByColumn).map(col => <option key={col} value={col}>{col} 移쇰읆 湲곗??쇰줈 ??踰???臾띔린</option>)}
                 </select>
                 {view.groupByColumn2 && (
                   <div className="flex bg-slate-100 p-1 rounded-2xl border-2 border-indigo-200">
@@ -1003,36 +977,35 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                 <div className="space-y-6 pt-4 border-t border-indigo-200 animate-in fade-in slide-in-from-top-4 duration-500">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between px-1">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">2차 헤더 디자인 및 가공</label>
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">2李??ㅻ뜑 ?붿옄??諛?媛怨?/label>
                       <button 
                         onClick={() => onUpdate({ ...view, groupHeaderIcon2: 'Folder', groupHeaderAlign2: 'left', groupHeaderColor2: 'text-violet-700', groupHeaderTextSize2: 'text-[14px]', groupHeaderExpression2: '' })}
                         className="text-[9px] font-black text-indigo-500 hover:text-indigo-700 transition-colors"
                       >
-                        디자인 초기화
-                      </button>
+                        ?붿옄??珥덇린??                      </button>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-400 pl-1">헤더 아이콘</label>
+                        <label className="text-[9px] font-black text-slate-400 pl-1">?ㅻ뜑 ?꾩씠肄?/label>
                         <select value={view.groupHeaderIcon2 || 'Folder'} onChange={e => onUpdate({...view, groupHeaderIcon2: e.target.value})} className="w-full p-3 text-xs rounded-xl border border-slate-200 font-bold bg-white text-slate-700 outline-none">
-                          <option value="Folder">폴더</option><option value="Star">별</option><option value="Tag">태그</option><option value="User">사용자</option><option value="Circle">원형</option><option value="Hash">해시(#)</option><option value="Info">정보</option><option value="AlertCircle">경고</option>
+                          <option value="Folder">?대뜑</option><option value="Star">蹂?/option><option value="Tag">?쒓렇</option><option value="User">?ъ슜??/option><option value="Circle">?먰삎</option><option value="Hash">?댁떆(#)</option><option value="Info">?뺣낫</option><option value="AlertCircle">寃쎄퀬</option>
                         </select>
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-400 pl-1">헤더 색상</label>
+                        <label className="text-[9px] font-black text-slate-400 pl-1">?ㅻ뜑 ?됱긽</label>
                         <select value={view.groupHeaderColor2 || 'text-violet-700'} onChange={e => onUpdate({...view, groupHeaderColor2: e.target.value})} className="w-full p-3 text-xs rounded-xl border border-slate-200 font-bold bg-white text-slate-700 outline-none">
-                          <option value="text-violet-700">보라색 (기본)</option><option value="text-indigo-900">남색</option><option value="text-slate-700">진회색</option><option value="text-emerald-700">초록색</option><option value="text-blue-700">파랑색</option><option value="text-rose-700">빨강색</option><option value="text-amber-700">주황색</option>
+                          <option value="text-violet-700">蹂대씪??(湲곕낯)</option><option value="text-indigo-900">?⑥깋</option><option value="text-slate-700">吏꾪쉶??/option><option value="text-emerald-700">珥덈줉??/option><option value="text-blue-700">?뚮옉??/option><option value="text-rose-700">鍮④컯??/option><option value="text-amber-700">二쇳솴??/option>
                         </select>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-400 pl-1">글자 크기 및 정렬</label>
+                        <label className="text-[9px] font-black text-slate-400 pl-1">湲???ш린 諛??뺣젹</label>
                         <div className="flex gap-1.5">
                           <select value={view.groupHeaderTextSize2 || 'text-[14px]'} onChange={e => onUpdate({...view, groupHeaderTextSize2: e.target.value})} className="flex-1 p-3 text-xs rounded-xl border border-slate-200 font-bold bg-white text-slate-700 outline-none">
-                            <option value="text-xs">작게</option><option value="text-[14px]">보통</option><option value="text-[15px]">조금 크게</option><option value="text-lg">크게</option>
+                            <option value="text-xs">?묎쾶</option><option value="text-[14px]">蹂댄넻</option><option value="text-[15px]">議곌툑 ?ш쾶</option><option value="text-lg">?ш쾶</option>
                           </select>
                           <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200">
                             {[
@@ -1046,62 +1019,41 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-400 pl-1">통계 표시 위치</label>
+                        <label className="text-[9px] font-black text-slate-400 pl-1">?듦퀎 ?쒖떆 ?꾩튂</label>
                         <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 h-[44px]">
                           <button 
                             onClick={() => onUpdate({...view, groupAggregationPosition2: 'beside_label'})}
                             className={`flex-1 text-[9px] font-black rounded-lg transition-all ${view.groupAggregationPosition2 === 'beside_label' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
                           >
-                            이름 바로 옆
-                          </button>
+                            ?대쫫 諛붾줈 ??                          </button>
                           <button 
                             onClick={() => onUpdate({...view, groupAggregationPosition2: 'right_end'})}
                             className={`flex-1 text-[9px] font-black rounded-lg transition-all ${view.groupAggregationPosition2 === 'right_end' || !view.groupAggregationPosition2 ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
                           >
-                            오른쪽 끝
-                          </button>
+                            ?ㅻⅨ履???                          </button>
                         </div>
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[9px] font-black text-indigo-500 pl-1 flex items-center gap-1"><Sparkles size={12}/> 2차 헤더 가공 수식 (Expression)</label>
+                      <label className="text-[9px] font-black text-indigo-500 pl-1 flex items-center gap-1"><Sparkles size={12}/> 2李??ㅻ뜑 媛怨??섏떇 (Expression)</label>
                       <input 
                         className="w-full p-4 rounded-2xl bg-white border border-indigo-100 font-mono text-[11px] font-bold text-slate-800 outline-none focus:border-indigo-400 transition-all shadow-inner"
                         value={view.groupHeaderExpression2 || ''}
                         onChange={e => onUpdate({...view, groupHeaderExpression2: e.target.value})}
-                        placeholder="예: val + ' (' + rowCount + '명)'"
+                        placeholder="?? val + ' (' + rowCount + '紐?'"
                       />
-                    </div>
-
-                    {/* 🔥 2차 상단 고정 옵션 (Sticky) */}
-                    <div className="pt-4 border-t border-indigo-100">
-                      <div className="flex items-center justify-between p-4 bg-slate-900 rounded-[1.5rem] border-2 border-indigo-500 shadow-xl group hover:scale-[1.02] transition-all">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-indigo-500 text-slate-900 rounded-lg shadow-inner"><ArrowUpCircle size={18}/></div>
-                          <div>
-                            <p className="text-xs font-black text-amber-400">2차 그룹 헤더 상단 고정</p>
-                            <p className="text-[9px] font-bold text-slate-400">1차 묶음바 아래에 2차 묶음바가 고정됩니다.</p>
-                          </div>
-                        </div>
-                        <button 
-                          onClick={() => onUpdate({...view, groupHeaderSticky2: !view.groupHeaderSticky2})}
-                          className={`w-14 h-7 rounded-full p-1 flex items-center transition-all duration-300 ${view.groupHeaderSticky2 ? 'bg-amber-500' : 'bg-slate-700'}`}
-                        >
-                          <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${view.groupHeaderSticky2 ? 'translate-x-7' : 'translate-x-0'}`} />
-                        </button>
-                      </div>
                     </div>
                   </div>
 
                   <div className="space-y-4 pt-4 border-t border-indigo-200">
                     <div className="flex items-center justify-between px-1">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">2차 그룹 요약 통계</label>
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">2李?洹몃９ ?붿빟 ?듦퀎</label>
                       <button 
-                        onClick={() => onUpdate({ ...view, groupAggregations2: [...(view.groupAggregations2 || []), { id: `agg2_${Date.now()}`, type: 'count', label: '소계', color: 'bg-violet-50 text-violet-600', displayStyle: 'button' }] })}
+                        onClick={() => onUpdate({ ...view, groupAggregations2: [...(view.groupAggregations2 || []), { id: `agg2_${Date.now()}`, type: 'count', label: '?뚭퀎', color: 'bg-violet-50 text-violet-600', displayStyle: 'button' }] })}
                         className="flex items-center gap-1 px-3 py-1 bg-violet-50 text-violet-600 rounded-lg text-[10px] font-black hover:bg-violet-100 transition-all border border-violet-100"
                       >
-                        <Plus size={12}/> 통계 추가
+                        <Plus size={12}/> ?듦퀎 異붽?
                       </button>
                     </div>
 
@@ -1115,62 +1067,62 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                           
                           <div className="grid grid-cols-3 gap-3">
                             <div className="space-y-1.5">
-                              <label className="text-[9px] font-black text-slate-400 pl-1">계산 방식</label>
+                              <label className="text-[9px] font-black text-slate-400 pl-1">怨꾩궛 諛⑹떇</label>
                               <select 
                                 value={agg.type} 
                                 onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map(a => a.id === agg.id ? { ...a, type: e.target.value as any } : a) })}
                                 className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-slate-50 outline-none"
                               >
-                                <option value="count">총 개수 (Count)</option>
-                                <option value="sum">합계 (Sum)</option>
-                                <option value="avg">평균 (Avg)</option>
-                                <option value="count_if">조건부 개수 (Count If)</option>
+                                <option value="count">珥?媛쒖닔 (Count)</option>
+                                <option value="sum">?⑷퀎 (Sum)</option>
+                                <option value="avg">?됯퇏 (Avg)</option>
+                                <option value="count_if">議곌굔遺 媛쒖닔 (Count If)</option>
                               </select>
                             </div>
                             <div className="space-y-1.5">
-                              <label className="text-[9px] font-black text-slate-400 pl-1">표시 라벨</label>
+                              <label className="text-[9px] font-black text-slate-400 pl-1">?쒖떆 ?쇰꺼</label>
                               <input 
                                 value={agg.label} 
                                 onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map(a => a.id === agg.id ? { ...a, label: e.target.value } : a) })}
                                 className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-white outline-none"
-                                placeholder="예: 소계"
+                                placeholder="?? ?뚭퀎"
                               />
                             </div>
                             <div className="space-y-1.5">
-                              <label className="text-[9px] font-black text-slate-400 pl-1">표시 형태</label>
+                              <label className="text-[9px] font-black text-slate-400 pl-1">?쒖떆 ?뺥깭</label>
                               <select 
                                 value={agg.displayStyle || 'button'} 
                                 onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map(a => a.id === agg.id ? { ...a, displayStyle: e.target.value as any } : a) })}
                                 className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-white outline-none"
                               >
-                                <option value="button">알약형 (Button)</option>
-                                <option value="text">글자만 (Text)</option>
+                                <option value="button">?뚯빟??(Button)</option>
+                                <option value="text">湲?먮쭔 (Text)</option>
                               </select>
                             </div>
                           </div>
 
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1.5">
-                              <label className="text-[9px] font-black text-slate-400 pl-1">대상 컬럼</label>
+                              <label className="text-[9px] font-black text-slate-400 pl-1">???而щ읆</label>
                               <select 
                                 value={agg.column || ''} 
                                 onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map(a => a.id === agg.id ? { ...a, column: e.target.value } : a) })}
                                 className="w-full p-2.5 text-[11px] rounded-xl border border-slate-200 font-bold bg-white outline-none"
                               >
-                                <option value="">컬럼 선택</option>
+                                <option value="">而щ읆 ?좏깮</option>
                                 {availableColumns.map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
                             </div>
                             {(agg.type === 'sum' || agg.type === 'avg' || agg.type === 'count_if') && (
                               <div className="space-y-1.5 animate-in fade-in">
                                 <label className="text-[9px] font-black text-amber-600 pl-1 flex items-center gap-1">
-                                  <Sparkles size={10}/> {agg.type === 'count_if' ? '조건 수식 (JS)' : '가공 수식 (Target JS)'}
+                                  <Sparkles size={10}/> {agg.type === 'count_if' ? '議곌굔 ?섏떇 (JS)' : '媛怨??섏떇 (Target JS)'}
                                 </label>
                                 <input 
                                   value={agg.conditionValue || ''} 
                                   onChange={e => onUpdate({ ...view, groupAggregations2: view.groupAggregations2?.map(a => a.id === agg.id ? { ...a, conditionValue: e.target.value } : a) })}
                                   className="w-full p-2.5 text-[11px] rounded-xl border border-amber-200 font-mono font-bold bg-white outline-none focus:border-amber-400"
-                                  placeholder={agg.type === 'count_if' ? "예: val === '완료'" : "예: val * 1.1"}
+                                  placeholder={agg.type === 'count_if' ? "?? val === '?꾨즺'" : "?? val * 1.1"}
                                 />
                               </div>
                             )}
@@ -1184,7 +1136,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
             </div>
             <div className="space-y-1">
               <SortConfigSection 
-                label="1차 정렬 기준"
+                label="1李??뺣젹 湲곗?"
                 column={view.sortColumn}
                 direction={view.sortDirection}
                 availableColumns={availableColumns}
@@ -1193,7 +1145,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
               />
               {view.sortColumn && (
                 <SortConfigSection 
-                  label="2차 정렬 (1차 기준이 같을 때)"
+                  label="2李??뺣젹 (1李?湲곗???媛숈쓣 ??"
                   column={view.sortColumn2}
                   direction={view.sortDirection2}
                   availableColumns={availableColumns.filter(c => c !== view.sortColumn)}
@@ -1206,96 +1158,90 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
           </div>
           <div className="space-y-6">
             <div className="space-y-3">
-              <label className="text-[10px] font-black text-slate-400 block px-1 uppercase tracking-wider whitespace-nowrap">카드 가로 배치 (열 개수)</label>
-              <select className="w-full p-3 rounded-xl bg-white border-2 border-slate-100 font-black text-slate-800 cursor-pointer outline-none focus:border-indigo-200" value={view.columnCount || 1} onChange={e => onUpdate({...view, columnCount: Number(e.target.value)})}>{[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}열 {n === 1 ? '(리스트 형태)' : `(${n}단 격자 형태)`}</option>)}</select>
+              <label className="text-[10px] font-black text-slate-400 block px-1 uppercase tracking-wider whitespace-nowrap">移대뱶 媛濡?諛곗튂 (??媛쒖닔)</label>
+              <select className="w-full p-3 rounded-xl bg-white border-2 border-slate-100 font-black text-slate-800 cursor-pointer outline-none focus:border-indigo-200" value={view.columnCount || 1} onChange={e => onUpdate({...view, columnCount: Number(e.target.value)})}>{[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}??{n === 1 ? '(由ъ뒪???뺥깭)' : `(${n}??寃⑹옄 ?뺥깭)`}</option>)}</select>
             </div>
 
 
             
             <div>
-              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5 whitespace-nowrap"><MousePointerClick size={14} className="text-indigo-500"/> 카드 클릭 액션</label>
+              <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5 whitespace-nowrap"><MousePointerClick size={14} className="text-indigo-500"/> 移대뱶 ?대┃ ?≪뀡</label>
               <select className="w-full p-3 rounded-xl bg-white border-2 border-slate-100 font-black text-slate-800 cursor-pointer outline-none" value={view.onClickActionId || ''} onChange={e => onUpdate({...view, onClickActionId: e.target.value || null})}>
-                <option value="">(클릭 동작 없음)</option>
-                {actions.map(act => <option key={act.id} value={act.id}>⚡ {act.name}</option>)}
+                <option value="">(?대┃ ?숈옉 ?놁쓬)</option>
+                {actions.map(act => <option key={act.id} value={act.id}>??{act.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[10px] font-black text-rose-500 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5 whitespace-nowrap animate-pulse"><Zap size={14} /> 뷰 시작 시 자동 실행(Automation)</label>
+              <label className="text-[10px] font-black text-rose-500 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5 whitespace-nowrap animate-pulse"><Zap size={14} /> 酉??쒖옉 ???먮룞 ?ㅽ뻾(Automation)</label>
               <select className="w-full p-3 rounded-xl bg-rose-50 border-2 border-rose-100 font-black text-rose-700 cursor-pointer outline-none focus:border-rose-300" value={view.onInitActionId || ''} onChange={e => onUpdate({...view, onInitActionId: e.target.value || null})}>
-                <option value="">(자동 실행 없음 - 일반 모드)</option>
-                {actions.map(act => <option key={act.id} value={act.id}>🚀 {act.name}</option>)}
+                <option value="">(?먮룞 ?ㅽ뻾 ?놁쓬 - ?쇰컲 紐⑤뱶)</option>
+                {actions.map(act => <option key={act.id} value={act.id}>?? {act.name}</option>)}
               </select>
-              <p className="text-[9px] font-bold text-rose-400 mt-1 px-1">* 뷰가 열리자마자 필터링된 데이터에 대해 위 액션을 수행합니다.</p>
+              <p className="text-[9px] font-bold text-rose-400 mt-1 px-1">* 酉곌? ?대━?먮쭏???꾪꽣留곷맂 ?곗씠?곗뿉 ??????≪뀡???섑뻾?⑸땲??</p>
             </div>
           </div>
         </div>
         
-        {/* 🔥 [신규] 어댑티브 UI (조건부 노출/비활성화) 설정 섹션 */}
+        {/* ?뵦 [?좉퇋] ?대뙌?곕툕 UI (議곌굔遺 ?몄텧/鍮꾪솢?깊솕) ?ㅼ젙 ?뱀뀡 */}
         <div className="mt-8 pt-8 border-t border-slate-100 min-w-max w-full">
            <div className="flex items-center gap-3 mb-6">
               <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-md"><Settings2 size={20}/></div>
               <div>
-                <h3 className="text-lg font-black text-slate-800">🚦 메뉴 노출 및 가용성 필터 (Adaptive UI)</h3>
-                <p className="text-xs text-slate-500 font-bold">특정 조건에 따라 메뉴를 숨기거나 비활성화(잠금)합니다.</p>
+                <h3 className="text-lg font-black text-slate-800">?슗 硫붾돱 ?몄텧 諛?媛?⑹꽦 ?꾪꽣 (Adaptive UI)</h3>
+                <p className="text-xs text-slate-500 font-bold">?뱀젙 議곌굔???곕씪 硫붾돱瑜??④린嫄곕굹 鍮꾪솢?깊솕(?좉툑)?⑸땲??</p>
               </div>
            </div>
            
            <div className="grid grid-cols-2 gap-8">
               <div className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5"><Sparkles size={14} className="text-amber-500"/> 제어 조건 (JavaScript Expression)</label>
+                  <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5"><Sparkles size={14} className="text-amber-500"/> ?쒖뼱 議곌굔 (JavaScript Expression)</label>
                   <textarea 
-                    className="w-full p-4 rounded-2xl font-mono text-sm font-black outline-none transition-all shadow-lg border-4 border-slate-900 bg-white focus:ring-4 focus:ring-amber-500/20"
-                    style={{ 
-                      color: '#000000',
-                      backgroundColor: '#ffffff',
-                      minHeight: '120px'
-                    }}
-                    rows={4}
+                    className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-mono text-xs font-bold text-slate-700 outline-none focus:border-amber-400 transition-all"
+                    rows={3}
                     value={view.visibilityExpr || ''}
                     onChange={e => onUpdate({...view, visibilityExpr: e.target.value})}
-                    placeholder="예: count('attendance_log', {date: 'today'}) > 0"
+                    placeholder="?? count('attendance_log', {date: 'today'}) > 0"
                   />
-                  <div className="mt-3 p-4 bg-slate-900 rounded-2xl border-2 border-amber-500 shadow-xl">
-                    <p className="text-[11px] font-black text-amber-400 leading-relaxed">
-                      <Sparkles size={14} className="inline mr-1 mb-1"/> **수식 작성 가이드**: 결과가 **참(true)**일 때만 설정이 적용됩니다.<br/>
-                      • `count('테이블', {'{조건}'}) &gt; 0`: 조건에 맞는 데이터가 존재할 때<br/>
-                      • `currentUser().role === 'admin'`: 로그인한 사용자가 관리자일 때
-                    </p>
+                  <div className="mt-2 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                    <p className="text-[10px] font-bold text-amber-700 leading-relaxed">
+                      ?뮕 **?꾩?留?*: 寃곌낵媛 **true**(李??대㈃ ?꾨옒 ?ㅼ젙???곸슜?⑸땲??<br/>
+                      - `count('?뚯씠釉?, {'{?꾪꽣}'}) &gt; 0`: 湲곕줉???덉쑝硫?br/>
+                      - `currentUser().role === 'admin'`: 愿由ъ옄硫?                    </p>
                   </div>
                 </div>
               </div>
               
               <div className="space-y-6">
                 <div className="bg-slate-50 p-5 rounded-2xl border-2 border-dashed border-slate-200">
-                  <label className="text-[10px] font-black text-slate-500 block mb-4 uppercase tracking-wider px-1">조건 만족 시 처리 방식 (Behavior)</label>
+                  <label className="text-[10px] font-black text-slate-500 block mb-4 uppercase tracking-wider px-1">議곌굔 留뚯” ??泥섎━ 諛⑹떇 (Behavior)</label>
                   <div className="flex gap-2">
                     <button 
                       onClick={() => onUpdate({ ...view, visibilityBehavior: 'hide' })}
                       className={`flex-1 py-3 rounded-xl text-xs font-black border-2 transition-all ${view.visibilityBehavior === 'hide' ? 'bg-slate-800 border-slate-800 text-white shadow-lg scale-105' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}
                     >
-                      🚫 메뉴에서 숨김
+                      ?슟 硫붾돱?먯꽌 ?④?
                     </button>
                     <button 
                       onClick={() => onUpdate({ ...view, visibilityBehavior: 'disable' })}
                       className={`flex-1 py-3 rounded-xl text-xs font-black border-2 transition-all ${view.visibilityBehavior === 'disable' ? 'bg-amber-600 border-amber-600 text-white shadow-lg scale-105' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'}`}
                     >
-                      🔒 비활성화 (보이지만 못 누름)
+                      ?뵏 鍮꾪솢?깊솕 (蹂댁씠吏留?紐??꾨쫫)
                     </button>
                   </div>
                 </div>
 
                 {view.visibilityBehavior === 'disable' && (
                   <div className="animate-in slide-in-from-top-2 duration-300">
-                    <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1">비활성화 시 상태 문구</label>
+                    <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1">鍮꾪솢?깊솕 ???곹깭 臾멸뎄</label>
                     <input 
                       type="text"
                       className="w-full p-4 rounded-2xl bg-white border-2 border-amber-100 font-black text-amber-700 outline-none focus:border-amber-400 shadow-sm"
                       value={view.disabledLabel || ''}
                       onChange={e => onUpdate({...view, disabledLabel: e.target.value})}
-                      placeholder="예: 오늘 감독 완료"
+                      placeholder="?? ?ㅻ뒛 媛먮룆 ?꾨즺"
                     />
-                    <p className="text-[9px] font-bold text-amber-400 mt-2 px-1">* 메뉴 아이콘 대신 이 텍스트가 표시되어 상태를 알려줍니다.</p>
+                    <p className="text-[9px] font-bold text-amber-400 mt-2 px-1">* 硫붾돱 ?꾩씠肄???????띿뒪?멸? ?쒖떆?섏뼱 ?곹깭瑜??뚮젮以띾땲??</p>
                   </div>
                 )}
               </div>
@@ -1308,24 +1254,24 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
           <div className="flex items-center gap-4">
             <div className="p-3 bg-indigo-100 text-indigo-700 rounded-2xl"><LayoutTemplate size={28}/></div>
             <div>
-              <h3 className="text-2xl font-black text-indigo-900 whitespace-nowrap">2. 카드 레이아웃 커스텀 설계</h3>
-              <p className="text-xs text-indigo-400 font-bold mt-1">카드에 보여줄 데이터의 배치와 높이를 결정합니다.</p>
+              <h3 className="text-2xl font-black text-indigo-900 whitespace-nowrap">2. 移대뱶 ?덉씠?꾩썐 而ㅼ뒪? ?ㅺ퀎</h3>
+              <p className="text-xs text-indigo-400 font-bold mt-1">移대뱶??蹂댁뿬以??곗씠?곗쓽 諛곗튂? ?믪씠瑜?寃곗젙?⑸땲??</p>
             </div>
           </div>
           
           <div className="flex items-center gap-6 bg-slate-50/80 p-3 rounded-2xl border border-slate-100 shadow-sm">
             <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter px-1 flex items-center gap-1"><ArrowUpDown size={12}/> 카드 높이 모드</label>
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter px-1 flex items-center gap-1"><ArrowUpDown size={12}/> 移대뱶 ?믪씠 紐⑤뱶</label>
               <div className="flex bg-slate-200/50 p-1 rounded-xl border border-slate-200">
-                <button onClick={() => onUpdate({...view, cardHeightMode: 'auto'})} className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${view.cardHeightMode === 'auto' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>자동 (Auto)</button>
-                <button onClick={() => onUpdate({...view, cardHeightMode: 'fixed'})} className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${view.cardHeightMode === 'fixed' || !view.cardHeightMode ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>고정 (Fixed)</button>
+                <button onClick={() => onUpdate({...view, cardHeightMode: 'auto'})} className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${view.cardHeightMode === 'auto' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>?먮룞 (Auto)</button>
+                <button onClick={() => onUpdate({...view, cardHeightMode: 'fixed'})} className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${view.cardHeightMode === 'fixed' || !view.cardHeightMode ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>怨좎젙 (Fixed)</button>
               </div>
             </div>
 
             {(!view.cardHeightMode || view.cardHeightMode === 'fixed') && (
               <div className="flex flex-col gap-2 min-w-[200px] animate-in fade-in slide-in-from-right-4">
                 <div className="flex items-center justify-between px-1">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">고정 높이: <span className="text-indigo-600">{view.cardHeight || 120}px</span></label>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">怨좎젙 ?믪씠: <span className="text-indigo-600">{view.cardHeight || 120}px</span></label>
                 </div>
                 <input 
                   type="range" min="40" max="400" step="5"
@@ -1338,12 +1284,12 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
 
             <div className="w-[1px] h-10 bg-slate-200 mx-1"></div>
 
-            <button onClick={addRootRow} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-sm shadow-xl shadow-indigo-200 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 whitespace-nowrap"><Plus size={18}/> 행(Row) 추가</button>
+            <button onClick={addRootRow} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-sm shadow-xl shadow-indigo-200 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 whitespace-nowrap"><Plus size={18}/> ??Row) 異붽?</button>
           </div>
         </div>
         <div className="space-y-4 overflow-visible w-full min-w-fit mt-10">
           {view.layoutRows.map(row => <RenderRowEditor key={row.id} row={row} depth={0} />)}
-          {view.layoutRows.length === 0 && (<div className="py-24 border-4 border-dashed border-slate-100 rounded-[2.5rem] flex flex-col items-center justify-center text-slate-300 gap-4 bg-slate-50/50"><Plus size={48} className="opacity-20"/><p className="font-black text-slate-400">우측 상단의 버튼을 눌러 카드 디자인을 시작하세요</p></div>)}
+          {view.layoutRows.length === 0 && (<div className="py-24 border-4 border-dashed border-slate-100 rounded-[2.5rem] flex flex-col items-center justify-center text-slate-300 gap-4 bg-slate-50/50"><Plus size={48} className="opacity-20"/><p className="font-black text-slate-400">?곗륫 ?곷떒??踰꾪듉???뚮윭 移대뱶 ?붿옄?몄쓣 ?쒖옉?섏꽭??/p></div>)}
         </div>
       </section>
 
@@ -1363,13 +1309,13 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
               <div className="flex items-center gap-3">
                 <TableProperties className="text-indigo-600" size={24} />
                 <div>
-                  <h3 className="text-lg font-black text-slate-800">[{view.tableName}] 쿼리 시뮬레이션 및 데이터 잠금</h3>
-                  <p className="text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-lg inline-block mt-0.5">총 {previewData.length}건 조회됨</p>
+                  <h3 className="text-lg font-black text-slate-800">[{view.tableName}] 荑쇰━ ?쒕??덉씠??諛??곗씠???좉툑</h3>
+                  <p className="text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-lg inline-block mt-0.5">珥?{previewData.length}嫄?議고쉶??/p>
                 </div>
               </div>
               <div className="flex items-center gap-6 border-l pl-6 border-slate-200">
                 <div className="flex items-center gap-2">
-                  <label className="text-[10px] uppercase font-black text-slate-500 leading-tight text-right mr-1">잠금 시 사용할<br/>식별자(PK) 칼럼</label>
+                  <label className="text-[10px] uppercase font-black text-slate-500 leading-tight text-right mr-1">?좉툑 ???ъ슜??br/>?앸퀎??PK) 移쇰읆</label>
                   <select value={tempKeyColumn} onChange={e => {
                       const selectedColumn = e.target.value;
                       setTempKeyColumn(selectedColumn);
@@ -1379,28 +1325,28 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                         const sortedData = [...previewData].sort((a, b) => {
                           const valA = a[selectedColumn];
                           const valB = b[selectedColumn];
-                          // null, undefined는 뒤로 보냄
+                          // null, undefined???ㅻ줈 蹂대깂
                           if (valA === null || valA === undefined) return 1;
                           if (valB === null || valB === undefined) return -1;
-                          // 숫자 포함 한글/영문 정렬 (localeCompare 활용)
+                          // ?レ옄 ?ы븿 ?쒓?/?곷Ц ?뺣젹 (localeCompare ?쒖슜)
                           return String(valA).localeCompare(String(valB), 'ko', { numeric: true });
                         });
                         setPreviewData(sortedData);
                       }
                   }} className="p-2.5 text-sm border-2 border-indigo-100 bg-white rounded-xl font-bold outline-none cursor-pointer text-indigo-700 focus:border-indigo-400">
-                    <option value="">-- 고유 식별자 선택 필수 --</option>
+                    <option value="">-- 怨좎쑀 ?앸퀎???좏깮 ?꾩닔 --</option>
                     {availableColumns.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <button 
                   onClick={() => {
-                    if (!tempKeyColumn) return alert('화면을 특정 데이터로 고정하려면 고유 식별자(PK) 칼럼을 먼저 선택해야 합니다.\n(예: 학번, 전화번호 등 중복되지 않는 칼럼)');
+                    if (!tempKeyColumn) return alert('?붾㈃???뱀젙 ?곗씠?곕줈 怨좎젙?섎젮硫?怨좎쑀 ?앸퀎??PK) 移쇰읆??癒쇱? ?좏깮?댁빞 ?⑸땲??\n(?? ?숇쾲, ?꾪솕踰덊샇 ??以묐났?섏? ?딅뒗 移쇰읆)');
                     onUpdate({ ...view, isLocked: selectedKeys.length > 0, lockedKeyColumn: tempKeyColumn, lockedRecordKeys: selectedKeys });
                     setIsPreviewModalOpen(false);
                   }}
                   className={`px-8 py-3 rounded-xl font-black shadow-md flex items-center gap-2 transition-all ${tempKeyColumn ? 'bg-indigo-600 hover:bg-indigo-700 text-white hover:scale-105 active:scale-95 shadow-indigo-200' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
                 >
-                  선택 완료 및 적용
+                  ?좏깮 ?꾨즺 諛??곸슜
                 </button>
                 <button onClick={() => setIsPreviewModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-slate-200 hover:bg-slate-300 rounded-full text-slate-500 hover:text-slate-800 transition-colors shrink-0 ml-2"><X size={20}/></button>
               </div>
@@ -1408,9 +1354,9 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
             {/* Modal Body & Table */}
             <div className="flex-1 overflow-auto p-0 relative bg-slate-100">
                {isLoadingPreview ? (
-                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-indigo-600 bg-white/50"><Loader2 className="animate-spin" size={40} /><p className="font-bold">데이터를 불러오는 중...</p></div>
+                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-indigo-600 bg-white/50"><Loader2 className="animate-spin" size={40} /><p className="font-bold">?곗씠?곕? 遺덈윭?ㅻ뒗 以?..</p></div>
                ) : previewData.length === 0 ? (
-                 <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-bold text-lg">조건에 맞는 데이터가 없습니다. 쿼리 설정을 확인해주세요.</div>
+                 <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-bold text-lg">議곌굔??留욌뒗 ?곗씠?곌? ?놁뒿?덈떎. 荑쇰━ ?ㅼ젙???뺤씤?댁＜?몄슂.</div>
                ) : (
                  <table className="w-full text-left border-separate border-spacing-0 bg-white">
                    <thead className="bg-slate-900 text-white sticky top-0 z-20 shadow-sm">
@@ -1447,10 +1393,10 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                          >
                            <div className="flex items-center gap-1">
                              {col} 
-                             {col === tempKeyColumn && <span className="text-yellow-400">🔑</span>}
+                             {col === tempKeyColumn && <span className="text-yellow-400">?뵎</span>}
                              {previewSortConfig?.column === col && (
                                <span className="text-indigo-400 ml-1 text-[10px]">
-                                 {previewSortConfig.direction === 'asc' ? '▲' : '▼'}
+                                 {previewSortConfig.direction === 'asc' ? '?? : '??}
                                </span>
                              )}
                            </div>
@@ -1465,7 +1411,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                        return (
                          <tr key={idx} className={`border-b hover:bg-indigo-50/50 transition-colors cursor-pointer ${isChecked ? 'bg-indigo-50 border-indigo-100' : 'border-slate-100'}`} onClick={() => {
                            if (!tempKeyColumn || !rowKey || rowKey === 'null' || rowKey === 'undefined') {
-                              if (!tempKeyColumn) alert('고유 식별자(PK) 칼럼을 우측 상단에서 먼저 선택해야 클릭이 가능합니다.');
+                              if (!tempKeyColumn) alert('怨좎쑀 ?앸퀎??PK) 移쇰읆???곗륫 ?곷떒?먯꽌 癒쇱? ?좏깮?댁빞 ?대┃??媛?ν빀?덈떎.');
                               return;
                            }
                            setSelectedKeys(prev => prev.includes(rowKey) ? prev.filter(k => k !== rowKey) : [...prev, rowKey]);
