@@ -9,63 +9,74 @@ export interface FormulaExample {
 
 export interface FormulaCategory {
   category: string;
-  iconType: 'link' | 'branch' | 'math' | 'terminal' | 'sparkles' | 'shield-check';
+  iconType: 'link' | 'branch' | 'math' | 'terminal' | 'sparkles' | 'database' | 'shield-check';
   color: string;
   items: FormulaExample[];
 }
 
 export const FORMULA_EXAMPLES: FormulaCategory[] = [
   {
-    category: "0. 시스템 운영 규칙 (KST 표준) 🚦",
+    category: "0. 🛡️ 시스템 운영 규칙 (KST 표준)",
     iconType: 'shield-check',
     color: 'slate',
     items: [
-      { title: "전역 시간 규격", code: "today, date, month, time, now", desc: "모든 시간 함수는 서울(KST) 시간을 기준으로 포맷팅되어 반환됩니다." },
-      { title: "오늘 데이터 조회", code: "count('테이블', {컬럼: 'today'})", desc: "날짜(YYYY-MM-DD)와 타임스탬프 형식을 모두 자동 감지하여 조회합니다." },
-      { title: "동적 상태 제어", code: "count(...) > 0", desc: "조건 결과가 참(true)일 때 메뉴가 비활성화되거나 숨겨집니다." },
+      { title: "전역 시간 규격", code: "today, date, month, time, now", desc: "모든 시간 함수는 서울(KST) 시간을 기준으로 반환됩니다." },
+      { title: "오늘 데이터 조회", code: "count('테이블', {컬럼: 'today'})", desc: "날짜와 타임스탬프를 자동 감지하여 오늘 데이터를 조회합니다." },
+      { title: "동적 상태 제어", code: "count(...) > 0", desc: "조건 결과에 따라 메뉴가 비활성화되거나 숨겨집니다." },
     ]
   },
   {
-    category: "1. 표준 날짜 및 시간 형식 (서울 기준) 📅",
+    category: "1. 💾 데이터 필터링 및 비교 (Filtering)",
+    iconType: 'database',
+    color: 'indigo',
+    items: [
+      { title: "오늘 데이터만 보기", code: "isToday({{date_column}})", desc: "날짜 컬럼의 데이터가 오늘인지 확인합니다." },
+      { title: "복합 상태 필터링", code: "['완료', '진행중'].includes({{status}})", desc: "상태가 완료이거나 진행중인 데이터만 표시합니다." },
+      { title: "수치 범위 필터", code: "{{score}} >= 80 && {{score}} <= 100", desc: "점수가 80점 이상 100점 이하인 행만 필터링합니다." },
+      { title: "데이터 존재 여부", code: "{{remark}} !== null && {{remark}} !== ''", desc: "비고란에 내용이 있는 데이터만 모아봅니다." },
+      { title: "문자열 검색", code: "{{title}}.includes('공지')", desc: "제목에 '공지'라는 단어가 포함된 데이터만 찾습니다." },
+      { title: "본인 데이터만(내 문서)", code: "{{created_by}} === currentUser().email", desc: "현재 로그인한 사용자가 작성한 데이터만 필터링합니다." },
+    ]
+  },
+  {
+    category: "2. 📅 날짜 및 시간 처리 (Dates)",
     iconType: 'math',
     color: 'emerald',
     items: [
-      { title: "오늘 (today)", code: "today", desc: "결과: 2026-04-16" },
-      { title: "현재 날짜 (date)", code: "date", desc: "결과: 2026-04-16" },
-      { title: "현재 년월 (month)", code: "month", desc: "결과: 2026-04" },
-      { title: "현재 년도 (year)", code: "year", desc: "결과: 2026" },
-      { title: "현재 시간 (time)", code: "time", desc: "결과: 14:07:07" },
-      { title: "현재 전체 (now)", code: "now", desc: "결과: 2026-04-16 14:07:07" },
+      { title: "이번 달 데이터", code: "{{created_at}}.startsWith(month)", desc: "작성일이 이번 달(YYYY-MM)인 데이터만 필터링합니다." },
+      { title: "올해 데이터", code: "{{created_at}}.startsWith(year)", desc: "작성일이 올해(YYYY)인 데이터만 필터링합니다." },
+      { title: "D-Day 계산", code: "Math.floor((new Date({{due_date}}) - new Date(today)) / (1000*60*60*24))", desc: "오늘 기준 마감일까지 남은 일수를 계산합니다." },
+      { title: "한국식 날짜 출력", code: "new Date({{date}}).toLocaleDateString('ko-KR')", desc: "결과: 2024년 4월 17일" },
     ]
   },
   {
-    category: "2. 조건문 (Adaptive UI 제어) 🔀",
+    category: "3. 🔀 조건부 텍스트 가공 (Conditional)",
     iconType: 'branch',
     color: 'rose',
     items: [
-      { title: "데이터 존재 여부", code: "count('attendance_log', {created_date: 'today'}) > 0", desc: "오늘 기록이 하나라도 있으면 참(true)" },
-      { title: "내 기록 확인", code: "count('tasks', {email: 'me'}) <= 0", desc: "내 담당 업무가 없으면 참(true)" },
-      { title: "사용자 정보 활용", code: "currentUser().role === 'admin'", desc: "로그인한 사용자가 관리자일 때만 메뉴 활성화" },
+      { title: "상태별 텍스트 출력", code: "{{status}} === 'Y' ? '🟢 완료' : '🔴 대기'", desc: "값에 따라 다른 텍스트와 이모지를 결합합니다." },
+      { title: "다중 조건 (A/B/C)", code: "{{score}} >= 90 ? '⭐⭐⭐' : ({{score}} >= 70 ? '⭐⭐' : '⭐')", desc: "비즈니스 등급 로직을 구현합니다." },
+      { title: "기본값 처리", code: "{{name}} || '이름 없음'", desc: "데이터가 없을 때 기본적으로 보여줄 텍스트를 지정합니다." },
     ]
   },
   {
-    category: "3. 데이터 연결 및 텍스트 🔗",
-    iconType: 'link',
-    color: 'indigo',
-    items: [
-      { title: "단순 연결", code: "{{성}} + {{이름}}", desc: "결과: 홍길동" },
-      { title: "구조화된 텍스트", code: "'[' + {{학번}} + '] ' + {{이름}}", desc: "결과: [10201] 홍길동" },
-      { title: "공백 포함", code: "{{반}} + ' ' + {{번호}} + '번'", desc: "결과: 3 15번" },
-    ]
-  },
-  {
-    category: "4. 데이터 가공 및 정규식 ✨",
-    iconType: 'sparkles',
+    category: "4. 🧩 텍스트 및 숫자 변환 (Utilities)",
+    iconType: 'terminal',
     color: 'amber',
     items: [
-      { title: "정규식 (패턴형)", code: "/(\\d{3})(\\d{4})(\\d{4})/", desc: "전화번호 마스킹 등에 사용" },
-      { title: "천단위 콤마 (₩)", code: "Number(val).toLocaleString() + '원'", desc: "결과: 1,234,500원" },
-      { title: "말줄임표 (...)", code: "val?.length > 10 ? val.slice(0, 10) + '...' : val", desc: "길이 초과 시 자동 생략" },
+      { title: "천단위 콤마 추가", code: "Number({{price}}).toLocaleString() + '원'", desc: "결과: 1,500,000원" },
+      { title: "전화번호 마스킹", code: "{{phone}}.replace(/(\\d{3})(\\d{4})(\\d{4})/, '$1-****-$3')", desc: "결과: 010-****-5678" },
+      { title: "말줄임 처리(길이 제한)", code: "{{content}}.length > 20 ? {{content}}.slice(0, 20) + '...' : {{content}}", desc: "내용이 너무 길면 자르고 '...'을 붙입니다." },
+    ]
+  },
+  {
+    category: "5. ✨ 핵심 헬퍼 변수 (Built-in)",
+    iconType: 'sparkles',
+    color: 'cyan',
+    items: [
+      { title: "today / now / month", code: "today", desc: "오늘 날짜(YYYY-MM-DD), 현재일시, 현재년월 자동 변수" },
+      { title: "isToday(date)", code: "isToday({{col}})", desc: "특정 날짜값이 오늘인지 판별하는 필수 함수" },
+      { title: "currentUser()", code: "currentUser().email", desc: "로그인 유저 정보 접근 (email, name)" },
     ]
   }
 ];

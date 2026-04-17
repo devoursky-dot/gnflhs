@@ -254,7 +254,25 @@ export const applyClientFilters = (data: any[], view: any, userProfile?: any): a
   // 🔥 [신규] 수동 선택(Lock) 유효성 검사 - 선택된 키들만 최종 리스트에 남김
   if (view.isLocked && view.lockedKeyColumn && view.lockedRecordKeys?.length > 0) {
     const keys = view.lockedRecordKeys.map((k: any) => String(k));
-    result = result.filter((r: any) => keys.includes(String(r[view.lockedKeyColumn])));
+    const pk = view.lockedKeyColumn;
+    result = result.filter((r: any) => {
+      const val = r[pk];
+      if (val === null || val === undefined) return false;
+      return keys.includes(String(val));
+    });
+  }
+
+  // ✨ [신규] 2단계 고급 수식 필터 (JS Expression) 적용
+  if (view.filterExpr) {
+    result = result.filter((row: any) => {
+      try {
+        // evaluateExpression은 utils.ts 내부에 정의되어 있으므로 바로 호출 가능
+        return !!evaluateExpression(view.filterExpr!, row);
+      } catch (e) {
+        console.error("Filter Expression Error:", e);
+        return true; // 오류 시 데이터 유실 방지를 위해 통과시킴
+      }
+    });
   }
 
   return result;

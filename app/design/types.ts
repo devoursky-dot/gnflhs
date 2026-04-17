@@ -100,6 +100,9 @@ export type View = {
   visibilityExpr?: string;        // 노출/활성화 조건 (JS Expression)
   visibilityBehavior?: 'hide' | 'disable'; // 조건 만족 시 동작 (숨김 또는 비활성화)
   disabledLabel?: string;         // 비활성화 시 표시할 문구
+  
+  // 🔥 [신규] 데이터 소스 필터 수식 (JS Expression)
+  filterExpr?: string;            // 데이터 필터링 조건 수식
 };
 
 export type LayoutRow = {

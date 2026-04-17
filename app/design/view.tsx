@@ -387,7 +387,80 @@ const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () 
       </div>
     </div>
   </div>
-);
+  );
+};
+
+// 🔥 [신규] 수식 예시 가이드 팝업 컴포넌트 (메뉴얼 수준 가이드)
+const FormulaHelpModal = ({ onClose, onSelect }: { onClose: () => void, onSelect: (code: string) => void }) => {
+  const [activeCategory, setActiveCategory] = useState(FORMULA_EXAMPLES[0].category);
+
+  return (
+    <div className="fixed inset-0 z-[2000] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-4xl h-[80vh] rounded-[3rem] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 border-4 border-indigo-100">
+        <div className="p-8 border-b flex justify-between items-center bg-gradient-to-r from-indigo-50 to-white">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg ring-4 ring-indigo-100"><Sparkles size={24}/></div>
+            <div>
+              <h3 className="text-2xl font-black text-slate-800 tracking-tight">수식 예시 대백과</h3>
+              <p className="text-xs font-bold text-indigo-500">원하는 수식을 클릭하여 즉시 적용하세요.</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-3 text-slate-400 hover:bg-slate-100 rounded-full transition-all hover:rotate-90"><X size={24}/></button>
+        </div>
+
+        <div className="flex-1 flex overflow-hidden">
+          {/* 사이드바 카테고리 */}
+          <div className="w-64 bg-slate-50 border-r border-slate-100 p-6 space-y-2 overflow-y-auto">
+            {FORMULA_EXAMPLES.map(cat => {
+              const IconMap: Record<string, any> = {
+                'database': Database,
+                'math': ArrowUpDown,
+                'branch': FolderTree,
+                'terminal': Settings2,
+                'sparkles': Sparkles,
+                'link': Zap, // link 대신 Zap 사용
+                'shield-check': Lock, // shield-check 대신 Lock 사용
+              };
+              const Icon = IconMap[cat.iconType as string] || Sparkles;
+              return (
+                <button 
+                  key={cat.category}
+                  onClick={() => setActiveCategory(cat.category)}
+                  className={`w-full flex items-center gap-3 px-4 py-4 rounded-2xl text-[13px] font-black transition-all ${activeCategory === cat.category ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white hover:shadow-sm'}`}
+                >
+                  <Icon size={18} strokeWidth={3}/>
+                  {cat.category.split('. ')[1] || cat.category}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 메인 예시 리스트 */}
+          <div className="flex-1 p-8 overflow-y-auto bg-white">
+            <div className="grid grid-cols-1 gap-6">
+              {FORMULA_EXAMPLES.find(c => c.category === activeCategory)?.items.map((item, i) => (
+                <div key={i} className="group p-6 rounded-[2rem] border-2 border-slate-100 hover:border-indigo-400 hover:bg-indigo-50/30 transition-all relative">
+                  <div className="flex justify-between items-start mb-3">
+                    <h4 className="text-base font-black text-slate-800 group-hover:text-indigo-700 transition-colors">{item.title}</h4>
+                    <button 
+                      onClick={() => { onSelect(item.code); onClose(); }} 
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[11px] font-black shadow-md hover:bg-indigo-700 active:scale-95 transition-all"
+                    >
+                      이 수식 사용하기
+                    </button>
+                  </div>
+                  <div className="bg-slate-900 rounded-2xl p-4 font-mono text-[13px] text-emerald-400 mb-2 shadow-inner border border-slate-800">
+                    {item.code}
+                  </div>
+                  <p className="text-xs font-bold text-slate-400 pl-1">💡 {item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 interface ViewEditorProps {
@@ -462,6 +535,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [tempKeyColumn, setTempKeyColumn] = useState<string>('');
   const [previewSortConfig, setPreviewSortConfig] = useState<{column: string, direction: 'asc'|'desc'} | null>(null);
+  const [isFormulaHelpOpen, setIsFormulaHelpOpen] = useState(false);
 
   const fetchPreviewData = async () => {
     if (!view.tableName) return alert("먼저 테이블을 선택해주세요.");
@@ -539,6 +613,17 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
       let finalData = data || [];
       if (virtualTable) {
         finalData = await resolveVirtualData(finalData, virtualTable);
+      }
+
+      // 🧠 [신규] 프리뷰에서도 수식 필터(filterExpr) 적용하여 실시간 확인 가능하게 함
+      if (view.filterExpr) {
+        // 프리뷰용 클라이언트 필터 로직
+        const { evaluateExpression } = await import('../preview/[appId]/utils');
+        finalData = finalData.filter((row: any) => {
+          try {
+            return evaluateExpression(view.filterExpr || 'true', row);
+          } catch(e) { return true; }
+        });
       }
 
       setPreviewData(finalData);
@@ -751,6 +836,45 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
               </div>
             ) : (
 <div className="text-center space-y-3"><Smartphone className="mx-auto text-slate-300" size={40}/><p className="text-xs text-slate-400 font-bold leading-relaxed whitespace-nowrap">필요한 경우 좌측에서 칼럼을<br/>선택해 데이터를 필터링하세요.</p></div>)}
+          </div>
+        </div>
+
+        {/* 🔥 [신규] 2단계 고급 데이터 필터 수식 (JS Expression) */}
+        <div className="mt-8 pt-8 border-t border-slate-100 space-y-4">
+          <div className="flex items-center justify-between px-2">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-indigo-500 text-white rounded-lg shadow-sm"><Sparkles size={16} className="animate-pulse"/></div>
+              <div>
+                <label className="text-sm font-black text-slate-900 tracking-tight">2단계 고급 수식 필터 (Advanced Logic)</label>
+                <p className="text-[10px] font-bold text-slate-400">문자열과 날짜를 자유롭게 조합하여 정교한 필터링을 수행합니다.</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setIsFormulaHelpOpen(true)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-xl text-[11px] font-black hover:bg-indigo-700 active:scale-95 transition-all shadow-md shadow-indigo-100 animate-bounce"
+            >
+              💡 수식 예시 가이드 확인
+            </button>
+          </div>
+          
+          <div className="relative group">
+            <textarea 
+              className="w-full p-6 rounded-[2rem] bg-indigo-50/20 border-2 border-indigo-100 font-mono text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 h-32 shadow-inner transition-all placeholder:text-slate-400"
+              value={view.filterExpr || ''}
+              onChange={e => onUpdate({...view, filterExpr: e.target.value})}
+              placeholder="예: isToday({{created_at}}) && {{status}} === '완료'"
+            />
+            <div className="absolute right-4 bottom-4 text-[9px] font-black text-indigo-400 bg-white/80 px-2 py-1 rounded-lg border border-indigo-50">
+              JavaScript Expression Mode
+            </div>
+          </div>
+          
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex gap-3 items-start">
+            <div className="p-1.5 bg-amber-500 text-white rounded-lg"><Search size={14}/></div>
+            <p className="text-[10px] font-bold text-amber-800 leading-relaxed">
+              <span className="font-black">[안내]</span> 위 1단계 서버 필터(필요시 적용)가 먼저 실행된 후, 수식 필터가 최종적으로 데이터를 걸러냅니다.<br/>
+              복합적인 논리(AND, OR)나 날짜 함수(`isToday` 등)를 자유롭게 활용하세요.
+            </p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-8 mt-8 pt-8 border-t border-slate-50 min-w-max w-full">
@@ -1353,6 +1477,13 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
         <FormatModal 
           cell={formatModalCell} onClose={() => setFormatModalCell(null)} 
           onSave={(updatedData: LayoutCell) => { mutate((rows: LayoutRow[]) => { const f = (arr: LayoutRow[]) => arr.forEach((r: LayoutRow) => r.cells.forEach((c: LayoutCell) => { if(c.id === updatedData.id) Object.assign(c, updatedData); else if(c.nestedRows) f(c.nestedRows); })); f(rows); }); setFormatModalCell(null); }} 
+        />
+      )}
+
+      {isFormulaHelpOpen && (
+        <FormulaHelpModal 
+          onClose={() => setIsFormulaHelpOpen(false)} 
+          onSelect={(code) => onUpdate({...view, filterExpr: (view.filterExpr || '') + code})} 
         />
       )}
 
