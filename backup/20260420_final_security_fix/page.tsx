@@ -93,7 +93,7 @@ export default function MainAppLauncher() {
   };
 
   const handleSaveAccess = async () => {
-    if (!isAdmin || !selectedAppForAccess) return;
+    if (!selectedAppForAccess) return;
     setIsSavingAccess(true);
     try {
       const updatedConfig = {
@@ -164,7 +164,6 @@ export default function MainAppLauncher() {
   const startCloneApp = (e: React.MouseEvent, app: any) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isAdmin) return;
     
     const config = app.app_config || { views: [], actions: [] };
     const tables = extractTablesFromApp(config);
@@ -183,7 +182,7 @@ export default function MainAppLauncher() {
    * 앱 및 테이블 복제 실행
    */
   const handleCloneAppWithTables = async () => {
-    if (!isAdmin || !cloningApp) return;
+    if (!cloningApp) return;
     setIsCloning(true);
     try {
       const config = JSON.parse(JSON.stringify(cloningApp.app_config || { views: [], actions: [] }));
@@ -373,24 +372,22 @@ export default function MainAppLauncher() {
                   >
                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-[2] duration-500 ease-out z-0"></div>
 
-                      {isAdmin && (
-                        <div className="absolute top-4 right-4 flex gap-2 z-20 opacity-0 group-hover:opacity-100 transition-all">
-                          <button
-                            onClick={(e) => startCloneApp(e, app)}
-                            className="w-10 h-10 rounded-full bg-white border border-slate-200 text-slate-400 flex items-center justify-center hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all shadow-sm"
-                            title="앱 복제하기"
-                          >
-                            <Copy size={16} />
-                          </button>
-                          <button
-                            onClick={(e) => openAccessModal(e, app)}
-                            className="w-10 h-10 rounded-full bg-white border border-slate-200 text-slate-400 flex items-center justify-center hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all shadow-sm"
-                            title="접근 권한 설정"
-                          >
-                            <Lock size={16} />
-                          </button>
-                        </div>
-                      )}
+                      <div className="absolute top-4 right-4 flex gap-2 z-20 opacity-0 group-hover:opacity-100 transition-all">
+                        <button
+                          onClick={(e) => startCloneApp(e, app)}
+                          className="w-10 h-10 rounded-full bg-white border border-slate-200 text-slate-400 flex items-center justify-center hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all shadow-sm"
+                          title="앱 복제하기"
+                        >
+                          <Copy size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => openAccessModal(e, app)}
+                          className="w-10 h-10 rounded-full bg-white border border-slate-200 text-slate-400 flex items-center justify-center hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all shadow-sm"
+                          title="접근 권한 설정"
+                        >
+                          <Lock size={16} />
+                        </button>
+                      </div>
 
                     <div className="relative z-10 flex items-start gap-4 mb-8">
                       <div className="w-14 h-14 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300 shadow-sm shrink-0">

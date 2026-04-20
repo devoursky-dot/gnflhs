@@ -25,7 +25,14 @@ export default function withAuth<P extends object>(
     useLayoutEffect(() => {
       const verify = async () => {
         try {
-          // 1. 쿠키에서 세션 데이터 획득 (프로젝트 고유 인증 방식)
+          // 1. Supabase 실제 세션 유효성 강제 검증 (신뢰성 강화)
+          const { data: { user }, error: authError } = await supabase.auth.getUser();
+          if (authError || !user) {
+            router.replace('/');
+            return;
+          }
+
+          // 2. localStorage 대신 Cookies에서 세션 획득
           const session = Cookies.get('gnflhs_session');
           if (!session) {
             router.replace('/');
@@ -33,8 +40,14 @@ export default function withAuth<P extends object>(
           }
 
           const sessionData = JSON.parse(session);
+          
+          // 쿠키의 ID와 실제 세션의 ID가 일치하는지 확인 (변조 방지)
+          if (sessionData.email !== user.email && sessionData.id !== user.email) {
+            throw new Error('Identity mismatch');
+          }
+
           const type = sessionData.type || 'teacher';
-          const loginId = sessionData.id || sessionData.email;
+          const loginId = user.email; // 신뢰할 수 있는 세션 데이터 사용
 
           let profile;
 

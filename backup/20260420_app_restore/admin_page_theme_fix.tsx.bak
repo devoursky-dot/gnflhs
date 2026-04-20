@@ -35,7 +35,6 @@ function AdminDashboardPage({ userProfile }: { userProfile?: any }) {
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isRelationSyncOpen, setIsRelationSyncOpen] = useState(false);
   const [lastDeleted, setLastDeleted] = useState<{ index: number, record: any } | null>(null);
-  const [isThemeLoaded, setIsThemeLoaded] = useState(false);
 
   const [excludedColumns, setExcludedColumns] = useState<string[]>(['year', 'month', 'YEAR', 'MONTH', '_year', '_month']);
   const [isExcludeSettingsOpen, setIsExcludeSettingsOpen] = useState(false);
@@ -93,14 +92,12 @@ function AdminDashboardPage({ userProfile }: { userProfile?: any }) {
     const savedStyle = localStorage.getItem("dashboard-style");
     if (savedTheme && COLOR_THEMES[savedTheme]) setThemeKey(savedTheme);
     if (savedStyle && DESIGN_STYLES[savedStyle]) setStyleKey(savedStyle);
-    setIsThemeLoaded(true);
   }, []);
 
   useEffect(() => {
-    if (!isThemeLoaded) return;
     localStorage.setItem("dashboard-theme", themeKey);
     localStorage.setItem("dashboard-style", styleKey);
-  }, [themeKey, styleKey, isThemeLoaded]);
+  }, [themeKey, styleKey]);
 
   // ── 스키마 패칭 ──
   useEffect(() => {

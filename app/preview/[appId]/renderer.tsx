@@ -39,6 +39,47 @@ export default function RenderPreviewLayout({ rows, rowData, actions, onExecuteA
               return (
                 <div key={cell.id} style={{ flex: cell.flex }} className={`flex flex-col justify-center min-w-0 overflow-hidden relative border-slate-100/50 bg-slate-50/30 ${paddingClass}`}>
                   <img src={String(cellValue)} alt="img" className={shapeClass} />
+                  
+                  {/* 🔥 [신규] 이미지 지능형 오버레이 레이어 */}
+                  {(() => {
+                    let overlayText = "";
+                    if (cell.imageOverlayExpression) {
+                      try {
+                        const evaluator = new Function('val', 'row', `try { return ${cell.imageOverlayExpression}; } catch(e) { return ""; }`);
+                        overlayText = String(evaluator(cellValue, rowData));
+                      } catch (err) {}
+                    }
+
+                    let showBadge = false;
+                    if (cell.imageBadgeExpression) {
+                      try {
+                        const bEvaluator = new Function('val', 'row', `try { return !!(${cell.imageBadgeExpression}); } catch(e) { return false; }`);
+                        showBadge = bEvaluator(cellValue, rowData);
+                      } catch (err) {}
+                    }
+
+                    const BadgeIcon = cell.imageBadgeIcon && IconMap[cell.imageBadgeIcon] ? IconMap[cell.imageBadgeIcon] : null;
+
+                    return (
+                      <>
+                        {/* 하단 텍스트 오버레이 (텍스트 전용 + 섀도우) */}
+                        {overlayText && (
+                          <div className="absolute bottom-1.5 left-0 right-0 flex justify-center px-2 pointer-events-none">
+                            <span className="text-white text-[10px] font-black drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] line-clamp-1 max-w-full text-center">
+                              {overlayText}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* 우측 상단 상태 배지 */}
+                        {showBadge && (
+                          <div className={`absolute top-2 right-2 ${cell.imageBadgeColor || 'bg-rose-500'} text-white p-1.5 rounded-lg shadow-lg animate-in zoom-in-50 duration-300 border border-white/20`}>
+                            {BadgeIcon ? <BadgeIcon size={12} strokeWidth={3} /> : <div className="w-2 h-2 bg-white rounded-full" />}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               );
             }

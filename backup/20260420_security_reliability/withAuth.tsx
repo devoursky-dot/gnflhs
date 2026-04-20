@@ -25,7 +25,7 @@ export default function withAuth<P extends object>(
     useLayoutEffect(() => {
       const verify = async () => {
         try {
-          // 1. 쿠키에서 세션 데이터 획득 (프로젝트 고유 인증 방식)
+          // localStorage 대신 Cookies에서 세션 획득
           const session = Cookies.get('gnflhs_session');
           if (!session) {
             router.replace('/');

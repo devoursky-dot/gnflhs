@@ -15,9 +15,8 @@ import ImageUploadModal from "./image";
 import RelationSyncModal from "./sync";
 import { EditableCell, ColumnHeader, COLOR_THEMES, DESIGN_STYLES } from "./table";
 import type { SchemaData } from "./table";
-import withAuth from "../withAuth";
 
-function AdminDashboardPage({ userProfile }: { userProfile?: any }) {
+export default function AdminDashboardPage() {
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [schemaData, setSchemaData] = useState<SchemaData>({});
   const [records, setRecords] = useState<any[]>([]);
@@ -35,7 +34,6 @@ function AdminDashboardPage({ userProfile }: { userProfile?: any }) {
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isRelationSyncOpen, setIsRelationSyncOpen] = useState(false);
   const [lastDeleted, setLastDeleted] = useState<{ index: number, record: any } | null>(null);
-  const [isThemeLoaded, setIsThemeLoaded] = useState(false);
 
   const [excludedColumns, setExcludedColumns] = useState<string[]>(['year', 'month', 'YEAR', 'MONTH', '_year', '_month']);
   const [isExcludeSettingsOpen, setIsExcludeSettingsOpen] = useState(false);
@@ -93,14 +91,12 @@ function AdminDashboardPage({ userProfile }: { userProfile?: any }) {
     const savedStyle = localStorage.getItem("dashboard-style");
     if (savedTheme && COLOR_THEMES[savedTheme]) setThemeKey(savedTheme);
     if (savedStyle && DESIGN_STYLES[savedStyle]) setStyleKey(savedStyle);
-    setIsThemeLoaded(true);
   }, []);
 
   useEffect(() => {
-    if (!isThemeLoaded) return;
     localStorage.setItem("dashboard-theme", themeKey);
     localStorage.setItem("dashboard-style", styleKey);
-  }, [themeKey, styleKey, isThemeLoaded]);
+  }, [themeKey, styleKey]);
 
   // ── 스키마 패칭 ──
   useEffect(() => {
@@ -599,4 +595,3 @@ function AdminDashboardPage({ userProfile }: { userProfile?: any }) {
     </div>
   );
 }
-export default withAuth(AdminDashboardPage, { adminOnly: true });

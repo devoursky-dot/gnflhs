@@ -20,11 +20,9 @@ const REGEX_PRESETS = [
   { name: '모든 숫자 가리기', pattern: '\\d', replace: '*' }
 ];
 
-const FormatModal = ({ cell, onClose, onSave, availableColumns }: { cell: LayoutCell, onClose: () => void, onSave: (data: LayoutCell) => void, availableColumns: string[] }) => {
+const FormatModal = ({ cell, onClose, onSave }: { cell: LayoutCell, onClose: () => void, onSave: (data: LayoutCell) => void }) => {
   const [data, setData] = useState<LayoutCell>({ ...cell });
-  const [activePicker, setActivePicker] = useState<boolean>(false);
   const formulaRef = React.useRef<HTMLTextAreaElement>(null);
-  const badgeFormulaRef = React.useRef<HTMLTextAreaElement>(null);
 
   const insertFormula = (snippet: string) => {
     if (!formulaRef.current) return;
@@ -224,82 +222,6 @@ const FormatModal = ({ cell, onClose, onSave, availableColumns }: { cell: Layout
                     <button onClick={() => setData({...data, imageShape: 'circle'})} className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all ${data.imageShape === 'circle' ? 'border-indigo-600 bg-indigo-50 shadow-md' : 'border-slate-200 bg-white hover:border-indigo-300'}`}><div className="w-12 h-12 bg-slate-300 rounded-full flex items-start justify-center overflow-hidden"><div className="w-6 h-6 bg-slate-400 rounded-full mt-1"></div></div><span className="text-xs font-black text-slate-700">증명사진 원형</span></button>
                   </div>
                   <p className="text-[10px] text-slate-400 font-bold px-2 text-center">* 원형은 인물 사진을 고려하여 자동으로 '위쪽(Top)'을 기준으로 둥글게 잘라냅니다.</p>
-
-                  <div className="pt-6 border-t border-slate-200 space-y-6">
-                    <div className="flex items-center gap-2 text-indigo-600 mb-2">
-                       <Sparkles size={16}/><h4 className="text-sm font-black tracking-tight">지능형 이미지 오버레이 (Advanced)</h4>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      <label className="text-[10px] font-black text-slate-500 pl-1 uppercase tracking-wider flex items-center justify-between">
-                        이미지 위 표시 텍스트 (수식)
-                        <span className="text-indigo-400 text-[9px] font-bold lowercase italic text-right leading-tight">val: 원본 데이터 / row: 전체 레코드</span>
-                      </label>
-                      <textarea 
-                        value={data.imageOverlayExpression || ''} 
-                        onChange={e => setData({...data, imageOverlayExpression: e.target.value})}
-                        className="w-full p-4 rounded-2xl bg-indigo-50/30 border-2 border-indigo-100 font-mono text-[11px] font-black text-indigo-800 outline-none focus:border-indigo-400 transition-all"
-                        rows={2}
-                        placeholder="예: row.name + '(' + row.student_id + ')'"
-                      />
-                    </div>
-
-                    <div className="p-5 bg-white rounded-3xl border-2 border-slate-100 shadow-sm space-y-5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-black text-rose-500 pl-1 uppercase tracking-wider flex items-center gap-1">
-                          <ImageIcon size={14}/> 조건부 상태 배지 (Badge)
-                        </label>
-                      </div>
-
-                      <div className="space-y-3">
-                        <label className="text-[9px] font-black text-slate-400 pl-1">배지 노출 조건 (참일 때만 표시)</label>
-                        <input 
-                          value={data.imageBadgeExpression || ''} 
-                          onChange={e => setData({...data, imageBadgeExpression: e.target.value})}
-                          className="w-full p-3 text-[11px] rounded-xl border border-slate-200 font-mono font-bold bg-slate-50 outline-none focus:border-rose-300"
-                          placeholder="예: row.score >= 90"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <label className="text-[9px] font-black text-slate-400 pl-1">배지 아이콘</label>
-                          <button 
-                            onClick={() => setActivePicker(true)}
-                            className="w-full p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-center gap-2 hover:bg-slate-50 transition-all font-bold text-slate-700"
-                          >
-                            {data.imageBadgeIcon && IconMap[data.imageBadgeIcon] ? 
-                              React.createElement(IconMap[data.imageBadgeIcon], { size: 16 }) : <ImageIcon size={16}/>}
-                            <span className="text-xs">{data.imageBadgeIcon || '아이콘 선택'}</span>
-                          </button>
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[9px] font-black text-slate-400 pl-1">배지 색상 테마</label>
-                          <select 
-                            value={data.imageBadgeColor || 'bg-rose-500'} 
-                            onChange={e => setData({...data, imageBadgeColor: e.target.value})}
-                            className="w-full p-3 text-xs rounded-xl border border-slate-200 font-bold bg-white text-slate-700 outline-none"
-                          >
-                            <option value="bg-rose-500">빨강색 (기본)</option>
-                            <option value="bg-emerald-500">초록색</option>
-                            <option value="bg-indigo-600">남색</option>
-                            <option value="bg-amber-500">주황색</option>
-                            <option value="bg-blue-500">파랑색</option>
-                            <option value="bg-slate-900">검정색</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {activePicker && (
-                    <IconPicker 
-                      isOpen={activePicker} 
-                      onClose={() => setActivePicker(false)} 
-                      selectedIcon={data.imageBadgeIcon} 
-                      onSelect={(n: string) => { setData({...data, imageBadgeIcon: n}); setActivePicker(false); }} 
-                    />
-                  )}
                 </div>
               ) : (
                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 pt-2">
@@ -1553,9 +1475,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
       
       {formatModalCell && (
         <FormatModal 
-          cell={formatModalCell} 
-          onClose={() => setFormatModalCell(null)} 
-          availableColumns={availableColumns}
+          cell={formatModalCell} onClose={() => setFormatModalCell(null)} 
           onSave={(updatedData: LayoutCell) => { mutate((rows: LayoutRow[]) => { const f = (arr: LayoutRow[]) => arr.forEach((r: LayoutRow) => r.cells.forEach((c: LayoutCell) => { if(c.id === updatedData.id) Object.assign(c, updatedData); else if(c.nestedRows) f(c.nestedRows); })); f(rows); }); setFormatModalCell(null); }} 
         />
       )}
