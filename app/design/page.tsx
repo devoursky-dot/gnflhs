@@ -37,6 +37,9 @@ function AppBuilder() {
   // 가상 테이블 관련 상태
   const [activeVirtualTable, setActiveVirtualTable] = useState<VirtualTable | null>(null);
 
+  const [isEngineSynced, setIsEngineSynced] = useState<boolean | null>(null);
+  const [syncDetails, setSyncDetails] = useState<any[]>([]);
+
   // --- [앱 복제 관련 상태] ---
   const [isCloneModalOpen, setIsCloneModalOpen] = useState(false);
   const [cloningApp, setCloningApp] = useState<any>(null);
@@ -63,7 +66,20 @@ function AppBuilder() {
       }
     }
     fetchSchema();
+    checkEngineSync();
   }, []);
+
+  const checkEngineSync = async () => {
+    try {
+      const res = await fetch('/api/check-sync');
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setIsEngineSynced(data.allSynced);
+      setSyncDetails(data.details);
+    } catch (err) {
+      console.error('엔진 동기화 체크 실패:', err);
+    }
+  };
   const moveView = (index: number, direction: 'up' | 'down') => {
     if ((direction === 'up' && index === 0) || (direction === 'down' && index === appState.views.length - 1)) return;
     const newViews = [...appState.views];
@@ -166,7 +182,7 @@ function AppBuilder() {
     }
   };
 
-  const handleSaveAndDeploy = async () => {
+  const handleSaveDraft = async () => {
     setIsSaving(true);
     try {
       const config = { 
@@ -175,7 +191,63 @@ function AppBuilder() {
         icon: appState.icon,
         virtualTables: appState.virtualTables || [] 
       };
-      const payload = { name: appState.name, app_config: config, draft_config: config };
+      const draftPayload = { name: appState.name, draft_config: config };
+      
+      if (!appState.id) {
+        const { data, error } = await supabase.from('apps').insert([draftPayload]).select('id');
+        if (error) throw error;
+        if (data && data.length > 0) setAppState(prev => ({ ...prev, id: data[0].id }));
+        alert('임시 저장(Draft)되었습니다. 라이브 앱은 아직 변하지 않았습니다.');
+      } else {
+        const { error } = await supabase.from('apps').update(draftPayload).eq('id', appState.id);
+        if (error) throw error;
+        alert('작업 내용이 Draft에 저장되었습니다.');
+      }
+    } catch (error: any) {
+      alert(`저장 중 오류: ${error.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveAndDeploy = async () => {
+    if (isEngineSynced === false) {
+      if (!window.confirm('⚠️ 엔진 코드가 현재 배포된 v1 버전과 일치하지 않습니다.\n이대로 배포하면 앱이 오작동할 수 있습니다.\n\n정말로 배포하시겠습니까?')) return;
+    } else {
+      if (!window.confirm('정말로 리얼 앱에 배포하시겠습니까?\n모든 사용자에게 즉시 반영되며, 현재 시점의 코드로 고정된 독립 실행 환경이 구축됩니다.')) return;
+    }
+    
+    setIsSaving(true);
+    try {
+      const config: any = { 
+        views: appState.views, 
+        actions: appState.actions, 
+        icon: appState.icon,
+        virtualTables: appState.virtualTables || [] 
+      };
+
+      // 🔥 [보안 설정 보존] 기존 DB의 보안 설정을 읽어와서 새 config에 병합
+      if (appState.id) {
+        const { data: existing } = await supabase
+          .from('apps')
+          .select('app_config')
+          .eq('id', appState.id)
+          .single();
+        if (existing?.app_config) {
+          config.isPublic = existing.app_config.isPublic;
+          config.allowedUsers = existing.app_config.allowedUsers;
+        }
+      }
+
+      // engine_version을 app_config 내부에 저장 (독립 실행 환경 보장)
+      config.engine_version = 'v1';
+      config.deployed_at = new Date().toISOString();
+
+      const payload = { 
+        name: appState.name, 
+        app_config: config, 
+        draft_config: config
+      };
 
       if (!appState.id) {
         const { data, error } = await supabase.from('apps').insert([payload]).select('id');
@@ -185,7 +257,7 @@ function AppBuilder() {
       } else {
         const { error } = await supabase.from('apps').update(payload).eq('id', appState.id);
         if (error) throw error;
-        alert('실제 사용자들에게 배포되었습니다!');
+        alert('실제 사용자들에게 배포되었습니다! 이제 이 버전은 독립적으로 작동합니다.');
       }
     } catch (error: any) {
       alert(`배포 중 오류가 발생했습니다.\n\n${error.message}`);
@@ -420,7 +492,14 @@ function AppBuilder() {
         <div className="w-[320px] flex flex-col h-full">
           <div className="p-6 bg-indigo-700 text-white border-b border-indigo-800 shrink-0 flex flex-col gap-4">
             <div className="flex justify-between items-center">
-              <span className="text-[10px] font-black text-indigo-300 tracking-widest uppercase">My Workspace</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black text-indigo-300 tracking-widest uppercase">My Workspace</span>
+                {isEngineSynced !== null && (
+                  <div className={`px-1.5 py-0.5 rounded-md text-[9px] font-black transition-all border ${isEngineSynced ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse'}`}>
+                    {isEngineSynced ? 'SYNCED' : 'UNSYNCED'}
+                  </div>
+                )}
+              </div>
               <div className="flex items-center gap-1.5">
                 <button onClick={() => window.open('/admin', 'TableManager', 'width=1400,height=900,resizable=yes')} className="p-2 bg-indigo-800 hover:bg-emerald-500 text-white rounded-xl transition-all" title="DB 관리 (새 창)"><Database size={16} /></button>
                 <button onClick={handleCreateNewApp} className="p-2 bg-indigo-800 hover:bg-indigo-900 text-white rounded-xl transition-all" title="새 앱 만들기"><Plus size={16} /></button>
@@ -531,10 +610,23 @@ function AppBuilder() {
             />
           </div>
 
-          <div className="p-6 bg-slate-50 border-t border-slate-200 shrink-0 z-30">
-            <button onClick={handleSaveAndDeploy} disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-black shadow-xl hover:shadow-indigo-500/30 transition-all active:scale-95 disabled:opacity-70 disabled:pointer-events-none">
+          <div className="p-6 bg-slate-50 border-t border-slate-200 shrink-0 z-30 space-y-3">
+            <button 
+              onClick={handleSaveDraft} 
+              disabled={isSaving} 
+              className="w-full flex items-center justify-center gap-2 py-3 bg-white border-2 border-indigo-100 hover:border-indigo-600 text-indigo-600 rounded-2xl text-sm font-black transition-all active:scale-95 disabled:opacity-50"
+            >
+              {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Database size={18} />}
+              💾 Draft 임시 저장
+            </button>
+
+            <button 
+              onClick={handleSaveAndDeploy} 
+              disabled={isSaving} 
+              className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-sm font-black shadow-xl hover:shadow-indigo-500/30 transition-all active:scale-95 disabled:opacity-70 disabled:pointer-events-none"
+            >
               {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
-              {isSaving ? '배포 진행 중...' : '🚀 실제 유저에게 배포하기'}
+              {isSaving ? '배포 진행 중...' : '🚀 정식 라이브 배포'}
             </button>
             {appState.id && (
               <div className="mt-3 flex items-center gap-2">

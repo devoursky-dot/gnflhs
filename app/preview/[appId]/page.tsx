@@ -12,9 +12,16 @@ import {
   evaluateExpression, processMappingValue, applyViewQuery, getSortedGroupKeys, resolveVirtualData, applyClientFilters,
   getKSTDate, getKSTHelpers
 } from './utils';
-import RenderPreviewLayout from './renderer';
+import * as UtilsV1 from '../../engines/v1/utils';
+import DefaultRenderer from './renderer';
 import { InsertModal, UpdateModal } from './modals';
 import { GroupAggregation } from '@/app/design/types';
+import dynamic from 'next/dynamic';
+
+// --- 버전별 엔진 컴포넌트 동적 로드 ---
+const RenderV1 = dynamic(() => import('../../engines/v1/renderer'));
+const InsertModalV1 = dynamic(() => import('../../engines/v1/modals').then(m => m.InsertModal));
+const UpdateModalV1 = dynamic(() => import('../../engines/v1/modals').then(m => m.UpdateModal));
 
 // 🔥 [업데이트] 그룹 헤더 Sticky 스타일 계산 헬퍼 (사용자 요청: 2단계 Stacked Sticky 지원)
 const getStickyStyles = (isSticky: boolean, showTopBar: boolean, level: number = 1, isParentSticky: boolean = false) => {
@@ -103,7 +110,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
           }
           
           document.title = mode === 'draft' ? `[Draft] ${data.name}` : data.name;
-          setAppData({ ...data, app_config: activeConfig });
+          setAppData({ ...data, app_config: activeConfig, engine_version: activeConfig?.engine_version || null });
           if (activeConfig?.views?.length > 0) {
             const vid = urlParams.get('viewId');
             setCurrentViewId(vid || activeConfig.views[0].id);
@@ -115,6 +122,23 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   }, [appId]);
 
   const currentView = appData?.app_config?.views?.find((v: any) => v.id === currentViewId);
+
+  // --- 버전별 엔진 선택 ---
+  const CurrentRenderer = appData?.engine_version === 'v1' ? RenderV1 : DefaultRenderer;
+  const CurrentInsertModal = appData?.engine_version === 'v1' ? InsertModalV1 : InsertModal;
+  const CurrentUpdateModal = appData?.engine_version === 'v1' ? UpdateModalV1 : UpdateModal;
+
+  // --- 🔥 버전별 유틸리티 함수 선택 (독립 실행 핵심) ---
+  const isV1 = appData?.engine_version === 'v1';
+  const utils = {
+    applyViewQuery: isV1 ? UtilsV1.applyViewQuery : applyViewQuery,
+    resolveVirtualData: isV1 ? UtilsV1.resolveVirtualData : resolveVirtualData,
+    applyClientFilters: isV1 ? UtilsV1.applyClientFilters : applyClientFilters,
+    processMappingValue: isV1 ? UtilsV1.processMappingValue : processMappingValue,
+    evaluateExpression: isV1 ? UtilsV1.evaluateExpression : evaluateExpression,
+    getKSTHelpers: isV1 ? UtilsV1.getKSTHelpers : getKSTHelpers,
+    getSortedGroupKeys: isV1 ? UtilsV1.getSortedGroupKeys : getSortedGroupKeys,
+  };
 
   const fetchTableData = async (view: any) => {
     if (!view || !view.tableName) return;
@@ -135,17 +159,17 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       if (!fetchTable) return;
 
       let query: any = supabase.from(fetchTable).select("*");
-      query = applyViewQuery(query, view, userProfile);
+      query = utils.applyViewQuery(query, view, userProfile);
       const { data, error } = await query.limit(3000); 
       
       if (error) throw error;
 
       let finalData = data || [];
       if (vt && finalData.length > 0) {
-        finalData = await resolveVirtualData(finalData, vt);
+        finalData = await utils.resolveVirtualData(finalData, vt);
       }
 
-      finalData = applyClientFilters(finalData, view, userProfile);
+      finalData = utils.applyClientFilters(finalData, view, userProfile);
 
       setTableData(prev => ({ ...prev, [view.tableName]: finalData }));
     } catch (err: any) {
@@ -174,7 +198,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   const buildPayloadFromMappings = (mappings: any[] | undefined, row: any): Record<string, any> => {
     const payload: Record<string, any> = {};
     mappings?.forEach((m: any) => {
-      if (m.mappingType === 'card_data')       payload[m.targetColumn] = processMappingValue(m.sourceValue, row);
+      if (m.mappingType === 'card_data')       payload[m.targetColumn] = utils.processMappingValue(m.sourceValue, row);
       else if (m.mappingType === 'static')     payload[m.targetColumn] = m.sourceValue;
       else if (m.mappingType === 'user_name')  payload[m.targetColumn] = userProfile?.name || '';
       else if (m.mappingType === 'user_email') payload[m.targetColumn] = userProfile?.email || '';
@@ -212,14 +236,14 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
         const fetchTable = vt ? vt.baseTableName : view.tableName;
 
         let query: any = supabase.from(fetchTable).select("*");
-        query = applyViewQuery(query, view, userProfile);
+        query = utils.applyViewQuery(query, view, userProfile);
         const { data: rawRows, error: fetchErr } = await query.limit(500);
         if (fetchErr) throw fetchErr;
 
         let sourceRows = rawRows || [];
 
         if (vt && sourceRows.length > 0) {
-          sourceRows = await resolveVirtualData(sourceRows, vt);
+          sourceRows = await utils.resolveVirtualData(sourceRows, vt);
         }
 
         if (sourceRows.length > 0) {
@@ -269,7 +293,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     if (!appData?.app_config?.views) return;
     const newStates: Record<string, any> = {};
     
-    const { today: isoToday, tomorrow: isoTomorrow } = getKSTHelpers();
+    const { today: isoToday, tomorrow: isoTomorrow } = utils.getKSTHelpers();
 
     // 🔥 [수정] 참조 오류 방지를 위해 함수를 먼저 정의
     const rowCountFn = async (t: string, f: Record<string, any> = {}) => {
@@ -566,7 +590,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     });
   }
 
-  const groupKeys = getSortedGroupKeys(groupedData, currentView?.groupSortDirection || 'asc');
+  const groupKeys = utils.getSortedGroupKeys(groupedData, currentView?.groupSortDirection || 'asc');
   const isAllExpanded = groupKeys.length > 0 && groupKeys.every(k => expandedGroups[k]);
   const handleToggleGroups = () => {
     if (isAllExpanded) setExpandedGroups({});
@@ -575,7 +599,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       groupKeys.forEach((k: string) => {
         next[k] = true;
         if (currentView?.groupByColumn2 && typeof groupedData[k] === 'object') {
-          getSortedGroupKeys(groupedData[k], currentView.groupSortDirection2 || 'asc').forEach((sk: string) => next[`${k}|${sk}`] = true);
+          utils.getSortedGroupKeys(groupedData[k], currentView.groupSortDirection2 || 'asc').forEach((sk: string) => next[`${k}|${sk}`] = true);
         }
       });
       setExpandedGroups(next);
@@ -743,7 +767,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                  const isExp = !!expandedGroups[k];
                  const stickyClass = getStickyStyles(currentView?.groupHeaderSticky, showTopBar, 1);
                  const subRows = currentView.groupByColumn2 ? groupedData[k] : {};
-                 const sks = currentView.groupByColumn2 ? getSortedGroupKeys(subRows, currentView.groupSortDirection2 || 'asc') : [];
+                 const sks = currentView.groupByColumn2 ? utils.getSortedGroupKeys(subRows, currentView.groupSortDirection2 || 'asc') : [];
                  const allInG1 = currentView.groupByColumn2 ? Object.values(groupedData[k]).flat() as any[] : groupedData[k] as any[];
                  const Icon1 = IconMap[currentView.groupHeaderIcon] || Folder;
                  const lbl1 = currentView.groupHeaderExpression ? String(new Function('val','rowCount', `return ${currentView.groupHeaderExpression}`)(k, allInG1.length)) : k;
@@ -790,7 +814,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                                    <div className={`grid ${gridClass} gap-1 p-1`}>
                                      {rs.map((r: any) => (
                                        <div key={r.id} onClick={() => { const ac = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (ac) handleAction(ac, r); }} className="bg-white rounded-none border border-slate-100 overflow-hidden hover:border-indigo-300 transition-all cursor-pointer">
-                                         <RenderPreviewLayout rows={currentView.layoutRows} rowData={r} actions={appData.app_config.actions} onExecuteAction={handleAction}/>
+                                         <CurrentRenderer rows={currentView.layoutRows} rowData={r} actions={appData.app_config.actions} onExecuteAction={handleAction}/>
                                        </div>
                                      ))}
                                    </div>
@@ -802,7 +826,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                            <div className={`grid ${gridClass} gap-1`}>
                              {groupedData[k].map((r: any) => (
                                <div key={r.id} onClick={() => { const ac = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (ac) handleAction(ac, r); }} className="bg-white rounded-none border border-slate-100 overflow-hidden hover:border-indigo-300 transition-all cursor-pointer">
-                                 <RenderPreviewLayout rows={currentView.layoutRows} rowData={r} actions={appData.app_config.actions} onExecuteAction={handleAction}/>
+                                 <CurrentRenderer rows={currentView.layoutRows} rowData={r} actions={appData.app_config.actions} onExecuteAction={handleAction}/>
                                </div>
                              ))}
                            </div>
@@ -817,7 +841,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
              <div className={`grid ${gridClass} gap-1`}>
                {displayData.map((r: any) => (
                  <div key={r.id} onClick={() => { const ac = appData.app_config.actions.find((a:any) => a.id === currentView.onClickActionId); if (ac) handleAction(ac, r); }} className="bg-white rounded-none border border-slate-100 overflow-hidden hover:border-indigo-300 transition-all cursor-pointer">
-                   <RenderPreviewLayout rows={currentView.layoutRows} rowData={r} actions={appData.app_config.actions} onExecuteAction={handleAction}/>
+                   <CurrentRenderer rows={currentView.layoutRows} rowData={r} actions={appData.app_config.actions} onExecuteAction={handleAction}/>
                  </div>
                ))}
              </div>
@@ -846,7 +870,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       </div>
 
       {/* ─── 입력/수정 모달 ─── */}
-      <InsertModal 
+      <CurrentInsertModal 
         isOpen={isInputModalOpen} 
         onClose={() => { setIsInputModalOpen(false); setActionQueue([]); }} 
         action={activeInsertAction} 
@@ -855,7 +879,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
         isSubmitting={isSubmitting} 
         onSubmit={handleSubmitInsert}
       />
-      <UpdateModal 
+      <CurrentUpdateModal 
         isOpen={isUpdateModalOpen} 
         onClose={() => { setIsUpdateModalOpen(false); setActionQueue([]); }} 
         action={activeUpdateAction} 

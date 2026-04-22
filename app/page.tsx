@@ -96,14 +96,27 @@ export default function MainAppLauncher() {
     if (!isAdmin || !selectedAppForAccess) return;
     setIsSavingAccess(true);
     try {
-      const updatedConfig = {
-        ...selectedAppForAccess.app_config,
+      // 보안 설정 값 준비
+      const securityPatch = {
         isPublic: accessIsPublic,
         allowedUsers: accessIsPublic ? [] : accessAllowedUsers
       };
+
+      // 현재 DB에서 최신 app_config와 draft_config를 조회
+      const { data: freshApp, error: fetchErr } = await supabase
+        .from('apps')
+        .select('app_config, draft_config')
+        .eq('id', selectedAppForAccess.id)
+        .single();
+      if (fetchErr) throw fetchErr;
+
+      // app_config와 draft_config 모두에 보안 설정을 동기화
+      const updatedAppConfig = { ...(freshApp.app_config || {}), ...securityPatch };
+      const updatedDraftConfig = { ...(freshApp.draft_config || {}), ...securityPatch };
+
       const { error } = await supabase
         .from('apps')
-        .update({ app_config: updatedConfig })
+        .update({ app_config: updatedAppConfig, draft_config: updatedDraftConfig })
         .eq('id', selectedAppForAccess.id);
       if (error) throw error;
       alert('앱 접근 권한이 업데이트되었습니다.');
@@ -373,6 +386,22 @@ export default function MainAppLauncher() {
                   >
                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-[2] duration-500 ease-out z-0"></div>
 
+                      {/* 배포 상태 표시 배지 */}
+                      {app.app_config && (
+                        <div className="absolute top-4 left-4 z-20 flex gap-1.5">
+                          <span className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500 text-white text-[9px] font-black rounded-full shadow-lg shadow-emerald-200 animate-pulse">
+                            <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
+                            LIVE
+                          </span>
+                          {/* 격리 버전 표시 */}
+                          {app.app_config.engine_version && (
+                            <span className="px-2 py-1 bg-slate-800 text-white text-[9px] font-black rounded-full shadow-lg">
+                              {app.app_config.engine_version.toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       {isAdmin && (
                         <div className="absolute top-4 right-4 flex gap-2 z-20 opacity-0 group-hover:opacity-100 transition-all">
                           <button
@@ -408,7 +437,7 @@ export default function MainAppLauncher() {
 
                     <div className="relative z-10 mt-auto flex items-center justify-between pt-4 border-t border-slate-100 group-hover:border-indigo-100 transition-colors">
                       <span className="text-xs font-bold text-slate-400 group-hover:text-indigo-500">
-                        {new Date(app.created_at).toLocaleDateString()} 생성됨
+                        {new Date(app.app_config?.deployed_at || app.created_at).toLocaleDateString()} {app.app_config?.deployed_at ? '최근 배포' : '생성됨'}
                       </span>
                       <span className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                         <ArrowRight size={16} strokeWidth={3} />
