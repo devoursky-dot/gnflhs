@@ -770,7 +770,9 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                  const sks = currentView.groupByColumn2 ? utils.getSortedGroupKeys(subRows, currentView.groupSortDirection2 || 'asc') : [];
                  const allInG1 = currentView.groupByColumn2 ? Object.values(groupedData[k]).flat() as any[] : groupedData[k] as any[];
                  const Icon1 = IconMap[currentView.groupHeaderIcon] || Folder;
-                 const lbl1 = currentView.groupHeaderExpression ? String(new Function('val','rowCount', `return ${currentView.groupHeaderExpression}`)(k, allInG1.length)) : k;
+                 const lbl1 = currentView.groupHeaderExpression 
+                    ? String(new Function('val', 'rowCount', 'row', 'rows', `try { return ${currentView.groupHeaderExpression}; } catch(e) { return val; }`)(k, allInG1.length, allInG1[0], allInG1)) 
+                    : k;
 
                  return (
                    <div key={k} className="bg-white rounded-none border border-slate-200 overflow-visible">
@@ -793,7 +795,9 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                            sks.map((sk: string) => {
                              const rs = subRows[sk]; const fk = `${k}|${sk}`; const isSkExp = !!expandedGroups[fk];
                              const Icon2 = IconMap[currentView.groupHeaderIcon2] || Folder;
-                             const lbl2 = currentView.groupHeaderExpression2 ? String(new Function('val','rowCount', `return ${currentView.groupHeaderExpression2}`)(sk, rs.length)) : sk;
+                             const lbl2 = currentView.groupHeaderExpression2 
+                                ? String(new Function('val', 'rowCount', 'row', 'rows', `try { return ${currentView.groupHeaderExpression2}; } catch(e) { return val; }`)(sk, rs.length, rs[0], rs)) 
+                                : sk;
                              const stickyClass2 = getStickyStyles(currentView?.groupHeaderSticky2, showTopBar, 2, currentView?.groupHeaderSticky);
                              return (
                                <div key={fk} className="ml-1 md:ml-4 border-l-2 border-indigo-100 mb-2 last:mb-0 overflow-visible">
