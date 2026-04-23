@@ -84,7 +84,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
 
   useEffect(() => {
     if (toast) {
-      const timer = setTimeout(() => setToast(null), 1500);
+      const timer = setTimeout(() => setToast(null), 800); // 🔥 1500 -> 800ms로 단축 (경쾌한 반응성)
       return () => clearTimeout(timer);
     }
   }, [toast]);
@@ -445,13 +445,34 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     } else if (currentStep.type === 'insert_row') {
       setActiveInsertAction(currentStep);
       const init = buildPayloadFromMappings(currentStep.insertMappings, rowData);
-      currentStep.insertMappings?.forEach((m: any) => {
-        if (m.mappingType === 'prompt' && m.valueType !== 'number') {
-          init[m.targetColumn] = '';
-        }
-      });
-      setFormData(init);
-      setIsInputModalOpen(true);
+      
+      // 🔥 [초고속 모드] 프롬프트가 없고 instantSave가 켜져있으면 모달 없이 즉시 저장
+      const hasPrompt = currentStep.insertMappings?.some((m: any) => m.mappingType === 'prompt');
+      const isInstant = !!(currentStep.instantSave || currentStep.batchMode);
+      
+      if (isInstant && !hasPrompt) {
+        setFormData(init);
+        (async () => {
+          setIsSubmitting(true);
+          try {
+            const targetTable = resolveTableName(currentStep.insertTableName);
+            if (!targetTable) throw new Error("대상 테이블이 없습니다.");
+            const { error } = await supabase.from(targetTable).insert([init]);
+            if (error) throw error;
+            setToast({ message: "즉시 저장 완료", type: 'success' });
+            fetchTableData(currentView);
+            processNextStep(remaining, rowData);
+            evaluateAllViewStates();
+          } catch (err: any) {
+            setToast({ message: `저장 실패: ${err.message}`, type: 'error' });
+          } finally {
+            setIsSubmitting(false);
+          }
+        })();
+      } else {
+        setFormData(init);
+        setIsInputModalOpen(true);
+      }
 
     } else if (currentStep.type === 'delete_row') {
       const targetTable = resolveTableName(currentStep.deleteTableName);
@@ -464,19 +485,42 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       await processNextStep(remaining, rowData);
 
     } else if (currentStep.type === 'update_row') {
-      if (currentStep.updateTableName && rowData.id) {
-        setActiveUpdateAction(currentStep);
-        setActiveRowData(rowData);
-        const init = buildPayloadFromMappings(currentStep.updateMappings, rowData);
-        currentStep.updateMappings?.forEach((m: any) => {
-          if (!init[m.targetColumn] && init[m.targetColumn] !== 0) {
-            init[m.targetColumn] = rowData[m.targetColumn] || '';
+      setActiveUpdateAction(currentStep);
+      setActiveRowData(rowData);
+      const init = buildPayloadFromMappings(currentStep.updateMappings, rowData);
+      
+      // 기존 데이터 유지 보강
+      currentStep.updateMappings?.forEach((m: any) => {
+        if (!init[m.targetColumn] && init[m.targetColumn] !== 0) {
+          init[m.targetColumn] = rowData[m.targetColumn] || '';
+        }
+      });
+
+      const hasPrompt = currentStep.updateMappings?.some((m: any) => m.mappingType === 'prompt');
+      const isInstant = !!(currentStep.instantSave || currentStep.batchMode);
+
+      if (isInstant && !hasPrompt) {
+        setUpdateFormData(init);
+        (async () => {
+          setIsUpdating(true);
+          try {
+            const targetTable = resolveTableName(currentStep.updateTableName);
+            if (!targetTable || !rowData.id) throw new Error("대상 데이터가 없습니다.");
+            const { error } = await supabase.from(targetTable).update(init).eq('id', rowData.id);
+            if (error) throw error;
+            setToast({ message: "즉시 수정 완료", type: 'success' });
+            fetchTableData(currentView);
+            processNextStep(remaining, rowData);
+            evaluateAllViewStates();
+          } catch (err: any) {
+            setToast({ message: `수정 실패: ${err.message}`, type: 'error' });
+          } finally {
+            setIsUpdating(false);
           }
-        });
+        })();
+      } else {
         setUpdateFormData(init);
         setIsUpdateModalOpen(true);
-      } else {
-        await processNextStep(remaining, rowData);
       }
 
     } else if (currentStep.type === 'send_sms') {
@@ -546,6 +590,10 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
             if (agg.type === 'sum') val = processed.reduce((acc, v) => acc + (Number(v) || 0), 0);
             else if (agg.type === 'avg') val = (processed.reduce((acc, v) => acc + (Number(v) || 0), 0) / (processed.length || 1)).toFixed(1);
             else if (agg.type === 'count_if') val = processed.filter((v: any) => !!v).length;
+            // ✨ [신규] 문자열 집계 지원
+            else if (agg.type === 'list') val = processed.filter(v => v !== null && v !== undefined).join(', ');
+            else if (agg.type === 'unique_list') val = Array.from(new Set(processed.filter(v => v !== null && v !== undefined))).join(', ');
+            else if (agg.type === 'first') val = processed[0] || '-';
           }
           const fmt = !isNaN(Number(val)) ? Number(val).toLocaleString() : val;
           return <div key={agg.id} className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black border ${agg.displayStyle === 'text' ? 'text-slate-600' : (agg.color || 'bg-slate-100 text-slate-500 border-slate-200')}`}><span className="opacity-70">{agg.label}:</span><span>{fmt}</span></div>;
@@ -632,7 +680,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   const showBottomBar = bottomBarViews.length > 0 && navPos !== 'hidden';
   const bottomPb = showBottomBar ? 'pb-20' : 'pb-4';
 
-  if (loading) return <div className="h-screen bg-slate-50 flex items-center justify-center font-black text-slate-300">LOADING...</div>;
+    if (loading) return <div className="h-screen bg-slate-50 flex items-center justify-center font-black text-slate-300">LOADING...</div>;
 
   return (
     <div className="h-screen bg-white flex overflow-hidden relative">
@@ -645,14 +693,14 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
         </div>
       )}
 
-      {/* ─── 데스크탑 전용 왼쪽 사이드바 ─── */}
+      {/* ─── 데스크탑 전용 왼쪽 사이드바 (고정형으로 최적화) ─── */}
       <div className="hidden md:flex md:w-72 lg:w-80 shrink-0 flex-col bg-white border-r pt-4 px-4">
         <div className="flex items-center justify-between mb-4">
            <div className="flex flex-col">
-              <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{appData?.name}</span>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tighter">{currentView?.name}</h1>
+              <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest truncate">{appData?.name}</span>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tighter truncate">{currentView?.name}</h1>
            </div>
-           <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2.5 text-slate-400 hover:bg-slate-50 rounded-xl transition-all">
+           <button onClick={() => setIsMenuOpen(true)} className="p-2.5 text-slate-400 hover:bg-slate-50 rounded-xl transition-all">
              <Menu size={24}/>
            </button>
         </div>
@@ -718,6 +766,25 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       {/* ─── 메인 콘텐츠 ─── */}
       <div className="flex-1 flex flex-col bg-slate-50 relative overflow-hidden min-w-0">
 
+        {/* 🔥 [신규] 시스템 메뉴 팝업 (대시보드 이동) */}
+        {isMenuOpen && (
+          <>
+            <div className="fixed inset-0 z-[1900] bg-slate-900/20 backdrop-blur-[2px] animate-in fade-in duration-200" onClick={() => setIsMenuOpen(false)} />
+            <div className="fixed top-16 left-4 md:left-72 lg:left-80 z-[2000] w-64 bg-white border border-slate-200 shadow-2xl rounded-2xl p-2 animate-in zoom-in-95 slide-in-from-top-4 duration-200">
+              <div className="p-3 border-b border-slate-50 mb-1">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">System Menu</span>
+                <span className="text-sm font-black text-slate-800">{appData.name} 관리</span>
+              </div>
+              <button 
+                onClick={() => { router.push('/'); setIsMenuOpen(false); }}
+                className="w-full flex items-center gap-3 p-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all font-bold text-sm"
+              >
+                <Home size={18}/> 대시보드로 이동
+              </button>
+            </div>
+          </>
+        )}
+
         {/* 모바일 상단 헤더바 */}
         {showTopBar && (
           <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-slate-100 shrink-0">
@@ -726,7 +793,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                 {appData.name} <span className="text-slate-300 font-thin mx-0.5">/</span> {viewStates[currentViewId]?.label || currentView.name}
               </h1>
             </div>
-            <button onClick={() => setIsMobileSidebarOpen(true)} className="shrink-0 p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
+            <button onClick={() => setIsMenuOpen(true)} className="shrink-0 p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
               <Menu size={20}/>
             </button>
           </div>

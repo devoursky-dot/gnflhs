@@ -1163,6 +1163,9 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                                 <option value="sum">합계 (Sum)</option>
                                 <option value="avg">평균 (Avg)</option>
                                 <option value="count_if">조건부 개수 (Count If)</option>
+                                <option value="unique_list">중복 제거 목록 (Unique List)</option>
+                                <option value="list">전체 목록 (List)</option>
+                                <option value="first">첫 번째 값 (First)</option>
                               </select>
                             </div>
                             <div className="space-y-1.5">
@@ -1377,6 +1380,9 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                                 <option value="sum">합계 (Sum)</option>
                                 <option value="avg">평균 (Avg)</option>
                                 <option value="count_if">조건부 개수 (Count If)</option>
+                                <option value="unique_list">중복 제거 목록 (Unique List)</option>
+                                <option value="list">전체 목록 (List)</option>
+                                <option value="first">첫 번째 값 (First)</option>
                               </select>
                             </div>
                             <div className="space-y-1.5">
