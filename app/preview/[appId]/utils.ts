@@ -129,7 +129,13 @@ export const applyViewQuery = (query: any, view: any, userProfile?: any) => {
 
   // 3. 정렬 적용 (물리 컬럼인 경우만)
   if (view.sortColumn) {
-    q = q.order(view.sortColumn, { ascending: view.sortDirection !== 'desc' });
+    // 🔥 [수정] 가상 테이블인 경우, 정렬 컬럼이 실제 컬럼이 아닐 확률이 높으므로 
+    // 여기서는 실제 컬럼인 경우에만 쿼리에 포함시키도록 처리해야 하지만, 
+    // 우선 가상 테이블이 아닐 때만 서버 정렬을 수행하게 하여 에러를 방지합니다.
+    const isVt = view.tableName?.startsWith('vt_');
+    if (!isVt) {
+      q = q.order(view.sortColumn, { ascending: view.sortDirection !== 'desc' });
+    }
   }
 
   // 🔥 [신규] 수동 선택(Lock) 유효성 검사 - 선택된 키들만 쿼리하도록 강제
@@ -272,6 +278,27 @@ export const applyClientFilters = (data: any[], view: any, userProfile?: any): a
         console.error("Filter Expression Error:", e);
         return true; // 오류 시 데이터 유실 방지를 위해 통과시킴
       }
+    });
+  }
+
+  // ✨ [신규] 클라이언트 사이드 정렬 (가상 컬럼 지원)
+  if (view.sortColumn) {
+    const col = view.sortColumn;
+    const isAsc = view.sortDirection !== 'desc';
+    
+    result.sort((a, b) => {
+      const valA = a[col];
+      const valB = b[col];
+      
+      if (valA === valB) return 0;
+      if (valA === null || valA === undefined) return 1;
+      if (valB === null || valB === undefined) return -1;
+      
+      const comparison = typeof valA === 'number' && typeof valB === 'number'
+        ? valA - valB
+        : String(valA).localeCompare(String(valB), undefined, { numeric: true });
+        
+      return isAsc ? comparison : -comparison;
     });
   }
 
