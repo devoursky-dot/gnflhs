@@ -4,6 +4,7 @@
 import React from 'react';
 import { MousePointerClick } from 'lucide-react';
 import { IconMap } from '@/app/design/picker';
+// import { LayoutCell, Action, LayoutRow } from './types'; 
 
 // 버튼 컬러 테마 설정
 const COLOR_THEMES: any = {
@@ -63,10 +64,16 @@ export default function RenderPreviewLayout({ rows, rowData, actions, onExecuteA
 
                     return (
                       <>
-                        {/* 하단 텍스트 오버레이 (텍스트 전용 + 섀도우) */}
+                        {/* 하단 텍스트 오버레이 (텍스트 전용 + 강력한 섀도우) */}
                         {overlayText && (
                           <div className="absolute bottom-1.5 left-0 right-0 flex justify-center px-2 pointer-events-none">
-                            <span className="text-white text-[10px] font-black drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] line-clamp-1 max-w-full text-center">
+                            <span 
+                              className="font-black drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] drop-shadow-[0_0_1px_rgba(0,0,0,1)] line-clamp-1 max-w-full text-center leading-tight transition-all"
+                              style={{ 
+                                fontSize: `${cell.imageOverlaySize || 10}px`, 
+                                color: cell.imageOverlayColor || '#ffffff' 
+                              }}
+                            >
                               {overlayText}
                             </span>
                           </div>

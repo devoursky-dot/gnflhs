@@ -242,6 +242,56 @@ const FormatModal = ({ cell, onClose, onSave, availableColumns }: { cell: Layout
                         rows={2}
                         placeholder="예: row.name + '(' + row.student_id + ')'"
                       />
+                      
+                      <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-500 pl-1 uppercase tracking-wider">글자 크기 (8~20px)</label>
+                          <select 
+                            value={data.imageOverlaySize || '10'} 
+                            onChange={e => setData({...data, imageOverlaySize: e.target.value})}
+                            className="w-full p-3 text-xs rounded-xl border-2 border-slate-100 font-black text-slate-800 outline-none bg-white focus:border-indigo-400"
+                          >
+                            {[8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40].map(size => (
+                              <option key={size} value={size}>{size}px</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-500 pl-1 uppercase tracking-wider text-right block w-full">글자 색상 (직접선택)</label>
+                          <input 
+                            type="color" 
+                            value={data.imageOverlayColor || '#ffffff'} 
+                            onChange={e => setData({...data, imageOverlayColor: e.target.value})}
+                            className="w-full h-[42px] rounded-xl border-2 border-slate-100 p-1 bg-white cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 pt-2 animate-in fade-in slide-in-from-bottom-1">
+                        <label className="text-[10px] font-black text-slate-400 pl-1 uppercase tracking-wider">추천 색상 팔레트 (10종)</label>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { name: '흰색', color: '#ffffff' },
+                            { name: '검정', color: '#000000' },
+                            { name: '빨강', color: '#ef4444' },
+                            { name: '노랑', color: '#facc15' },
+                            { name: '초록', color: '#22c55e' },
+                            { name: '파랑', color: '#3b82f6' },
+                            { name: '보라', color: '#a855f7' },
+                            { name: '분홍', color: '#ec4899' },
+                            { name: '오렌지', color: '#f97316' },
+                            { name: '청록', color: '#06b6d4' }
+                          ].map(c => (
+                            <button 
+                              key={c.color}
+                              title={c.name}
+                              onClick={() => setData({...data, imageOverlayColor: c.color})}
+                              className={`w-7 h-7 rounded-lg border-2 transition-all ${data.imageOverlayColor === c.color ? 'border-indigo-600 scale-110 shadow-md' : 'border-white shadow-sm hover:scale-110'}`}
+                              style={{ backgroundColor: c.color }}
+                            />
+                          ))}
+                        </div>
+                      </div>
                     </div>
 
                     <div className="p-5 bg-white rounded-3xl border-2 border-slate-100 shadow-sm space-y-5">

@@ -14,7 +14,6 @@ export type AppState = {
   id: number | null;
   name: string;
   icon?: string | null;
-  engine_version?: string | null; // 🔥 [신규] 독립 실행 엔진 버전 (v1, v1.1 등)
   views: View[];
   actions: Action[];
   virtualTables?: VirtualTable[]; // 🔥 [신규] 전역 가상 테이블 설정

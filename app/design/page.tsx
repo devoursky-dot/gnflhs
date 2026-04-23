@@ -8,9 +8,10 @@ import { supabase } from '@/app/supabaseClient';
 import { AppState, View, Action, SchemaData } from './types';
 import ViewEditor from './view';
 import ActionEditor from './action';
-import { Plus, Send, Loader2, ExternalLink, Trash2, FolderOpen, X, Star, ArrowUp, ArrowDown, Copy, PanelLeftClose, PanelLeft, Database } from 'lucide-react';
+import { Plus, Send, Loader2, ExternalLink, Trash2, FolderOpen, X, Star, ArrowUp, ArrowDown, Copy, PanelLeftClose, PanelLeft, Database, AlertCircle, ArrowRight, Settings2 } from 'lucide-react';
 import IconPicker, { IconMap } from './picker'; 
 import withAuth from '../withAuth';
+import { CURRENT_ENGINE_VERSION } from '../engines/version';
 import { VirtualTableManager, VirtualTableEditor } from './data';
 import { VirtualTable } from './types';
 
@@ -21,6 +22,7 @@ function AppBuilder() {
     id: null, 
     name: '새로운 앱',
     icon: null, 
+    engine_version: null,
     views: [{ id: 'v1', name: '메인 홈 (첫 화면)', tableName: null, cardHeight: 120, columnCount: 1, layoutRows: [], onClickActionId: null }],
     actions: []
   });
@@ -45,6 +47,8 @@ function AppBuilder() {
   const [cloningApp, setCloningApp] = useState<any>(null);
   const [tableMappings, setTableMappings] = useState<Record<string, { action: 'reuse' | 'clone', newName: string }>>({});
   const [isCloning, setIsCloning] = useState(false);
+  const [isDeployModalOpen, setIsDeployModalOpen] = useState(false); // 🔥 배포 확인 모달 상태
+  const [availableEngines, setAvailableEngines] = useState<string[]>(['v1']); // 🔥 사용 가능한 엔진 목록
 
 
   // 나머지 useEffect 및 핸들러 함수들은 기존대로 유지
@@ -211,12 +215,17 @@ function AppBuilder() {
   };
 
   const handleSaveAndDeploy = async () => {
-    if (isEngineSynced === false) {
-      if (!window.confirm('⚠️ 엔진 코드가 현재 배포된 v1 버전과 일치하지 않습니다.\n이대로 배포하면 앱이 오작동할 수 있습니다.\n\n정말로 배포하시겠습니까?')) return;
-    } else {
-      if (!window.confirm('정말로 리얼 앱에 배포하시겠습니까?\n모든 사용자에게 즉시 반영되며, 현재 시점의 코드로 고정된 독립 실행 환경이 구축됩니다.')) return;
-    }
-    
+    // 엔진 목록 가져오기
+    try {
+      const res = await fetch('/api/list-engines');
+      const data = await res.json();
+      if (data.engines) setAvailableEngines(data.engines);
+    } catch (e) {}
+    setIsDeployModalOpen(true);
+  };
+
+  const executeActualDeploy = async () => {
+    setIsDeployModalOpen(false);
     setIsSaving(true);
     try {
       const config: any = { 
@@ -240,7 +249,7 @@ function AppBuilder() {
       }
 
       // engine_version을 app_config 내부에 저장 (독립 실행 환경 보장)
-      config.engine_version = 'v1';
+      config.engine_version = config.engine_version || CURRENT_ENGINE_VERSION;
       config.deployed_at = new Date().toISOString();
 
       const payload = { 
@@ -292,6 +301,7 @@ function AppBuilder() {
         id: data.id,
         name: data.name || '이름 없는 앱',
         icon: configToLoad.icon || null,
+        engine_version: configToLoad.engine_version || null, // 🔥 엔진 버전 로드
         views: configToLoad.views || [],
         actions: configToLoad.actions || [],
         virtualTables: configToLoad.virtualTables || []
@@ -406,9 +416,10 @@ function AppBuilder() {
   const handleCreateNewApp = () => {
     const newViewId = `v_${Date.now()}`;
     setAppState({
-      id: null, name: '새로운 앱', icon: null,
+      id: null, name: '새로운 앱', icon: null, engine_version: null,
       views: [{ id: newViewId, name: '메인 홈 (첫 화면)', tableName: null, cardHeight: 120, columnCount: 1, layoutRows: [], onClickActionId: null }],
-      actions: []
+      actions: [],
+      virtualTables: []
     });
     setActiveItem({ type: 'view', id: newViewId });
     setIsAppListModalOpen(false);
@@ -494,11 +505,10 @@ function AppBuilder() {
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-black text-indigo-300 tracking-widest uppercase">My Workspace</span>
-                {isEngineSynced !== null && (
-                  <div className={`px-1.5 py-0.5 rounded-md text-[9px] font-black transition-all border ${isEngineSynced ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse'}`}>
-                    {isEngineSynced ? 'SYNCED' : 'UNSYNCED'}
-                  </div>
-                )}
+                {/* 🔥 싱크 표시 제거 및 버전 정보만 작게 표시 */}
+                <div className="px-2 py-0.5 bg-indigo-900/50 border border-indigo-700 rounded-full text-[8px] font-black text-indigo-300">
+                  ENGINE: {appState.engine_version || CURRENT_ENGINE_VERSION}
+                </div>
               </div>
               <div className="flex items-center gap-1.5">
                 <button onClick={() => window.open('/admin', 'TableManager', 'width=1400,height=900,resizable=yes')} className="p-2 bg-indigo-800 hover:bg-emerald-500 text-white rounded-xl transition-all" title="DB 관리 (새 창)"><Database size={16} /></button>
@@ -690,7 +700,69 @@ function AppBuilder() {
         onSelect={handleIconSelect}
       />
 
-      {/* --- [앱 복제 상세 설정 모달] --- */}
+      {/* --- [🚀 최종 배포 확인 모달] --- */}
+      {isDeployModalOpen && (
+        <div className="fixed inset-0 z-[200] bg-slate-900/80 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300 border-4 border-indigo-100">
+            <div className="p-8 text-center bg-slate-50/50 border-b border-slate-100">
+              <div className="w-20 h-20 bg-indigo-600 text-white rounded-3xl shadow-2xl shadow-indigo-200 flex items-center justify-center mx-auto mb-6 animate-bounce duration-[3s]">
+                <Send size={32} />
+              </div>
+              <h2 className="text-3xl font-black text-slate-800 tracking-tight">리얼 서버 배포 승인</h2>
+              <p className="text-slate-400 font-bold mt-2 uppercase tracking-widest text-xs">Final Deployment Review</p>
+            </div>
+            
+            <div className="p-10 space-y-8">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-5 bg-slate-50 rounded-2xl border-2 border-slate-100">
+                  <span className="text-sm font-black text-slate-400">대상 앱</span>
+                  <span className="text-lg font-black text-slate-800">{appState.name}</span>
+                </div>
+                <div className="flex items-center justify-between p-5 bg-indigo-50/50 rounded-2xl border-2 border-indigo-100">
+                  <span className="text-sm font-black text-indigo-400">적용 엔진 버전</span>
+                  <select 
+                    value={appState.engine_version || CURRENT_ENGINE_VERSION}
+                    onChange={(e) => setAppState({...appState, engine_version: e.target.value})}
+                    className="bg-white border-2 border-indigo-200 text-indigo-800 text-xs font-black px-4 py-2 rounded-xl shadow-sm focus:border-indigo-500 outline-none cursor-pointer"
+                  >
+                    {availableEngines.map(ver => (
+                      <option key={ver} value={ver}>{ver} {ver === CURRENT_ENGINE_VERSION ? '(최신)' : ''}</option>
+                    ))}
+                    <option value="custom">+ 직접 입력...</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="bg-rose-50 p-6 rounded-[2rem] border-2 border-rose-100 flex items-start gap-4">
+                <div className="p-2 bg-rose-500 text-white rounded-xl shadow-lg shrink-0"><AlertCircle size={18} /></div>
+                <div>
+                  <p className="text-sm font-black text-rose-700 leading-snug">배포 시 주의사항</p>
+                  <p className="text-[11px] text-rose-500 font-bold mt-1.5 leading-relaxed">
+                    승인 즉시 실제 사용자들의 화면에 반영됩니다.<br/>
+                    배포된 앱은 위 엔진 버전에 고정되어 작동하며,<br/>
+                    설정 오류 시 서비스가 중단될 수 있습니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-8 bg-slate-50 flex gap-4">
+              <button 
+                onClick={() => setIsDeployModalOpen(false)}
+                className="flex-1 py-4 text-slate-500 font-black rounded-2xl hover:bg-white hover:shadow-md transition-all border-2 border-transparent"
+              >
+                다시 검토하기
+              </button>
+              <button 
+                onClick={executeActualDeploy}
+                className="flex-[1.5] py-4 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-700 hover:shadow-xl hover:shadow-indigo-200 active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                최종 배포 승인 <ArrowRight size={18} strokeWidth={3} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {isCloneModalOpen && (
         <div className="fixed inset-0 z-[120] bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-xl rounded-[3rem] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300">

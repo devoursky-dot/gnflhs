@@ -60,7 +60,11 @@ export default function MainAppLauncher() {
         .select('id, name, created_at, app_config')
         .order('id', { ascending: false });
       if (error) throw error;
-      if (data) setApps(data);
+      if (data) {
+        // 'engine_version'이 명시된 완전 독립 앱들만 메인 화면에 표시
+        const independentApps = data.filter((app: any) => app.app_config?.engine_version);
+        setApps(independentApps);
+      }
     } catch (error) {
       console.error('앱 목록 로드 실패:', error);
     }
