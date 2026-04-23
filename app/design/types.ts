@@ -142,6 +142,8 @@ export type LayoutCell = {
   
   // 🔥 [신규] 이미지 인텔리전트 오버레이 & 배지
   imageOverlayExpression?: string;  // 이미지 위 텍스트 수식
+  imageOverlaySize?: string;        // 이미지 위 글자 크기 (8~40px)
+  imageOverlayColor?: string;       // 이미지 위 글자 색상
   imageBadgeExpression?: string;    // 배지 노출 조건 수식
   imageBadgeIcon?: string;          // 배지 아이콘 (IconMap 키)
   imageBadgeColor?: string;         // 배지 배경색
