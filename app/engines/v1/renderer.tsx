@@ -26,7 +26,10 @@ const isImageUrl = (url: any) => {
 
 export default function RenderPreviewLayout({ rows, rowData, actions, onExecuteAction }: any) {
   return (
-    <div className="flex flex-col gap-0 w-full h-full flex-1 text-slate-900">
+    <div 
+      style={{ color: 'var(--theme-text-main)' }}
+      className="flex flex-col gap-0 w-full h-full flex-1"
+    >
       {rows?.map((row: any) => (
         <div key={row.id} style={{ flex: row.flex || 1 }} className="flex gap-0 w-full items-stretch">
           {row.cells?.map((cell: any) => {
@@ -127,13 +130,14 @@ export default function RenderPreviewLayout({ rows, rowData, actions, onExecuteA
               const textWeightClass = cell.textWeight || 'font-black';
               
               const isHexColor = cell.textColor?.startsWith('#');
-              const textColorClass = isHexColor ? '' : (cell.textColor || 'text-slate-800');
-              const textInlineStyle = isHexColor ? { color: cell.textColor } : {};
+              const textInlineStyle: React.CSSProperties = isHexColor 
+                ? { color: cell.textColor } 
+                : { color: 'var(--theme-text-main)' }; // 프리셋의 메인 글자색 참조
 
               return (
                 <div key={cell.id} style={{ flex: cell.flex }} className={`flex flex-col justify-center min-w-0 overflow-hidden relative border-slate-100/50 p-0.5 ${alignItemClass}`}>
                   <span 
-                    className={`${textSizeClass} ${textWeightClass} ${textColorClass} break-words leading-tight w-full`}
+                    className={`${textSizeClass} ${textWeightClass} break-words leading-tight w-full`}
                     style={textInlineStyle}
                   >
                     {displayText}
@@ -156,49 +160,26 @@ export default function RenderPreviewLayout({ rows, rowData, actions, onExecuteA
                   const variant = cell.buttonVariant || 'default';
                   const colorKey = cell.buttonColor || 'slate';
                   const ActIcon = act.icon && IconMap[act.icon] ? IconMap[act.icon] : MousePointerClick;
-
-                  const theme = COLOR_THEMES[colorKey] || COLOR_THEMES.slate;
                   
-                  let styleClasses = '';
-                  let inlineStyles: any = {};
-
-                  if (shapeClass === 'rounded-none') {
-                    styleClasses = `bg-transparent ${theme.textCol} hover:bg-slate-100/50`;
-                  } else {
-                    switch (variant) {
-                      case 'raised':
-                        styleClasses = `${theme.bg} ${theme.text} hover:-translate-y-0.5 active:translate-y-0 transition-all`;
-                        break;
-                      case 'inset':
-                        styleClasses = `${theme.bg} ${theme.text} hover:opacity-90 active:opacity-100 transition-all`;
-                        break;
-                      case 'outline':
-                        styleClasses = `bg-transparent border-2 ${theme.textCol.replace('text-', 'border-')} ${theme.textCol} hover:${theme.bg} hover:text-white transition-all`;
-                        break;
-                      case '3d':
-                        styleClasses = `${theme.bg} ${theme.text} border-b-[4px] ${theme.border} active:border-b-0 active:translate-y-[4px] transition-all`;
-                        break;
-                      case 'shadow':
-                        styleClasses = `${theme.bg} ${theme.text} hover:scale-105 active:scale-95 transition-all`;
-                        break;
-                      case 'glass':
-                        styleClasses = `bg-white/20 backdrop-blur-md border border-white/30 ${theme.textCol} hover:bg-white/30 transition-all`;
-                        break;
-                      default:
-                        styleClasses = `${theme.bg} ${theme.text} hover:opacity-90 active:scale-95 transition-all`;
-                    }
-                  }
+                  // 디자인 토큰 기반의 동적 버튼 스타일 계산
+                  const isOutline = variant === 'outline';
+                  const isGhost = shapeClass === 'rounded-none';
+                  
+                  const btnStyle: React.CSSProperties = {
+                    backgroundColor: (isOutline || isGhost) ? 'transparent' : 'var(--theme-primary)',
+                    color: (isOutline || isGhost) ? 'var(--theme-primary)' : 'var(--theme-text-on-primary)',
+                    borderColor: isOutline ? 'var(--theme-primary)' : 'transparent',
+                  };
 
                   const textColorIsHex = cell.textColor?.startsWith('#');
-                  const btnTextColorClass = textColorIsHex ? '' : (cell.textColor || '');
                   const btnInlineStyle = textColorIsHex ? { color: cell.textColor } : {};
 
                   return (
                     <div className={`w-full h-full flex items-center p-0.5 ${wrapperAlignClass}`}>
                       <button 
                          onClick={(e) => { e.stopPropagation(); onExecuteAction(act, rowData); }} 
-                         className={`${cell.textSize || 'text-[10px]'} ${cell.textWeight || 'font-bold'} ${btnTextColorClass} flex items-center justify-center gap-1 overflow-hidden ${shapeClass} ${btnWidthClass} ${styleClasses}`}
-                         style={{ ...inlineStyles, ...btnInlineStyle }}
+                         className={`${cell.textSize || 'text-[10px]'} ${cell.textWeight || 'font-bold'} flex items-center justify-center gap-1 overflow-hidden transition-all active:scale-95 ${shapeClass} ${btnWidthClass} ${isGhost ? 'hover:bg-[var(--theme-bg-subtle)]' : 'hover:opacity-90'} ${isOutline ? 'border-2' : ''}`}
+                         style={{ ...btnStyle, ...btnInlineStyle }}
                       >
                          {(bStyle === 'icon' || bStyle === 'both') && <ActIcon size={cell.textSize?.includes('lg') || cell.textSize?.includes('xl') ? 16 : 12} className="shrink-0" />}
                          {(bStyle === 'text' || bStyle === 'both') && <span className="truncate">{act.name}</span>}

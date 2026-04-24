@@ -1,0 +1,177 @@
+export interface ThemeTokens {
+  id: string;
+  name: string;
+  mode: 'light' | 'dark';
+  primary: string;
+  bg: string;
+  bgSubtle: string;      // 배지나 연한 배경용
+  surface: string;
+  border: string;
+  borderStrong: string;  // 강조된 경계선
+  textMain: string;
+  textMuted: string;
+  textOnPrimary: string; // 버튼 위 글자색 등
+  inputBg: string;
+  inputText: string;
+  placeholder: string;
+  accent: string;
+  ring: string;
+}
+
+export const THEMES: Record<string, ThemeTokens> = {
+  // --- ☀️ Light Modes ---
+  vercel_lite: {
+    id: 'vercel_lite',
+    name: 'Vercel Lite',
+    mode: 'light',
+    primary: '#000000',
+    bg: '#fafafa',
+    bgSubtle: '#f3f4f6',
+    surface: '#ffffff',
+    border: '#e5e5e5',
+    borderStrong: '#d4d4d4',
+    textMain: '#171717',
+    textMuted: '#737373',
+    textOnPrimary: '#ffffff',
+    inputBg: '#ffffff',
+    inputText: '#171717',
+    placeholder: '#a3a3a3',
+    accent: '#000000',
+    ring: '#000000',
+  },
+  oceanic: {
+    id: 'oceanic',
+    name: 'Oceanic',
+    mode: 'light',
+    primary: '#0284c7',
+    bg: '#f0f9ff',
+    bgSubtle: '#e0f2fe',
+    surface: '#ffffff',
+    border: '#e0f2fe',
+    borderStrong: '#bae6fd',
+    textMain: '#0c4a6e',
+    textMuted: '#075985',
+    textOnPrimary: '#ffffff',
+    inputBg: '#ffffff',
+    inputText: '#0c4a6e',
+    placeholder: '#7dd3fc',
+    accent: '#0ea5e9',
+    ring: '#0284c7',
+  },
+  mint_fresh: {
+    id: 'mint_fresh',
+    name: 'Mint Fresh',
+    mode: 'light',
+    primary: '#059669',
+    bg: '#f0fdf4',
+    bgSubtle: '#dcfce7',
+    surface: '#ffffff',
+    border: '#dcfce7',
+    borderStrong: '#bbf7d0',
+    textMain: '#064e3b',
+    textMuted: '#166534',
+    textOnPrimary: '#ffffff',
+    inputBg: '#ffffff',
+    inputText: '#064e3b',
+    placeholder: '#66bb6a',
+    accent: '#10b981',
+    ring: '#059669',
+  },
+  sunset_glow: {
+    id: 'sunset_glow',
+    name: 'Sunset Glow',
+    mode: 'light',
+    primary: '#ea580c',
+    bg: '#fff7ed',
+    bgSubtle: '#ffedd5',
+    surface: '#ffffff',
+    border: '#ffedd5',
+    borderStrong: '#fed7aa',
+    textMain: '#431407',
+    textMuted: '#9a3412',
+    textOnPrimary: '#ffffff',
+    inputBg: '#ffffff',
+    inputText: '#431407',
+    placeholder: '#fb923c',
+    accent: '#f97316',
+    ring: '#ea580c',
+  },
+
+  // --- 🌙 Dark Modes ---
+  linear_dark: {
+    id: 'linear_dark',
+    name: 'Linear Dark',
+    mode: 'dark',
+    primary: '#818cf8',
+    bg: '#0b0e14',
+    bgSubtle: '#161b22',
+    surface: '#161b22',
+    border: '#30363d',
+    borderStrong: '#444c56',
+    textMain: '#f1f5f9',
+    textMuted: '#94a3b8',
+    textOnPrimary: '#ffffff',
+    inputBg: '#0b0e14',
+    inputText: '#f1f5f9',
+    placeholder: '#4b5563',
+    accent: '#6366f1',
+    ring: '#818cf8',
+  },
+  cyber_green: {
+    id: 'cyber_green',
+    name: 'Cyber Green',
+    mode: 'dark',
+    primary: '#22c55e',
+    bg: '#020617',
+    bgSubtle: '#0f172a',
+    surface: '#0f172a',
+    border: '#1e293b',
+    borderStrong: '#334155',
+    textMain: '#f0fdf4',
+    textMuted: '#94a3b8',
+    textOnPrimary: '#000000',
+    inputBg: '#020617',
+    inputText: '#f0fdf4',
+    placeholder: '#334155',
+    accent: '#10b981',
+    ring: '#22c55e',
+  },
+  royal_night: {
+    id: 'royal_night',
+    name: 'Royal Night',
+    mode: 'dark',
+    primary: '#d8b4fe',
+    bg: '#0f071a',
+    bgSubtle: '#1e1b4b',
+    surface: '#1e1b4b',
+    border: '#312e81',
+    borderStrong: '#4338ca',
+    textMain: '#f5f3ff',
+    textMuted: '#a78bfa',
+    textOnPrimary: '#000000',
+    inputBg: '#0f071a',
+    inputText: '#f5f3ff',
+    placeholder: '#4c1d95',
+    accent: '#c084fc',
+    ring: '#d8b4fe',
+  },
+  deep_zinc: {
+    id: 'deep_zinc',
+    name: 'Deep Zinc',
+    mode: 'dark',
+    primary: '#e2e8f0',
+    bg: '#09090b',
+    bgSubtle: '#18181b',
+    surface: '#18181b',
+    border: '#27272a',
+    borderStrong: '#3f3f46',
+    textMain: '#ffffff',
+    textMuted: '#a1a1aa',
+    textOnPrimary: '#09090b',
+    inputBg: '#09090b',
+    inputText: '#ffffff',
+    placeholder: '#52525b',
+    accent: '#f4f4f5',
+    ring: '#e2e8f0',
+  }
+};
