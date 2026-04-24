@@ -1133,7 +1133,10 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
 
         {/* 모바일 전용 하단 네비게이션 탭바 */}
         {showBottomBar && (
-          <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-100 flex items-center justify-around px-2 z-[1100] shadow-[0_-4px_10px_rgba(0,0,0,0.03)]">
+          <div 
+            style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)' }}
+            className="md:hidden fixed bottom-0 left-0 right-0 h-16 border-t flex items-center justify-around px-2 z-[1100] shadow-[0_-4px_10px_rgba(0,0,0,0.03)]"
+          >
             {bottomBarViews.slice(0, 5).map((v: any) => {
               const Icon = IconMap[v.icon] || Layout;
               const isActive = currentViewId === v.id;
@@ -1141,7 +1144,8 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
               return (
                 <button key={v.id} disabled={st?.disabled}
                   onClick={() => { setCurrentViewId(v.id); setSearchTerm(''); }}
-                  className={`flex flex-col items-center gap-1 transition-all ${isActive ? 'text-indigo-600 scale-110' : 'text-slate-400'} ${st?.disabled ? 'opacity-30' : ''}`}
+                  style={{ color: isActive ? 'var(--theme-primary)' : 'var(--theme-text-muted)' }}
+                  className={`flex flex-col items-center gap-1 transition-all ${isActive ? 'scale-110' : ''} ${st?.disabled ? 'opacity-30' : ''}`}
                 >
                   <Icon size={20} strokeWidth={isActive ? 3 : 2} />
                   <span className="text-[9px] font-black uppercase tracking-tighter truncate w-16 text-center">{st?.label || v.name}</span>
