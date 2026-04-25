@@ -120,7 +120,7 @@ export const evaluateExpression = (expr: string, rowData: any): any => {
 export const applyViewQuery = (query: any, view: any, userProfile?: any) => {
   let q = query;
 
-  // 1. [스마트 필터] 단일 조건 처리
+  // 1. [스마트 필터] 단일 조건 처리 (에디터 호환)
   if (view.filterColumn && (view.filterValue || view.filterOperator?.includes('null'))) {
     const col = view.filterColumn;
     const op = view.filterOperator || 'eq';
