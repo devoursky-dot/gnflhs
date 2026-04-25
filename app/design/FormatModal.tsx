@@ -99,13 +99,38 @@ const FormatModal = ({ cell, onClose, onSave, availableColumns }: FormatModalPro
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 pl-1 uppercase tracking-wider">커스텀 색상 (Color)</label>
-                <input 
-                  type="color" 
-                  value={data.textColor || '#1e293b'} 
-                  onChange={e => setData({...data, textColor: e.target.value})}
-                  className="w-full h-[46px] rounded-xl border-2 border-slate-50 p-1 bg-slate-50/50 cursor-pointer"
-                />
+                <label className="text-[10px] font-black text-slate-500 pl-1 uppercase tracking-wider">글자 색상 (Color)</label>
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100">
+                    <button 
+                      onClick={() => setData({...data, textColor: ''})} 
+                      className={`flex-1 py-1.5 text-[9px] font-black rounded-lg transition-all ${!data.textColor || (!data.textColor.startsWith('#') && data.textColor !== 'theme-primary' && !data.textColor.startsWith('text-')) ? 'bg-white text-slate-800 shadow-sm border border-slate-200' : 'text-slate-400'}`}
+                    >
+                      테마 기본
+                    </button>
+                    <button 
+                      onClick={() => setData({...data, textColor: 'theme-primary'})} 
+                      className={`flex-1 py-1.5 text-[9px] font-black rounded-lg transition-all ${data.textColor === 'theme-primary' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400'}`}
+                    >
+                      테마 강조
+                    </button>
+                    <button 
+                      onClick={() => setData({...data, textColor: '#000000'})} 
+                      className={`flex-1 py-1.5 text-[9px] font-black rounded-lg transition-all ${data.textColor?.startsWith('#') ? 'bg-white text-slate-800 shadow-sm border border-slate-200' : 'text-slate-400'}`}
+                    >
+                      직접 선택
+                    </button>
+                  </div>
+                  
+                  {data.textColor?.startsWith('#') && (
+                    <input 
+                      type="color" 
+                      value={data.textColor} 
+                      onChange={e => setData({...data, textColor: e.target.value})}
+                      className="w-full h-8 rounded-lg border-2 border-slate-50 p-0.5 bg-white cursor-pointer animate-in fade-in zoom-in-95 duration-200"
+                    />
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -355,19 +380,6 @@ const FormatModal = ({ cell, onClose, onSave, availableColumns }: FormatModalPro
                 </div>
               ) : (
                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 pt-2">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 pl-1">글자 색상 (Color)</label>
-                    <select value={data.textColor || ''} onChange={e => setData({...data, textColor: e.target.value})} className="w-full p-3 text-sm rounded-xl border-2 border-slate-100 font-bold text-slate-900 focus:border-indigo-500 outline-none cursor-pointer" style={{ color: 'var(--text-primary)' }}>
-                      <option value="">기본 색상</option>
-                      <option value="text-slate-500">회색 (Slate)</option>
-                      <option value="text-indigo-600">청보라 (Indigo)</option>
-                      <option value="text-blue-600">파랑 (Blue)</option>
-                      <option value="text-emerald-600">초록 (Emerald)</option>
-                      <option value="text-rose-600">빨강 (Rose)</option>
-                      <option value="text-amber-600">주황 (Amber)</option>
-                      <option value="text-white">흰색 (White - 어두운 배경용)</option>
-                    </select>
-                  </div>
 
                   {/* ⚡ 데이터 가공 파이프라인 가이드 UI */}
                   <div className="py-6 flex flex-col items-center">

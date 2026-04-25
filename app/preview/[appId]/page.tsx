@@ -41,7 +41,7 @@ const getStickyStyles = (isSticky: boolean, showTopBar: boolean, level: number =
     }
   }
 
-  return `sticky ${topClass} ${zIndex} shadow-sm border-b border-slate-100 bg-white`;
+  return `sticky ${topClass} ${zIndex} shadow-sm border-b border-[var(--theme-border)] bg-[var(--theme-surface)]`;
 };
 
 function LiveAppPreview({ userProfile }: { userProfile?: any }) {
@@ -836,7 +836,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                 onClick={() => { setCurrentViewId(v.id); setSearchTerm(''); }}
                 style={{ 
                   backgroundColor: isActive ? 'var(--theme-primary)' : 'transparent',
-                  color: isActive ? '#fff' : 'var(--theme-text-main)'
+                  color: isActive ? 'var(--theme-text-on-primary)' : 'var(--theme-text-main)'
                 }}
                 className={`w-full flex items-center justify-between p-3 rounded-none transition-all ${st?.disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
               >
@@ -1000,12 +1000,15 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                   setExpandedGroups(allOpen);
                 }
               }}
-              style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)' }}
-              className="w-full pl-9 pr-3 py-1.5 border rounded-none text-xs font-bold outline-none focus:border-[var(--theme-primary)] transition-all text-slate-800"
+              style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)', color: 'var(--theme-input-text)' }}
+              className="w-full pl-9 pr-3 py-1.5 border rounded-none text-xs font-bold outline-none focus:border-[var(--theme-primary)] transition-all"
             />
           </div>
           {currentView?.groupByColumn && (
-            <button onClick={handleToggleGroups} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-none text-[10px] font-bold hover:bg-indigo-100 transition-all flex items-center gap-1 border border-indigo-100 shrink-0">
+            <button onClick={handleToggleGroups} 
+              style={{ backgroundColor: 'var(--theme-bg-subtle)', color: 'var(--theme-primary)', borderColor: 'var(--theme-border)' }}
+              className="px-3 py-1.5 rounded-none text-[10px] font-bold transition-all flex items-center gap-1 border shrink-0"
+            >
               {isAllExpanded ? <ChevronsUp size={12} /> : <ChevronsUpDown size={12} />} {isAllExpanded ? '접기' : '펼치기'}
             </button>
           )}
@@ -1050,7 +1053,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                           {renderAggregations(allInG1, currentView.groupAggregations)}
                         </div>
                       </div>
-                      <ChevronDown size={18} className="text-slate-300 transition-all duration-300 shrink-0 mt-0.5" style={{ transform: isExp ? 'rotate(180deg)' : 'none' }} />
+                      <ChevronDown size={18} className="transition-all duration-300 shrink-0 mt-0.5" style={{ color: 'var(--theme-text-muted)', transform: isExp ? 'rotate(180deg)' : 'none' }} />
                     </button>
                     {isExp && (
                       <div style={{ backgroundColor: 'var(--theme-bg)', borderColor: 'var(--theme-border)' }} className="border-t p-2 overflow-visible">
@@ -1076,7 +1079,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                                       {renderAggregations(rs, currentView.groupAggregations2)}
                                     </div>
                                   </div>
-                                  <ChevronDown size={18} className="text-slate-300 transition-all shrink-0 mt-0.5" style={{ transform: isSkExp ? 'rotate(180deg)' : 'none' }} />
+                                  <ChevronDown size={18} className="transition-all shrink-0 mt-0.5" style={{ color: 'var(--theme-text-muted)', transform: isSkExp ? 'rotate(180deg)' : 'none' }} />
                                 </button>
                                 {isSkExp && (
                                   <div className={`grid ${gridClass} gap-1 p-1`}>

@@ -63,6 +63,8 @@ export const getKSTHelpers = () => {
   };
 };
 
+const expressionCache = new Map<string, { type: 'js' | 'string', func?: Function }>();
+
 /**
  * 스마트 수식 평가 엔진
  */
@@ -71,32 +73,42 @@ export const evaluateExpression = (expr: string, rowData: any): any => {
 
   try {
     const dateHelpers = getKSTHelpers();
-
-    // {{컬럼명}} 패턴 치환
-    let processedExpr = expr.replace(/\{\{(.*?)\}\}/g, (_, key) => {
-      const k = key.trim();
-      const val = rowData ? rowData[k] : undefined;
-      if (typeof val === 'string') return `"${val.replace(/"/g, '\\"')}"`;
-      if (typeof val === 'number') return String(val);
-      if (val === null || val === undefined) return 'null';
-      return JSON.stringify(val);
-    });
-
-    // 샌드박스화된 실행
-    // context를 통해 rowData 및 dateHelpers에 직접 접근 가능하게 함
     const context = { ...(rowData || {}), ...dateHelpers };
-    const func = new Function('context', `
-      with(context) {
-        try {
-          return ${processedExpr};
-        } catch(e) {
-          return "${processedExpr.replace(/"/g, '\\"')}";
-        }
+
+    let cached = expressionCache.get(expr);
+
+    // 🚀 [성능 패치] 매 row당 new Function()을 생성하여 브라우저가 정지되는 심각한 성능 저하 버그(무한 로딩)를 해결하기 위해 Memoization 도입
+    if (!cached) {
+      try {
+        const jsExpr = expr.replace(/\{\{(.*?)\}\}/g, (_, key) => `(context[${JSON.stringify(key.trim())}] ?? null)`);
+        const func = new Function('context', `
+          with(context) {
+            return (${jsExpr});
+          }
+        `);
+        cached = { type: 'js', func };
+      } catch (e) {
+        // JS 문법이 아닌 단순 문자열(예: URL 보간)인 경우 컴파일 실패
+        cached = { type: 'string' };
       }
-    `);
-    return func(context);
+      expressionCache.set(expr, cached);
+    }
+
+    if (cached.type === 'js' && cached.func) {
+      try {
+        const result = cached.func(context);
+        return result;
+      } catch (e) {
+        // 실행 중 에러가 나면 하단 문자열 치환으로 Fallback
+      }
+    }
+
+    // Fallback: 단순 문자열 보간 모드 (String Interpolation)
+    return expr.replace(/\{\{(.*?)\}\}/g, (_, key) => {
+      const val = context[key.trim()];
+      return val !== undefined && val !== null ? String(val) : '';
+    });
   } catch (err) {
-    // 수식이 아니거나 평가 실패 시 원본 혹은 에러 메시지 반환
     return expr;
   }
 };
@@ -326,7 +338,8 @@ export const resolveVirtualData = async (baseData: any[], virtualTable: any): Pr
   if (!virtualTable || !baseData.length) return baseData;
 
   try {
-    let resolvedData = [...baseData];
+    // in-place mutation으로 처리 (배열 전체 복사를 피하여 성능 대폭 개선)
+    const resolvedData = baseData.map((row: any) => ({ ...row })); // 최초 1회만 shallow copy
     const columns = virtualTable.columns || [];
 
     // 1단계: 조인(Join) 컬럼 처리
@@ -339,78 +352,103 @@ export const resolveVirtualData = async (baseData: any[], virtualTable: any): Pr
       const localValues = Array.from(new Set(resolvedData.map((row: any) => row[localKey]).filter((val: any) => val !== undefined && val !== null)));
       
       if (localValues.length > 0) {
-        const { data: foreignData, error } = await (supabase as any)
-          .from(targetTable)
-          .select(`${foreignKey}, ${sourceColumn}`)
-          .in(foreignKey, localValues);
+        // 한국어 등 멀티바이트 값의 URL 인코딩 길이를 고려하여 chunk를 작게 설정
+        const chunkSize = 50;
+        const chunks: any[][] = [];
+        
+        for (let i = 0; i < localValues.length; i += chunkSize) {
+          chunks.push(localValues.slice(i, i + chunkSize));
+        }
 
-        if (!error && foreignData) {
-          // 일대다 데이터를 그룹화함
-          const groupedForeign = new Map<string, any[]>();
-          foreignData.forEach((fRow: any) => {
-            const k = String(fRow[foreignKey]);
-            if (!groupedForeign.has(k)) groupedForeign.set(k, []);
-            groupedForeign.get(k)?.push(fRow[sourceColumn]);
-          });
-
-          resolvedData = resolvedData.map((row: any) => {
-            const matchingValues = groupedForeign.get(String(row[localKey])) || [];
-            let processedVal: any = null;
-
-            if (matchingValues.length > 0) {
-              const agg = aggregationType || 'none';
-              const sep = separator || ', ';
-
-              switch (agg) {
-                case 'none': 
-                  processedVal = matchingValues[matchingValues.length - 1]; 
-                  break;
-                case 'list': 
-                  processedVal = matchingValues.join(sep); 
-                  break;
-                case 'unique_list': 
-                  processedVal = Array.from(new Set(matchingValues)).join(sep); 
-                  break;
-                case 'count': 
-                  processedVal = matchingValues.length; 
-                  break;
-                case 'unique_count': 
-                  processedVal = new Set(matchingValues).size; 
-                  break;
-                case 'sum': 
-                  processedVal = matchingValues.reduce((acc, v) => acc + (Number(v) || 0), 0); 
-                  break;
-                case 'avg': 
-                  processedVal = matchingValues.reduce((acc, v) => acc + (Number(v) || 0), 0) / matchingValues.length; 
-                  break;
-                case 'min': 
-                  processedVal = Math.min(...matchingValues.map((v: any) => Number(v) || 0)); 
-                  break;
-                case 'max': 
-                  processedVal = Math.max(...matchingValues.map((v: any) => Number(v) || 0)); 
-                  break;
-              }
+        // 동시 요청 수를 제한하여 안정적으로 처리 (5개씩 병렬)
+        const concurrency = 5;
+        let allForeignData: any[] = [];
+        
+        for (let batch = 0; batch < chunks.length; batch += concurrency) {
+          const batchChunks = chunks.slice(batch, batch + concurrency);
+          const batchPromises = batchChunks.map(chunk =>
+            (supabase as any)
+              .from(targetTable)
+              .select(`${foreignKey}, ${sourceColumn}`)
+              .in(foreignKey, chunk)
+          );
+          
+          const batchResults = await Promise.all(batchPromises);
+          for (const res of batchResults) {
+            if (!res.error && res.data) {
+              allForeignData = allForeignData.concat(res.data);
             }
+          }
+        }
 
-            return { ...row, [col.name]: processedVal };
-          });
+        // 일대다 데이터를 그룹화함
+        const groupedForeign = new Map<string, any[]>();
+        allForeignData.forEach((fRow: any) => {
+          const k = String(fRow[foreignKey]);
+          if (!groupedForeign.has(k)) groupedForeign.set(k, []);
+          groupedForeign.get(k)?.push(fRow[sourceColumn]);
+        });
+
+        // in-place로 값 할당 (새 배열 생성 회피)
+        for (let i = 0; i < resolvedData.length; i++) {
+          const row = resolvedData[i];
+          const matchingValues = groupedForeign.get(String(row[localKey])) || [];
+          let processedVal: any = null;
+
+          if (matchingValues.length > 0) {
+            const agg = aggregationType || 'none';
+            const sep = separator || ', ';
+
+            switch (agg) {
+              case 'none': 
+                processedVal = matchingValues[matchingValues.length - 1]; 
+                break;
+              case 'list': 
+                processedVal = matchingValues.join(sep); 
+                break;
+              case 'unique_list': 
+                processedVal = Array.from(new Set(matchingValues)).join(sep); 
+                break;
+              case 'count': 
+                processedVal = matchingValues.length; 
+                break;
+              case 'unique_count': 
+                processedVal = new Set(matchingValues).size; 
+                break;
+              case 'sum': 
+                processedVal = matchingValues.reduce((acc: number, v: any) => acc + (Number(v) || 0), 0); 
+                break;
+              case 'avg': 
+                processedVal = matchingValues.reduce((acc: number, v: any) => acc + (Number(v) || 0), 0) / matchingValues.length; 
+                break;
+              case 'min': 
+                processedVal = Math.min(...matchingValues.map((v: any) => Number(v) || 0)); 
+                break;
+              case 'max': 
+                processedVal = Math.max(...matchingValues.map((v: any) => Number(v) || 0)); 
+                break;
+            }
+          }
+
+          row[col.name] = processedVal;
         }
       } else {
-        resolvedData = resolvedData.map((row: any) => ({ ...row, [col.name]: null }));
+        for (let i = 0; i < resolvedData.length; i++) {
+          resolvedData[i][col.name] = null;
+        }
       }
     }
 
-    // 2단계: 수식(Formula) 컬럼 처리
+    // 2단계: 수식(Formula) 컬럼 처리 (in-place)
     const formulaCols = columns.filter((c: any) => c.type === 'formula' && c.formulaConfig);
     
     for (const col of formulaCols) {
       const expr = col.formulaConfig.expression;
       if (!expr) continue;
 
-      resolvedData = resolvedData.map((row: any) => ({
-        ...row,
-        [col.name]: evaluateExpression(expr, row)
-      }));
+      for (let i = 0; i < resolvedData.length; i++) {
+        resolvedData[i][col.name] = evaluateExpression(expr, resolvedData[i]);
+      }
     }
 
     return resolvedData;
@@ -419,3 +457,4 @@ export const resolveVirtualData = async (baseData: any[], virtualTable: any): Pr
     return baseData;
   }
 };
+

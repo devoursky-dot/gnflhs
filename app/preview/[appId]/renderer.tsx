@@ -130,14 +130,17 @@ export default function RenderPreviewLayout({ rows, rowData, actions, onExecuteA
               const textWeightClass = cell.textWeight || 'font-black';
               
               const isHexColor = cell.textColor?.startsWith('#');
+              const isTailwindColor = cell.textColor?.startsWith('text-');
+              const isThemePrimary = cell.textColor === 'theme-primary';
+              
               const textInlineStyle: React.CSSProperties = isHexColor 
                 ? { color: cell.textColor } 
-                : { color: 'var(--theme-text-main)' }; // 프리셋의 메인 글자색 참조
+                : (isThemePrimary ? { color: 'var(--theme-primary)' } : (isTailwindColor ? {} : { color: 'var(--theme-text-main)' }));
 
               return (
                 <div key={cell.id} style={{ flex: cell.flex }} className={`flex flex-col justify-center min-w-0 overflow-hidden relative border-slate-100/50 p-0.5 ${alignItemClass}`}>
                   <span 
-                    className={`${textSizeClass} ${textWeightClass} break-words leading-tight w-full`}
+                    className={`${textSizeClass} ${textWeightClass} ${isTailwindColor ? cell.textColor : ''} break-words leading-tight w-full`}
                     style={textInlineStyle}
                   >
                     {displayText}

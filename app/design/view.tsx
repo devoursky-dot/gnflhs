@@ -10,7 +10,7 @@ import {
 import { supabase } from '@/app/supabaseClient';
 import IconPicker, { IconMap } from './picker';
 import { FORMULA_EXAMPLES, FormulaCategory, FormulaExample } from './formulas';
-import { resolveVirtualData } from '../preview/[appId]/utils';
+import { resolveVirtualData, evaluateExpression } from '../preview/[appId]/utils';
 import FormatModal from './FormatModal';
 
 
@@ -171,13 +171,23 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
 
     setIsPreviewModalOpen(true); 
     setIsLoadingPreview(true);
+    setPreviewData([]); // 🚀 [신규] 새로운 조회를 위해 기존 데이터 초기화 (이전 숫자 잔상 제거)
 
     try {
       // 1. 데이터 가져오기 (가상이면 베이스 테이블에서 가져옴)
-      let query = supabase.from(baseTableName!).select('*').limit(30000); 
+      if (isVirtual && !virtualTable) {
+        throw new Error(`가상 테이블 정의를 찾을 수 없습니다: ${view.tableName}. 테이블 설정을 다시 확인해주세요.`);
+      }
+      if (!baseTableName) {
+        throw new Error("연결된 테이블이 없습니다. 테이블 설정을 먼저 진행해주세요.");
+      }
+      
+      // 가상 테이블은 Join/Formula 후처리가 무거우므로 디자인 프리뷰에서는 500건으로 제한
+      const previewLimit = isVirtual ? 500 : 30000;
+      let query = supabase.from(baseTableName!).select('*').limit(previewLimit); 
       
       // 🧠 [신규] 노코딩 스타일 지능형 필터 동기화
-      if (view.filterColumn && (view.filterValue || view.filterOperator?.includes('null'))) {
+      if (view.filterColumn && view.filterValue !== undefined && view.filterValue !== null && view.filterValue !== '') {
         const op = view.filterOperator || 'eq';
         const val = String(view.filterValue || '').trim();
         const col = view.filterColumn;
@@ -242,7 +252,6 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
       // 🧠 [신규] 프리뷰에서도 수식 필터(filterExpr) 적용하여 실시간 확인 가능하게 함
       if (view.filterExpr) {
         // 프리뷰용 클라이언트 필터 로직
-        const { evaluateExpression } = await import('../preview/[appId]/utils');
         finalData = finalData.filter((row: any) => {
           try {
             return evaluateExpression(view.filterExpr || 'true', row);
@@ -384,7 +393,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
               <select 
                 className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-black text-slate-800 outline-none focus:border-indigo-500 transition-all cursor-pointer" 
                 value={view.tableName || ''} 
-                onChange={e => onUpdate({...view, tableName: e.target.value, filterColumn: null, sortColumn: null, groupByColumn: null, layoutRows: []})}
+                onChange={e => onUpdate({...view, tableName: e.target.value, filterColumn: null, filterValue: null, filterExpr: '', sortColumn: null, groupByColumn: null, layoutRows: []})}
               >
                 <option value="">테이블 선택</option>
                 <optgroup label="데이터베이스 테이블 (Supabase)">
@@ -397,7 +406,10 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                 )}
               </select>
             </div>
-            <div><label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5"><Filter size={14}/> 1단계 서버 필터 (선택사항)</label><select className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-black text-indigo-600 outline-none focus:border-indigo-500 transition-all cursor-pointer" value={view.filterColumn || ''} onChange={e => onUpdate({...view, filterColumn: e.target.value || null})}><option value="">필터 없음 (전체 데이터 가져오기)</option>{availableColumns.map((col: string) => <option key={col} value={col}>{col}</option>)}</select></div>
+            <div><label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5"><Filter size={14}/> 1단계 서버 필터 (선택사항)</label><select className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-100 font-black text-indigo-600 outline-none focus:border-indigo-500 transition-all cursor-pointer" value={view.filterColumn || ''} onChange={e => {
+              const col = e.target.value || null;
+              onUpdate({...view, filterColumn: col, filterValue: col ? view.filterValue : null, filterExpr: col ? view.filterExpr : ''});
+            }}><option value="">필터 없음 (전체 데이터 가져오기)</option>{availableColumns.map((col: string) => <option key={col} value={col}>{col}</option>)}</select></div>
           </div>
           <div className="bg-slate-50/50 rounded-3xl p-6 border-2 border-dashed border-slate-200 flex flex-col justify-center">
             {view.filterColumn ? (
@@ -1222,7 +1234,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                      </tr>
                    </thead>
                    <tbody>
-                     {previewData.map((row: any, idx: number) => {
+                     {previewData.slice(0, 500).map((row: any, idx: number) => {
                        const rowKey = tempKeyColumn ? String(row[tempKeyColumn]) : null;
                        const isChecked = rowKey ? selectedKeys.includes(rowKey) : false;
                        return (
@@ -1242,7 +1254,8 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                          </tr>
                        );
                      })}
-                   </tbody>
+                   {previewData.length > 500 && ( <tr><td colSpan={availableColumns.length + 1} className='p-6 text-center text-sm font-bold text-slate-500 bg-slate-50 border-t-2 border-slate-200'>... 이 외에도 {previewData.length - 500}건의 데이터가 더 숨겨져 있습니다.<br/><span className='text-xs text-slate-400 font-normal'>더 보려면 헤더를 클릭해 정렬하세요.</span></td></tr> )}
+                    </tbody>
                  </table>
                )}
             </div>

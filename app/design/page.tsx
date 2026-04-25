@@ -24,7 +24,8 @@ function AppBuilder() {
     icon: null, 
     engine_version: null,
     views: [{ id: 'v1', name: '메인 홈 (첫 화면)', tableName: null, cardHeight: 120, columnCount: 1, layoutRows: [], onClickActionId: null }],
-    actions: []
+    actions: [],
+    virtualTables: []
   });
   // 기존 AppBuilder 상태들 및 함수들은 그대로 유지
   const [schemaData, setSchemaData] = useState<SchemaData>({});
