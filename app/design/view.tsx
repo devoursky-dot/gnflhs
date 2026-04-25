@@ -160,8 +160,10 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
   const [tempKeyColumn, setTempKeyColumn] = useState<string>('');
   const [previewSortConfig, setPreviewSortConfig] = useState<{column: string, direction: 'asc'|'desc'} | null>(null);
   const [isFormulaHelpOpen, setIsFormulaHelpOpen] = useState(false);
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const fetchPreviewData = async () => {
+  const fetchPreviewData = async (options: { ignoreFormulaFilter?: boolean } = { ignoreFormulaFilter: true }) => {
     if (!view.tableName) return alert("먼저 테이블을 선택해주세요.");
     
     // [스마트 기본값] id가 있으면 자동으로 선택, 이미 저장된게 있으면 그것을 우선함
@@ -171,7 +173,9 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
 
     setIsPreviewModalOpen(true); 
     setIsLoadingPreview(true);
-    setPreviewData([]); // 🚀 [신규] 새로운 조회를 위해 기존 데이터 초기화 (이전 숫자 잔상 제거)
+    setPreviewData([]); 
+    setLastSelectedIndex(null);
+    setSearchTerm('');
 
     try {
       // 1. 데이터 가져오기 (가상이면 베이스 테이블에서 가져옴)
@@ -192,7 +196,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
         const val = String(view.filterValue || '').trim();
         const col = view.filterColumn;
 
-        // 원본 테이블에 있는 컬럼인 경우에만 쿼리단에서 필터링 (가상 컬럼 필터는 나중에 클라이언트 처리)
+        // 원본 테이블에 있는 컬럼인 경우에만 쿼리단에서 필터링
         if (schemaData[baseTableName!]?.includes(col)) {
           const now = new Date();
           const isoToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -249,14 +253,36 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
         finalData = await resolveVirtualData(finalData, virtualTable);
       }
 
-      // 🧠 [신규] 프리뷰에서도 수식 필터(filterExpr) 적용하여 실시간 확인 가능하게 함
-      if (view.filterExpr) {
-        // 프리뷰용 클라이언트 필터 로직
+      // 🧠 [신규] 프리뷰에서도 수식 필터(filterExpr) 적용
+      // ⚠️ 수동 선택(Data Lock) 모달 등 명시적으로 요청된 경우에는 무시함
+      if (view.filterExpr && !options.ignoreFormulaFilter) {
         finalData = finalData.filter((row: any) => {
           try {
             return evaluateExpression(view.filterExpr || 'true', row);
           } catch(e) { return true; }
         });
+      }
+
+      // 🔥 [핵심 보완] 이미 선택된 데이터가 누락된 경우 강제 병합
+      const defaultKeyInFetch = view.lockedKeyColumn || (availableColumns.includes('id') ? 'id' : '');
+      if (view.lockedRecordKeys?.length && defaultKeyInFetch) {
+          const currentKeys = new Set(finalData.map(r => String(r[defaultKeyInFetch])));
+          const missingKeys = view.lockedRecordKeys.filter(k => !currentKeys.has(k));
+          
+          if (missingKeys.length > 0) {
+              const { data: missingData, error: missingError } = await supabase
+                  .from(baseTableName!)
+                  .select('*')
+                  .in(defaultKeyInFetch, missingKeys);
+              
+              if (!missingError && missingData) {
+                  let resolvedMissing = missingData;
+                  if (virtualTable) {
+                    resolvedMissing = await resolveVirtualData(missingData, virtualTable);
+                  }
+                  finalData = [...resolvedMissing, ...finalData];
+              }
+          }
       }
 
       setPreviewData(finalData);
@@ -379,7 +405,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
           </div>
           {view.tableName && (
             <button 
-              onClick={fetchPreviewData} 
+              onClick={() => fetchPreviewData({ ignoreFormulaFilter: true })} 
               className={`px-6 py-3 rounded-xl font-black text-sm flex items-center gap-2 transition-all border whitespace-nowrap ${view.lockedRecordKeys?.length ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'}`}
             >
               <Eye size={18} /> {view.lockedRecordKeys?.length ? '수동 선택(Pick) 수정하기' : '설정 확인 및 데이터 수동 픽(Pick)'}
@@ -1139,7 +1165,10 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                 <TableProperties className="text-indigo-600" size={24} />
                 <div>
                   <h3 className="text-lg font-black text-slate-800">[{view.tableName}] 쿼리 시뮬레이션 및 데이터 잠금</h3>
-                  <p className="text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-lg inline-block mt-0.5">총 {previewData.length}건 조회됨</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-lg inline-block">총 {previewData.length}건 조회됨</p>
+                    <p className="text-xs font-bold text-rose-600 bg-rose-100 px-2 py-0.5 rounded-lg inline-block">{selectedKeys.length}명 선택됨</p>
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-6 border-l pl-6 border-slate-200">
@@ -1180,7 +1209,22 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                 <button onClick={() => setIsPreviewModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-slate-200 hover:bg-slate-300 rounded-full text-slate-500 hover:text-slate-800 transition-colors shrink-0 ml-2"><X size={20}/></button>
               </div>
             </div>
-            {/* Modal Body & Table */}
+            {/* Modal Body & Table Search Bar */}
+            <div className="px-4 py-2.5 bg-slate-50 border-b flex items-center gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input 
+                  type="text" 
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  placeholder="이름, 학번 등으로 학생 찾기..."
+                  className="w-full pl-10 pr-4 py-2 bg-white border-2 border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500 transition-all shadow-sm"
+                />
+              </div>
+              <div className="text-[10px] font-black text-slate-400 bg-slate-100 px-3 py-2 rounded-lg border border-slate-200 uppercase tracking-tighter">
+                * Shift + 클릭으로 범위 선택 가능
+              </div>
+            </div>
             <div className="flex-1 overflow-auto p-0 relative bg-slate-100">
                {isLoadingPreview ? (
                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-indigo-600 bg-white/50"><Loader2 className="animate-spin" size={40} /><p className="font-bold">데이터를 불러오는 중...</p></div>
@@ -1188,73 +1232,104 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                  <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-bold text-lg">조건에 맞는 데이터가 없습니다. 쿼리 설정을 확인해주세요.</div>
                ) : (
                  <table className="w-full text-left border-separate border-spacing-0 bg-white">
-                   <thead className="bg-slate-900 text-white sticky top-0 z-20 shadow-sm">
-                     <tr>
-                       {tempKeyColumn && (
-                         <th className="p-4 w-12 text-center border-b border-slate-700 bg-slate-800 cursor-pointer hover:bg-slate-700 transition-colors" onClick={() => {
-                             if (selectedKeys.length === previewData.length && previewData.length > 0) setSelectedKeys([]);
-                             else {
-                               const allKeys = previewData.map((r: any) => String(r[tempKeyColumn])).filter((k: string) => k && k !== 'null' && k !== 'undefined');
-                               setSelectedKeys(allKeys);
-                             }
-                         }}>
-                           <input type="checkbox" className="w-4 h-4 cursor-pointer accent-indigo-500 pointer-events-none" checked={selectedKeys.length === previewData.length && previewData.length > 0} readOnly />
-                         </th>
-                       )}
-                       {availableColumns.map((col: string) => (
-                         <th key={col} 
-                           className={`p-4 text-xs font-black uppercase tracking-wider border-b border-slate-700 whitespace-nowrap cursor-pointer hover:bg-slate-800 transition-colors ${col === tempKeyColumn ? 'bg-indigo-900 text-indigo-200' : ''}`}
-                           onClick={() => {
-                             let newDir: 'asc' | 'desc' = 'asc';
-                             if (previewSortConfig?.column === col && previewSortConfig.direction === 'asc') newDir = 'desc';
-                             setPreviewSortConfig({ column: col, direction: newDir });
-                             
-                             const sorted = [...previewData].sort((a: any, b: any) => {
-                               const valA = a[col];
-                               const valB = b[col];
-                               if (valA === null || valA === undefined) return 1;
-                               if (valB === null || valB === undefined) return -1;
-                               const res = String(valA).localeCompare(String(valB), 'ko', { numeric: true });
-                               return newDir === 'asc' ? res : -res;
-                             });
-                             setPreviewData(sorted);
-                           }}
-                         >
-                           <div className="flex items-center gap-1">
-                             {col} 
-                             {col === tempKeyColumn && <span className="text-yellow-400">🔑</span>}
-                             {previewSortConfig?.column === col && (
-                               <span className="text-indigo-400 ml-1 text-[10px]">
-                                 {previewSortConfig.direction === 'asc' ? '▲' : '▼'}
+                    <thead className="bg-slate-900 text-white sticky top-0 z-20 shadow-sm">
+                      <tr>
+                        {tempKeyColumn && (
+                          <th className="p-4 w-12 text-center border-b border-slate-700 bg-slate-800 cursor-pointer hover:bg-slate-700 transition-colors group" onClick={() => {
+                              // 선택된 항목 상단 정렬
+                              const sortedBySelection = [...previewData].sort((a: any, b: any) => {
+                                const isA = selectedKeys.includes(String(a[tempKeyColumn]));
+                                const isB = selectedKeys.includes(String(b[tempKeyColumn]));
+                                if (isA === isB) return 0;
+                                return isA ? -1 : 1;
+                              });
+                              setPreviewData(sortedBySelection);
+                              setLastSelectedIndex(null);
+                          }}>
+                            <div className="flex flex-col items-center gap-0.5">
+                              <input type="checkbox" className="w-4 h-4 cursor-pointer accent-indigo-500 pointer-events-none" checked={selectedKeys.length === previewData.length && previewData.length > 0} readOnly />
+                              <span className="text-[8px] font-black text-slate-500 group-hover:text-white uppercase leading-none">선택순</span>
+                            </div>
+                          </th>
+                        )}
+                        {availableColumns.map((col: string) => (
+                          <th key={col} 
+                            className={`p-4 text-xs font-black uppercase tracking-wider border-b border-slate-700 whitespace-nowrap cursor-pointer hover:bg-slate-800 transition-colors ${col === tempKeyColumn ? 'bg-indigo-900 text-indigo-200' : ''}`}
+                            onClick={() => {
+                              let newDir: 'asc' | 'desc' = 'asc';
+                              if (previewSortConfig?.column === col && previewSortConfig.direction === 'asc') newDir = 'desc';
+                              setPreviewSortConfig({ column: col, direction: newDir });
+                              
+                              const sorted = [...previewData].sort((a: any, b: any) => {
+                                const valA = a[col];
+                                const valB = b[col];
+                                if (valA === null || valA === undefined) return 1;
+                                if (valB === null || valB === undefined) return -1;
+                                const res = String(valA).localeCompare(String(valB), 'ko', { numeric: true });
+                                return newDir === 'asc' ? res : -res;
+                              });
+                              setPreviewData(sorted);
+                            }}
+                          >
+                            <div className="flex items-center gap-1">
+                              {col} 
+                              {col === tempKeyColumn && <span className="text-yellow-400">🔑</span>}
+                              {previewSortConfig?.column === col && (
+                                <span className="text-indigo-400 ml-1 text-[10px]">
+                                  {previewSortConfig.direction === 'asc' ? '▲' : '▼'}
                                 </span>
-                             )}
-                           </div>
-                         </th>
-                       ))}
-                     </tr>
-                   </thead>
-                   <tbody>
-                     {previewData.slice(0, 500).map((row: any, idx: number) => {
-                       const rowKey = tempKeyColumn ? String(row[tempKeyColumn]) : null;
-                       const isChecked = rowKey ? selectedKeys.includes(rowKey) : false;
-                       return (
-                         <tr key={idx} className={`border-b hover:bg-indigo-50/50 transition-colors cursor-pointer ${isChecked ? 'bg-indigo-50 border-indigo-100' : 'border-slate-100'}`} onClick={() => {
-                           if (!tempKeyColumn || !rowKey || rowKey === 'null' || rowKey === 'undefined') {
-                              if (!tempKeyColumn) alert('고유 식별자(PK) 칼럼을 우측 상단에서 먼저 선택해야 클릭이 가능합니다.');
-                              return;
-                           }
-                           setSelectedKeys(prev => prev.includes(rowKey) ? prev.filter(k => k !== rowKey) : [...prev, rowKey]);
-                         }}>
-                           {tempKeyColumn && (
-                             <td className="p-4 text-center border-r border-slate-50">
-                               <input type="checkbox" className="w-4 h-4 cursor-pointer accent-indigo-500 pointer-events-none" checked={isChecked} readOnly />
-                             </td>
-                           )}
-                           {availableColumns.map((col: string) => <td key={col} className={`p-4 text-sm font-medium whitespace-nowrap max-w-[200px] truncate ${col === tempKeyColumn ? 'text-indigo-700 font-black bg-indigo-50/30' : 'text-slate-700'}`}>{row[col] !== null ? String(row[col]) : <span className="text-slate-300 italic">null</span>}</td>)}
-                         </tr>
-                       );
-                     })}
-                   {previewData.length > 500 && ( <tr><td colSpan={availableColumns.length + 1} className='p-6 text-center text-sm font-bold text-slate-500 bg-slate-50 border-t-2 border-slate-200'>... 이 외에도 {previewData.length - 500}건의 데이터가 더 숨겨져 있습니다.<br/><span className='text-xs text-slate-400 font-normal'>더 보려면 헤더를 클릭해 정렬하세요.</span></td></tr> )}
+                              )}
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {previewData
+                        .filter((row: any) => {
+                          if (!searchTerm) return true;
+                          return Object.values(row).some(v => String(v).toLowerCase().includes(searchTerm.toLowerCase()));
+                        })
+                        .slice(0, 500).map((row: any, idxInFiltered: number) => {
+                        const rowKey = tempKeyColumn ? String(row[tempKeyColumn]) : null;
+                        const isChecked = rowKey ? selectedKeys.includes(rowKey) : false;
+                        return (
+                          <tr key={idxInFiltered} className={`border-b hover:bg-indigo-50/50 transition-colors cursor-pointer select-none ${isChecked ? 'bg-indigo-50 border-indigo-100' : 'border-slate-100'}`} onClick={(e) => {
+                            if (!tempKeyColumn || !rowKey || rowKey === 'null' || rowKey === 'undefined') {
+                               if (!tempKeyColumn) alert('고유 식별자(PK) 칼럼을 우측 상단에서 먼저 선택해야 클릭이 가능합니다.');
+                               return;
+                            }
+                            
+                            if (e.shiftKey && lastSelectedIndex !== null) {
+                              const visibleData = previewData.filter((r: any) => {
+                                if (!searchTerm) return true;
+                                return Object.values(r).some(v => String(v).toLowerCase().includes(searchTerm.toLowerCase()));
+                              });
+                              const start = Math.min(lastSelectedIndex, idxInFiltered);
+                              const end = Math.max(lastSelectedIndex, idxInFiltered);
+                              const rangeKeys = visibleData.slice(start, end + 1)
+                                .map((r: any) => String(r[tempKeyColumn]))
+                                .filter((k: string) => k && k !== 'null' && k !== 'undefined');
+                              
+                              setSelectedKeys(prev => {
+                                const resultSet = new Set([...prev, ...rangeKeys]);
+                                return Array.from(resultSet);
+                              });
+                            } else {
+                              setSelectedKeys(prev => prev.includes(rowKey) ? prev.filter(k => k !== rowKey) : [...prev, rowKey]);
+                            }
+                            setLastSelectedIndex(idxInFiltered);
+                          }}>
+                            {tempKeyColumn && (
+                              <td className="p-4 text-center border-r border-slate-50">
+                                <input type="checkbox" className="w-4 h-4 cursor-pointer accent-indigo-500 pointer-events-none" checked={isChecked} readOnly />
+                              </td>
+                            )}
+                            {availableColumns.map((col: string) => <td key={col} className={`p-4 text-sm font-medium whitespace-nowrap max-w-[200px] truncate ${col === tempKeyColumn ? 'text-indigo-700 font-black bg-indigo-50/30' : 'text-slate-700'}`}>{row[col] !== null ? String(row[col]) : <span className="text-slate-300 italic">null</span>}</td>)}
+                          </tr>
+                        );
+                      })}
+                    {previewData.length > 500 && ( <tr><td colSpan={availableColumns.length + 1} className='p-6 text-center text-sm font-bold text-slate-500 bg-slate-50 border-t-2 border-slate-200'>... 이 외에도 {previewData.length - 500}건의 데이터가 더 숨겨져 있습니다.<br/><span className='text-xs text-slate-400 font-normal'>더 보려면 헤더를 클릭해 정렬하세요.</span></td></tr> )}
                     </tbody>
                  </table>
                )}
