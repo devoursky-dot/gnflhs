@@ -511,10 +511,16 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       setActiveRowData(rowData);
       const init = buildPayloadFromMappings(currentStep.updateMappings, rowData);
 
-      // 기존 데이터 유지 보강
+      // 기존 데이터 유지 보강 (수정 액션은 기존 행 데이터를 우선 표시)
       currentStep.updateMappings?.forEach((m: any) => {
-        if (!init[m.targetColumn] && init[m.targetColumn] !== 0) {
-          init[m.targetColumn] = rowData[m.targetColumn] || '';
+        const hasExistingData = rowData && rowData[m.targetColumn] !== undefined && rowData[m.targetColumn] !== null;
+        
+        if (m.mappingType === 'prompt') {
+          // 사용자 입력형(prompt)은 기존 값이 있다면 기본값을 무시하고 기존 값을 보여줌
+          if (hasExistingData) init[m.targetColumn] = rowData[m.targetColumn];
+        } else if (!init[m.targetColumn] && init[m.targetColumn] !== 0) {
+          // 그 외 자동 매핑 항목 중 누락된 경우에만 보충
+          if (hasExistingData) init[m.targetColumn] = rowData[m.targetColumn];
         }
       });
 
