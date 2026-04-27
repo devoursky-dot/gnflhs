@@ -51,6 +51,10 @@ export type View = {
   tableName: string | null;
   navPosition?: 'both' | 'bottom' | 'top' | 'hidden';
   
+  // 🔥 [신규] 다중 선택 모드 제어
+  enableMultiSelect?: boolean;
+  multiSelectActionIds?: string[];
+  
   filterColumn?: string | null;  
   filterOperator?: 'eq' | 'neq' | 'like' | 'contains' | 'starts' | 'ends' | 'gt' | 'lt' | 'gte' | 'lte' | 'in' | 'between' | 'is_null' | 'is_not_null'; 
   filterValue?: string | null;   
@@ -178,7 +182,6 @@ export type ActionStep = {
   deleteTableName?: string | null;
   updateTableName?: string | null;
   updateMappings?: InsertMapping[];
-  requireConfirmation?: boolean;
   confirmationMessage?: string | null;
   smsTableName?: string | null;
   smsPhoneColumn?: string | null;
@@ -192,6 +195,9 @@ export type Action = ActionStep & {
   name: string;
   icon?: string | null;
   steps?: ActionStep[]; // 🔥 [신규] 다단계 동작 시퀀스
+  navPosition?: 'both' | 'bottom' | 'top' | 'hidden';
+  showInSelectionModeOnly?: boolean;
+  requireConfirm?: boolean;
 };
 
 export type SchemaData = Record<string, string[]>;

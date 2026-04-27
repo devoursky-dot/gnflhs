@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { View, SchemaData, LayoutRow, Action, LayoutCell, VirtualTable, GroupAggregation } from './types';
 import { 
   Database, LayoutTemplate, Plus, Columns, Rows, ChevronLeft, 
-  ChevronRight, X, MousePointerClick, Star, Filter, Search, Smartphone, Eye, Loader2, TableProperties, ArrowUpDown, FolderTree, Trash2, Minus, Wand2, Image as ImageIcon, Type, Sparkles, AlignLeft, AlignCenter, AlignRight, Lock, Zap, Settings2, ArrowUpCircle
+  ChevronRight, X, MousePointerClick, Star, Filter, Search, Smartphone, Eye, Loader2, TableProperties, ArrowUpDown, FolderTree, Trash2, Minus, Wand2, Image as ImageIcon, Type, Sparkles, AlignLeft, AlignCenter, AlignRight, Lock, Zap, Settings2, ArrowUpCircle, CheckCircle2
 } from 'lucide-react';
 import { supabase } from '@/app/supabaseClient';
 import IconPicker, { IconMap } from './picker';
@@ -1018,6 +1018,42 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                 {actions.map((act: Action) => <option key={act.id} value={act.id}>🚀 {act.name}</option>)}
               </select>
               <p className="text-[9px] font-bold text-rose-400 mt-1 px-1">* 뷰가 열리자마자 필터링된 데이터에 대해 위 액션을 수행합니다.</p>
+            </div>
+
+            <div className="md:col-span-2 pt-4 border-t border-slate-100">
+              <label className="text-[10px] font-black text-rose-500 block mb-2 uppercase tracking-wider px-1 flex items-center gap-1.5 whitespace-nowrap"><CheckCircle2 size={14} /> 카드 다중 선택 (Long Press) 모드 지원</label>
+              <label className="flex items-center gap-3 cursor-pointer group w-fit" onClick={(e) => { e.preventDefault(); onUpdate({ ...view, enableMultiSelect: !view.enableMultiSelect }); }}>
+                <div className={`w-10 h-6 rounded-full p-1 transition-all flex items-center ${view.enableMultiSelect ? 'bg-rose-500' : 'bg-slate-200'}`}>
+                  <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform ${view.enableMultiSelect ? 'translate-x-4' : 'translate-x-0'}`} />
+                </div>
+                <div>
+                  <span className="text-sm font-black text-slate-700 block">이 뷰에서 다중 선택 허용</span>
+                  <span className="text-[10px] text-slate-400 font-bold block">카드를 꾹 눌러 다중 선택 모드로 진입할 수 있게 합니다.</span>
+                </div>
+              </label>
+
+              {view.enableMultiSelect && (
+                <div className="mt-4 p-4 bg-rose-50 rounded-2xl border border-rose-100">
+                  <label className="text-[10px] font-black text-rose-700 block mb-3 uppercase tracking-wider px-1">다중 선택 시 하단에 노출할 전용 액션 선택</label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {actions.map((act) => {
+                      const isSelected = view.multiSelectActionIds?.includes(act.id);
+                      return (
+                        <label key={act.id} className={`flex items-center gap-2 p-3 border rounded-xl cursor-pointer transition-all ${isSelected ? 'bg-rose-500 text-white border-rose-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-rose-300'}`}>
+                          <input type="checkbox" checked={isSelected || false} onChange={(e) => {
+                            const newIds = e.target.checked 
+                              ? [...(view.multiSelectActionIds || []), act.id]
+                              : (view.multiSelectActionIds || []).filter(id => id !== act.id);
+                            onUpdate({ ...view, multiSelectActionIds: newIds });
+                          }} className="hidden" />
+                          <span className="text-xs font-bold truncate">{act.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[9px] font-bold text-rose-400 mt-2 px-1">* 체크한 액션 메뉴들만 다중 선택 모드 하단에 표시됩니다.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

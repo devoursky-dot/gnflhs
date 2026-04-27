@@ -90,11 +90,7 @@ export function InsertModal({ isOpen, onClose, action, formData, setFormData, on
                             const updatedData = { ...formData, [mapping.targetColumn]: opt };
                             setFormData(updatedData);
                             const promptMappings = action?.insertMappings?.filter((m: any) => m.mappingType === 'prompt') || [];
-                            const isOnlyPrompt = promptMappings.length === 1;
                             const noCustom = !mapping.allowCustomPrompt;
-                            if (action?.requireConfirmation === false && isOnlyPrompt && noCustom) {
-                              onSubmit(updatedData);
-                            }
                           }}
                           style={{ 
                             backgroundColor: val === opt ? 'var(--theme-primary)' : 'var(--theme-surface)',

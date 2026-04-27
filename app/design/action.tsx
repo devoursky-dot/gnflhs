@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Action, View, SchemaData, InsertMapping, UpdateMapping, VirtualTable, ActionStep } from './types';
-import { Trash2, Plus, DatabaseZap, HelpCircle, X, Code2, Layers, Settings2, Star, MessageSquare, Zap, Calculator, Navigation, Bell } from 'lucide-react';
+import { Trash2, Plus, DatabaseZap, HelpCircle, X, Code2, Layers, Settings2, Star, MessageSquare, Zap, Calculator, Navigation, Bell, Layout } from 'lucide-react';
 import { IconMap } from './picker';
 import { FORMULA_EXAMPLES, FormulaCategory, FormulaExample } from './formulas';
 
@@ -68,7 +68,6 @@ export default function ActionEditor({
         smsTableName: action.smsTableName,
         insertMappings: action.insertMappings,
         updateMappings: action.updateMappings,
-        requireConfirmation: action.requireConfirmation,
         batchMode: action.batchMode,
         smsMessageTemplate: action.smsMessageTemplate,
         targetViewId: action.targetViewId,
@@ -217,6 +216,47 @@ export default function ActionEditor({
             </div>
           </div>
 
+          <div className="pt-4 border-t border-slate-200/50">
+            <h3 className="text-sm font-black text-slate-800 mb-4 flex items-center gap-2"><Layout size={18} className="text-indigo-500" /> 액션 노출 및 속성 설정</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest block">네비게이션 노출 (Navigation)</label>
+                <select 
+                  value={action.navPosition || 'hidden'}
+                  onChange={e => onUpdate({ ...action, navPosition: e.target.value as any })}
+                  className="w-full p-3 rounded-xl border border-slate-200 bg-white font-bold text-slate-700 outline-none focus:border-indigo-400"
+                >
+                  <option value="hidden">숨김 (뷰 안에서만 표시)</option>
+                  <option value="bottom">하단 탭바 (Bottom Tab)</option>
+                  <option value="top">상단 메뉴 (Hamburger)</option>
+                  <option value="both">상/하단 모두 (Both)</option>
+                </select>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest block invisible">추가 속성</label>
+                <label className="flex items-center gap-3 cursor-pointer group" onClick={(e) => { e.preventDefault(); onUpdate({ ...action, showInSelectionModeOnly: !action.showInSelectionModeOnly }); }}>
+                  <div className={`w-10 h-6 rounded-full p-1 transition-all flex items-center ${action.showInSelectionModeOnly ? 'bg-amber-500' : 'bg-slate-200'}`}>
+                    <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform ${action.showInSelectionModeOnly ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </div>
+                  <div>
+                    <span className="text-sm font-black text-slate-700 block">다중 선택 시에만 노출 (Smart Visibility)</span>
+                    <span className="text-[10px] text-slate-400 font-bold block">카드를 꾹 눌러 다중 선택 모드가 켜졌을 때만 메뉴에 나타납니다.</span>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer group" onClick={(e) => { e.preventDefault(); onUpdate({ ...action, requireConfirm: !action.requireConfirm }); }}>
+                  <div className={`w-10 h-6 rounded-full p-1 transition-all flex items-center ${action.requireConfirm ? 'bg-rose-500' : 'bg-slate-200'}`}>
+                    <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform ${action.requireConfirm ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </div>
+                  <div>
+                    <span className="text-sm font-black text-slate-700 block">실행 전 확인창 띄우기 (Require Confirm)</span>
+                    <span className="text-[10px] text-slate-400 font-bold block">중요한 배치 데이터 처리 전 한 번 더 묻습니다.</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+
           {/* 🔥 [신규] 동작 시퀀스 관리 UI */}
           <div className="pt-4 border-t border-slate-200/50">
             <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">동작 시퀀스 (Sequential Steps)</label>
@@ -360,19 +400,6 @@ export default function ActionEditor({
                 )}
               </select>
 
-              <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                <input
-                  type="checkbox"
-                  id="quick-save-toggle"
-                  checked={currentStep.requireConfirmation === false}
-                  onChange={(e) => updateCurrentStep({ requireConfirmation: !e.target.checked })}
-                  className="w-5 h-5 accent-amber-600"
-                />
-                <label htmlFor="quick-save-toggle" className="text-sm font-black text-amber-900 cursor-pointer flex items-center gap-2">
-                  ⚡ 초고속 모드 (확인창 없이 즉시 저장) 
-                  <span className="text-[10px] font-bold text-amber-600/70 ml-2">* 입력 항목이 하나뿐인 버튼형 폼은 클릭 즉시 저장됩니다.</span>
-                </label>
-              </div>
 
               <div className="flex items-center gap-3 p-4 bg-rose-50 rounded-2xl border border-rose-100">
                 <input

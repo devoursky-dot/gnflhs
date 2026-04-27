@@ -81,6 +81,34 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [actionQueue, setActionQueue] = useState<any[]>([]); // 🔥 [신규] 다단계 동작 큐
   const [pendingRowData, setPendingRowData] = useState<any>(null); // 현재 동작의 기준 데이터
+  const [batchSourceRows, setBatchSourceRows] = useState<any[] | null>(null); // 🔥 배치 데이터 모달 연동用
+  
+  // 🔥 [신규] 다중 선택(Multi-select) 및 Long Press 상태
+  const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
+  const pressTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const onCardPointerDown = (r: any) => {
+    if (!currentView?.enableMultiSelect) return;
+    pressTimerRef.current = setTimeout(() => {
+      setIsSelectionMode(true);
+      setSelectedRowKeys(prev => prev.includes(r.id) ? prev : [...prev, r.id]);
+    }, 500); 
+  };
+
+  const onCardPointerUp = () => {
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+  };
+
+  const onCardClick = (r: any) => {
+    if (isSelectionMode) {
+      setSelectedRowKeys(prev => prev.includes(r.id) ? prev.filter(k => k !== r.id) : [...prev, r.id]);
+    } else {
+      const ac = appData.app_config.actions?.find((a: any) => a.id === currentView.onClickActionId); 
+      if (ac) handleAction(ac, r);
+    }
+  };
+
 
   useEffect(() => {
     if (toast) {
@@ -236,6 +264,115 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     return tableId;
   };
 
+  // 🔥 [신규] 다중 데이터 고속 일괄 처리 (Insert, Update, Delete)
+  const executeBatchAction = async (action: any, view: any, sourceRows: any[]) => {
+    if (action.requireConfirm) {
+      if (!window.confirm(`선택된 ${sourceRows.length}개의 데이터에 대해 [${action.name}] 작업을 실행하시겠습니까?\n작업 후 되돌릴 수 없습니다.`)) {
+        return;
+      }
+    }
+
+    setIsAutomating(true);
+    setAutomationProgress(0);
+    setAutomationLog(`${action.name} 대량 처리 중...`);
+
+    try {
+      const steps = action.steps && action.steps.length > 0 ? action.steps : [action];
+      const firstStep = steps[0];
+      const stepType = firstStep.type;
+      
+      if (sourceRows.length > 0) {
+        // [1] INSERT (추가)
+        if (stepType === 'insert_row') {
+          const mappings = firstStep.insertMappings;
+          const targetTable = resolveTableName(firstStep.insertTableName);
+          if (targetTable && mappings && mappings.length > 0) {
+            const hasPrompt = mappings.some((m: any) => m.mappingType === 'prompt');
+            if (hasPrompt) {
+              setBatchSourceRows(sourceRows);
+              setActiveInsertAction(firstStep);
+              setActionQueue(steps.length > 1 ? steps.slice(1) : []);
+              setPendingRowData(sourceRows[0]);
+              setFormData(buildPayloadFromMappings(mappings, sourceRows[0]));
+              setIsInputModalOpen(true);
+              setIsSelectionMode(false);
+              setSelectedRowKeys([]);
+              return; // Wait for modal submission
+            }
+            const payloads = sourceRows.map((row: any) => buildPayloadFromMappings(mappings, row));
+            const { error: insertErr } = await supabase.from(targetTable).insert(payloads);
+            if (insertErr) console.warn("Insert error during batch:", insertErr);
+          }
+        }
+        // [2] UPDATE (수정)
+        else if (stepType === 'update_row') {
+          const mappings = firstStep.updateMappings;
+          const targetTable = resolveTableName(firstStep.updateTableName);
+          if (targetTable && mappings && mappings.length > 0) {
+            const hasPrompt = mappings.some((m: any) => m.mappingType === 'prompt');
+            if (hasPrompt) {
+              setBatchSourceRows(sourceRows);
+              setActiveUpdateAction(firstStep);
+              setActionQueue(steps.length > 1 ? steps.slice(1) : []);
+              setActiveRowData(sourceRows[0]); // 모달 참조용
+              setPendingRowData(sourceRows[0]);
+              setUpdateFormData(buildPayloadFromMappings(mappings, sourceRows[0]));
+              setIsUpdateModalOpen(true);
+              setIsSelectionMode(false);
+              setSelectedRowKeys([]);
+              return; // Wait for modal submission
+            }
+            // 빠른 병렬 처리 (청크 단위로 분할하여 서버 부하 방지)
+            const chunkSize = 50;
+            for (let i = 0; i < sourceRows.length; i += chunkSize) {
+              const chunk = sourceRows.slice(i, i + chunkSize);
+              await Promise.all(chunk.map((row: any) => {
+                const init = buildPayloadFromMappings(mappings, row);
+                // 물리 테이블 ID 식별 및 업데이트
+                return supabase.from(targetTable).update(init).eq('id', row.id);
+              }));
+              setAutomationProgress(Math.floor(((i + chunk.length) / sourceRows.length) * 100));
+            }
+          }
+        }
+        // [3] DELETE (삭제)
+        else if (stepType === 'delete_row') {
+          const targetTable = resolveTableName(firstStep.deleteTableName);
+          if (targetTable) {
+            const idsToDelete = sourceRows.map((r: any) => r.id).filter(id => id !== undefined && id !== null);
+            if (idsToDelete.length > 0) {
+              // in 문으로 대량 아이디 한 번에 삭제
+              const { error: delErr } = await supabase.from(targetTable).delete().in('id', idsToDelete);
+              if (delErr) console.warn("Delete error during batch:", delErr);
+            }
+          }
+        }
+      }
+
+      // 후속 스텝 처리
+      if (steps.length > 1) {
+        const remainingSteps = steps.slice(1);
+        await processNextStep(remainingSteps, sourceRows?.[0] || {});
+      } else if (firstStep.targetViewId) {
+        setCurrentViewId(firstStep.targetViewId);
+      }
+      
+      // 처리 완료 후 리프레시
+      fetchTableData(currentView);
+      setIsSelectionMode(false);
+      setSelectedRowKeys([]);
+
+    } catch (e: any) {
+      console.error("Batch Execution Error:", e);
+      alert(`배치 작업 중 오류가 발생했습니다: ${e.message}`);
+    } finally {
+      await evaluateAllViewStates();
+      setAutomationProgress(100);
+      setAutomationLog("실행 완료!");
+      setTimeout(() => setIsAutomating(false), 500);
+    }
+  };
+
   const handleInitAutomation = async (action: any, view: any) => {
     setIsAutomating(true);
     setAutomationProgress(10);
@@ -243,7 +380,6 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
 
     try {
       const steps = action.steps && action.steps.length > 0 ? action.steps : [action];
-
       const firstStep = steps[0];
       const isBatchMode = !!(firstStep.batchMode || action.batchMode);
 
@@ -258,35 +394,13 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
         if (fetchErr) throw fetchErr;
 
         let sourceRows = rawRows || [];
-
         if (vt && sourceRows.length > 0) {
           sourceRows = await utils.resolveVirtualData(sourceRows, vt);
         }
 
         if (sourceRows.length > 0) {
-          const stepType = firstStep.type;
-          if (stepType === 'insert_row') {
-            const mappings = firstStep.insertMappings;
-            const targetTable = resolveTableName(firstStep.insertTableName);
-            if (targetTable && mappings && mappings.length > 0) {
-              const payloads = sourceRows.map((row: any) => buildPayloadFromMappings(mappings, row));
-              setAutomationLog(`학생 ${payloads.length}명 배치 중...`);
-
-              const { error: insertErr } = await supabase.from(targetTable).insert(payloads);
-
-              if (insertErr) {
-                console.warn("Insert error during batch automation:", insertErr);
-              }
-            }
-          }
-        }
-
-        // 1단계에 targetViewId가 있거나, 다음 단계가 있는 경우 처리
-        if (steps.length > 1) {
-          const remainingSteps = steps.slice(1);
-          await processNextStep(remainingSteps, sourceRows?.[0] || {});
-        } else if (firstStep.targetViewId) {
-          setCurrentViewId(firstStep.targetViewId);
+           await executeBatchAction(action, view, sourceRows);
+           return; // executeBatchAction에서 종료 처리함
         }
       } else {
         setAutomationLog("시작 동작 실행 중...");
@@ -468,11 +582,10 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       setActiveInsertAction(currentStep);
       const init = buildPayloadFromMappings(currentStep.insertMappings, rowData);
 
-      // 🔥 [초고속 모드] 프롬프트가 없고 instantSave가 켜져있으면 모달 없이 즉시 저장
+      // 🔥 프롬프트가 없으면 모달 없이 즉시 백그라운드 저장
       const hasPrompt = currentStep.insertMappings?.some((m: any) => m.mappingType === 'prompt');
-      const isInstant = !!(currentStep.instantSave || currentStep.batchMode);
 
-      if (isInstant && !hasPrompt) {
+      if (!hasPrompt) {
         setFormData(init);
         (async () => {
           setIsSubmitting(true);
@@ -525,9 +638,8 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       });
 
       const hasPrompt = currentStep.updateMappings?.some((m: any) => m.mappingType === 'prompt');
-      const isInstant = !!(currentStep.instantSave || currentStep.batchMode);
 
-      if (isInstant && !hasPrompt) {
+      if (!hasPrompt) {
         setUpdateFormData(init);
         (async () => {
           setIsUpdating(true);
@@ -558,6 +670,11 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   };
 
   const handleAction = async (action: any, rowData: any) => {
+    if (action.requireConfirm) {
+      if (!window.confirm(`[${action.name}] 작업을 실행하시겠습니까?`)) {
+        return;
+      }
+    }
     const steps = action.steps && action.steps.length > 0 ? action.steps : [action];
     processNextStep(steps, rowData);
   };
@@ -569,8 +686,24 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       const targetTableId = activeInsertAction.insertTableName;
       const targetVt = targetTableId.startsWith('vt_') ? appData?.app_config?.virtualTables?.find((v: any) => v.id === targetTableId) : null;
       const targetTable = targetVt ? targetVt.baseTableName : targetTableId;
-      const { error } = await supabase.from(targetTable).insert([forced || formData]);
-      if (error) throw error;
+      const payload = forced || formData;
+
+      if (batchSourceRows && batchSourceRows.length > 0) {
+        const batchedPayloads = batchSourceRows.map((row: any) => {
+           const basePayload = buildPayloadFromMappings(activeInsertAction.insertMappings, row);
+           activeInsertAction.insertMappings?.forEach((m: any) => {
+             if (m.mappingType === 'prompt') basePayload[m.targetColumn] = payload[m.targetColumn];
+           });
+           return basePayload;
+        });
+        const { error } = await supabase.from(targetTable).insert(batchedPayloads);
+        if (error) throw error;
+        setBatchSourceRows(null);
+      } else {
+        const { error } = await supabase.from(targetTable).insert([payload]);
+        if (error) throw error;
+      }
+      
       setToast({ message: "성공적으로 저장되었습니다.", type: 'success' });
       setIsInputModalOpen(false);
       fetchTableData(currentView);
@@ -584,14 +717,32 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   };
 
   const handleSubmitUpdate = async (forced?: any) => {
-    if (!activeUpdateAction || !activeRowData) return;
+    if (!activeUpdateAction) return; // 배치 모드일땐 activeRowData가 1개지만 실제 다수일수 있음
     setIsUpdating(true);
     try {
       const targetTableId = activeUpdateAction.updateTableName;
       const targetVt = targetTableId.startsWith('vt_') ? appData?.app_config?.virtualTables?.find((v: any) => v.id === targetTableId) : null;
       const targetTable = targetVt ? targetVt.baseTableName : targetTableId;
-      const { error } = await supabase.from(targetTable).update(forced || updateFormData).eq('id', activeRowData.id);
-      if (error) throw error;
+      const payload = forced || updateFormData;
+
+      if (batchSourceRows && batchSourceRows.length > 0) {
+        const chunkSize = 50;
+        for (let i = 0; i < batchSourceRows.length; i += chunkSize) {
+          const chunk = batchSourceRows.slice(i, i + chunkSize);
+          await Promise.all(chunk.map((row: any) => {
+            const basePayload = buildPayloadFromMappings(activeUpdateAction.updateMappings, row);
+            activeUpdateAction.updateMappings?.forEach((m: any) => {
+              if (m.mappingType === 'prompt') basePayload[m.targetColumn] = payload[m.targetColumn];
+            });
+            return supabase.from(targetTable).update(basePayload).eq('id', row.id);
+          }));
+        }
+        setBatchSourceRows(null);
+      } else {
+        const { error } = await supabase.from(targetTable).update(payload).eq('id', activeRowData.id);
+        if (error) throw error;
+      }
+      
       setToast({ message: "성공적으로 수정되었습니다.", type: 'success' });
       setIsUpdateModalOpen(false);
       fetchTableData(currentView);
@@ -702,20 +853,72 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
     return 'grid-cols-1 lg:grid-cols-2';
   })(currentView?.columnCount || 1);
 
+  // 🔥 [신규] 실제로 화면에 '노출'되고 있는 카드들만 추출 (그룹 확장 상태 반영)
+  const visibleRows = (() => {
+    // 그룹화가 꺼져있거나 그룹 키가 없으면 검색 결과 전체 반환
+    if (!currentView?.groupByColumn || !groupKeys || groupKeys.length === 0) return displayData;
+    
+    let visible: any[] = [];
+    groupKeys.forEach((gk: string) => {
+      // 1단계 그룹이 열려있는지 확인
+      if (expandedGroups[gk]) {
+        if (currentView.groupByColumn2) {
+          // 2단계 그룹 처리
+          const subData = groupedData[gk];
+          const subKeys = utils.getSortedGroupKeys(subData, currentView.groupSortDirection2 || 'asc');
+          subKeys.forEach((sk: string) => {
+            const combinedKey = `${gk}|${sk}`;
+            if (expandedGroups[combinedKey]) {
+              visible = [...visible, ...(subData[sk] || [])];
+            }
+          });
+        } else {
+          // 1단계 그룹 데이터 추가
+          visible = [...visible, ...(groupedData[gk] || [])];
+        }
+      }
+    });
+    return visible;
+  })();
+
   // ─── 메뉴 노출 로직 (역할 분담) ───
   const allViews = (appData?.app_config?.views || []).filter((v: any) => !viewStates[v.id]?.hidden);
+  const allActions = (appData?.app_config?.actions || []);
 
-  // [상단/햄버거 역할] top 또는 both 설정된 메뉴들
-  const sidebarViews = allViews.filter((v: any) => v.navPosition !== 'hidden' && (v.navPosition === 'top' || v.navPosition === 'both' || !v.navPosition));
+  let sidebarItems: any[] = [];
+  let bottomBarItems: any[] = [];
+  
+  if (isSelectionMode) {
+    const selActionsList = currentView?.multiSelectActionIds?.length > 0 
+      ? allActions.filter((a: any) => currentView.multiSelectActionIds!.includes(a.id))
+      : allActions.filter((a: any) => a.batchMode || a.showInSelectionModeOnly);
+      
+    const selItems = selActionsList.map((a: any) => ({...a, isAction: true, refItem: a}));
+    selItems.push({ id: 'cancel_select', name: '선택 취소', icon: 'X', isAction: 'cancel' });
+    selItems.push({ id: 'select_all', name: '표시된 카드 전체 선택', icon: 'CheckCircle2', isAction: 'select_all' });
+    
+    sidebarItems = selItems;
+    bottomBarItems = selItems;
+  } else {
+    // [상단/햄버거 역할] top 또는 both 설정된 메뉴들
+    const topViews = allViews.filter((v: any) => v.navPosition !== 'hidden' && (v.navPosition === 'top' || v.navPosition === 'both' || !v.navPosition)).map((v: any) => ({...v, isAction: false, refItem: v}));
+    const topActions = allActions.filter((a: any) => (a.navPosition === 'top' || a.navPosition === 'both') && !a.showInSelectionModeOnly).map((a: any) => ({...a, isAction: true, refItem: a}));
+    sidebarItems = [...topViews, ...topActions];
 
-  // [하단/사이드바 역할] bottom 또는 both 설정된 메뉴들
-  const bottomBarViews = allViews.filter((v: any) => v.navPosition !== 'hidden' && (v.navPosition === 'bottom' || v.navPosition === 'both' || !v.navPosition));
+    // [하단/사이드바 역할] bottom 또는 both 설정된 메뉴들
+    const botViews = allViews.filter((v: any) => v.navPosition !== 'hidden' && (v.navPosition === 'bottom' || v.navPosition === 'both' || !v.navPosition)).map((v: any) => ({...v, isAction: false, refItem: v}));
+    const botActions = allActions.filter((a: any) => (a.navPosition === 'bottom' || a.navPosition === 'both') && !a.showInSelectionModeOnly).map((a: any) => ({...a, isAction: true, refItem: a}));
+    bottomBarItems = [...botViews, ...botActions];
+  }
+  
+  // legacy variables for specific use cases
+  const bottomBarViews = bottomBarItems.filter(i => !i.isAction);
 
   const navPos = currentView?.navPosition || 'both';
 
   // 모바일 전용 바 노출 조건 (md:hidden에 의해 데스크탑에서는 숨겨짐)
   const showTopBar = navPos === 'both' || navPos === 'top';
-  const showBottomBar = (navPos === 'both' || navPos === 'bottom') && bottomBarViews.length > 0;
+  const showBottomBar = (navPos === 'both' || navPos === 'bottom') && (bottomBarViews.length > 0 || isSelectionMode);
   const bottomPb = showBottomBar ? 'pb-20 md:pb-4' : 'pb-4';
 
   // ─── 테마 엔진 (DB 설정 + 사용자 선택 로컬 스토리지) ───
@@ -833,20 +1036,36 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
           />
         </div>
         <div className="flex-1 overflow-y-auto space-y-1 scrollbar-hide pr-2">
-          {bottomBarViews.map((v: any) => {
-            const Icon = IconMap[v.icon] || Layout;
-            const isActive = currentViewId === v.id;
-            const st = viewStates[v.id];
+          {bottomBarItems.map((item: any) => {
+            const Icon = IconMap[item.icon] || (item.isAction ? Zap : Layout);
+            const isActive = !item.isAction && currentViewId === item.id;
+            const st = item.isAction ? null : viewStates[item.id];
             return (
-              <button key={v.id} disabled={st?.disabled}
-                onClick={() => { setCurrentViewId(v.id); setSearchTerm(''); }}
+              <button key={item.id} disabled={st?.disabled || (item.isAction && isSelectionMode && selectedRowKeys.length === 0)}
+                onClick={() => { 
+                  if (item.isAction === 'cancel') {
+                    setIsSelectionMode(false); setSelectedRowKeys([]);
+                  } else if (item.isAction === 'select_all') {
+                    setSelectedRowKeys(visibleRows.map((r: any) => r.id));
+                  } else if (item.isAction) {
+                    if (isSelectionMode && selectedRowKeys.length > 0) {
+                      // 🔥 [중요] 선택된 ID들이 실제로 '눈에 보이는(펼쳐진)' 데이터 내에 있는지 한 번 더 교차 검증
+                      const fullData = visibleRows.filter((r:any) => selectedRowKeys.includes(r.id));
+                      executeBatchAction(item.refItem, currentView, fullData);
+                    } else {
+                      handleAction(item.refItem, {});
+                    }
+                  } else {
+                    setCurrentViewId(item.id); setSearchTerm(''); 
+                  }
+                }}
                 style={{ 
                   backgroundColor: isActive ? 'var(--theme-primary)' : 'transparent',
                   color: isActive ? 'var(--theme-text-on-primary)' : 'var(--theme-text-main)'
                 }}
                 className={`w-full flex items-center justify-between p-3 rounded-none transition-all ${st?.disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
               >
-                <div className="flex items-center gap-4"><Icon size={20} /> <span className="font-black text-[15px]">{st?.label || v.name}</span></div>
+                <div className="flex items-center gap-4"><Icon size={20} /> <span className="font-black text-[15px]">{st?.label || item.name}</span></div>
                 {st?.disabled && <Lock size={14} />}
               </button>
             );
@@ -871,20 +1090,39 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
           <button onClick={() => setIsMobileSidebarOpen(false)} style={{ color: 'var(--theme-text-muted)' }} className="p-2 hover:bg-[var(--theme-bg-subtle)] rounded-xl"><X size={20} /></button>
         </div>
         <div className="flex-1 overflow-y-auto space-y-1 scrollbar-hide">
-          {sidebarViews.map((v: any) => {
-            const Icon = IconMap[v.icon] || Layout;
-            const isActive = currentViewId === v.id;
-            const st = viewStates[v.id];
+          {sidebarItems.map((item: any) => {
+            const Icon = IconMap[item.icon] || (item.isAction ? Zap : Layout);
+            const isActive = !item.isAction && currentViewId === item.id;
+            const st = item.isAction ? null : viewStates[item.id];
             return (
-              <button key={v.id} disabled={st?.disabled}
-                onClick={() => { setCurrentViewId(v.id); setSearchTerm(''); setIsMobileSidebarOpen(false); }}
+              <button key={item.id} disabled={st?.disabled || (item.isAction && isSelectionMode && selectedRowKeys.length === 0)}
+                onClick={() => { 
+                  if (item.isAction === 'cancel') {
+                    setIsSelectionMode(false); setSelectedRowKeys([]);
+                    setIsMobileSidebarOpen(false);
+                  } else if (item.isAction === 'select_all') {
+                    setSelectedRowKeys(visibleRows.map((r: any) => r.id));
+                    setIsMobileSidebarOpen(false);
+                  } else if (item.isAction) {
+                    if (isSelectionMode && selectedRowKeys.length > 0) {
+                      // 🔥 [중요] 선택된 ID들이 실제로 '눈에 보이는(펼쳐진)' 데이터 내에 있는지 한 번 더 교차 검증
+                      const fullData = visibleRows.filter((r:any) => selectedRowKeys.includes(r.id));
+                      executeBatchAction(item.refItem, currentView, fullData);
+                    } else {
+                      handleAction(item.refItem, {});
+                    }
+                    setIsMobileSidebarOpen(false);
+                  } else {
+                    setCurrentViewId(item.id); setSearchTerm(''); setIsMobileSidebarOpen(false); 
+                  }
+                }}
                 style={{ 
                   backgroundColor: isActive ? 'var(--theme-primary)' : 'transparent',
                   color: isActive ? 'var(--theme-text-on-primary)' : 'var(--theme-text-main)'
                 }}
                 className={`w-full flex items-center justify-between p-3 rounded-none transition-all ${st?.disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
               >
-                <div className="flex items-center gap-3"><Icon size={20} /><span className="font-black text-[15px]">{st?.label || v.name}</span></div>
+                <div className="flex items-center gap-3"><Icon size={20} /><span className="font-black text-[15px]">{st?.label || item.name}</span></div>
                 {st?.disabled && <Lock size={14} />}
               </button>
             );
@@ -1092,9 +1330,12 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                                     {rs.map((r: any) => (
                                       <div 
                                         key={r.id} 
-                                        onClick={() => { const ac = appData.app_config.actions.find((a: any) => a.id === currentView.onClickActionId); if (ac) handleAction(ac, r); }} 
+                                        onClick={(e) => { e.preventDefault(); onCardClick(r); }}
+                                        onPointerDown={() => onCardPointerDown(r)}
+                                        onPointerUp={onCardPointerUp}
+                                        onPointerLeave={onCardPointerUp}
                                         style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)' }}
-                                        className="rounded-none border overflow-hidden hover:border-[var(--theme-primary)] transition-all cursor-pointer"
+                                        className={`rounded-none border overflow-hidden hover:border-[var(--theme-primary)] transition-all cursor-pointer ${isSelectionMode ? (selectedRowKeys.includes(r.id) ? 'border-[3px] !border-[var(--theme-primary)] scale-[0.98]' : 'border-[3px] border-transparent opacity-60') : ''}`}
                                       >
                                         <CurrentRenderer rows={currentView.layoutRows} rowData={r} actions={appData.app_config.actions} onExecuteAction={handleAction} />
                                       </div>
@@ -1109,9 +1350,12 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                             {groupedData[k].map((r: any) => (
                               <div 
                                 key={r.id} 
-                                onClick={() => { const ac = appData.app_config.actions.find((a: any) => a.id === currentView.onClickActionId); if (ac) handleAction(ac, r); }} 
+                                onClick={(e) => { e.preventDefault(); onCardClick(r); }}
+                                onPointerDown={() => onCardPointerDown(r)}
+                                onPointerUp={onCardPointerUp}
+                                onPointerLeave={onCardPointerUp}
                                 style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)' }}
-                                className="rounded-none border overflow-hidden hover:border-[var(--theme-primary)] transition-all cursor-pointer"
+                                className={`rounded-none border overflow-hidden hover:border-[var(--theme-primary)] transition-all cursor-pointer ${isSelectionMode ? (selectedRowKeys.includes(r.id) ? 'border-[3px] !border-[var(--theme-primary)] scale-[0.98]' : 'border-[3px] border-transparent opacity-60') : ''}`}
                               >
                                 <CurrentRenderer rows={currentView.layoutRows} rowData={r} actions={appData.app_config.actions} onExecuteAction={handleAction} />
                               </div>
@@ -1129,9 +1373,12 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
               {displayData.map((r: any) => (
                 <div 
                   key={r.id} 
-                  onClick={() => { const ac = appData.app_config.actions.find((a: any) => a.id === currentView.onClickActionId); if (ac) handleAction(ac, r); }} 
+                  onClick={(e) => { e.preventDefault(); onCardClick(r); }}
+                  onPointerDown={() => onCardPointerDown(r)}
+                  onPointerUp={onCardPointerUp}
+                  onPointerLeave={onCardPointerUp}
                   style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)' }}
-                  className="rounded-none border overflow-hidden hover:border-[var(--theme-primary)] transition-all cursor-pointer"
+                  className={`rounded-none border overflow-hidden hover:border-[var(--theme-primary)] transition-all cursor-pointer ${isSelectionMode ? (selectedRowKeys.includes(r.id) ? 'border-[3px] !border-[var(--theme-primary)] scale-[0.98]' : 'border-[3px] border-transparent opacity-60') : ''}`}
                 >
                   <CurrentRenderer rows={currentView.layoutRows} rowData={r} actions={appData.app_config.actions} onExecuteAction={handleAction} />
                 </div>
@@ -1146,21 +1393,45 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
             style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)' }}
             className="md:hidden fixed bottom-0 left-0 right-0 h-16 border-t flex items-center justify-around px-2 z-[1100] shadow-[0_-4px_10px_rgba(0,0,0,0.03)]"
           >
-            {bottomBarViews.slice(0, 5).map((v: any) => {
-              const Icon = IconMap[v.icon] || Layout;
-              const isActive = currentViewId === v.id;
-              const st = viewStates[v.id];
-              return (
-                <button key={v.id} disabled={st?.disabled}
-                  onClick={() => { setCurrentViewId(v.id); setSearchTerm(''); }}
-                  style={{ color: isActive ? 'var(--theme-primary)' : 'var(--theme-text-muted)' }}
-                  className={`flex flex-col items-center gap-1 transition-all ${isActive ? 'scale-110' : ''} ${st?.disabled ? 'opacity-30' : ''}`}
-                >
-                  <Icon size={20} strokeWidth={isActive ? 3 : 2} />
-                  <span className="text-[9px] font-black uppercase tracking-tighter truncate w-16 text-center">{st?.label || v.name}</span>
-                </button>
-              );
-            })}
+            {(() => {
+              const renderNavItems = isSelectionMode ? bottomBarItems : bottomBarItems.slice(0, 5);
+
+              return renderNavItems.map((item: any) => {
+                const Icon = IconMap[item.icon] || (item.isAction ? Zap : Layout);
+                const isActive = !item.isAction && currentViewId === item.id;
+                const st = item.isAction ? null : viewStates[item.id];
+                const btnDisabled = st?.disabled || (item.isAction === true && selectedRowKeys.length === 0 && isSelectionMode);
+
+                return (
+                  <button key={item.id} disabled={btnDisabled}
+                    onClick={() => { 
+                      if (item.isAction === 'cancel') {
+                        setIsSelectionMode(false); setSelectedRowKeys([]);
+                      } else if (item.isAction === 'select_all') {
+                        setSelectedRowKeys(visibleRows.map((r: any) => r.id));
+                      } else if (item.isAction) {
+                        if (isSelectionMode && selectedRowKeys.length > 0) {
+                          // 🔥 [중요] 선택된 ID들이 실제로 '눈에 보이는(펼쳐진)' 데이터 내에 있는지 한 번 더 교차 검증
+                          const fullData = visibleRows.filter((r:any) => selectedRowKeys.includes(r.id));
+                          executeBatchAction(item.refItem, currentView, fullData);
+                        } else {
+                          handleAction(item.refItem, {});
+                        }
+                      } else {
+                        setCurrentViewId(item.id); setSearchTerm(''); 
+                      }
+                    }}
+                    style={{ color: isActive || (item.isAction && isSelectionMode) ? 'var(--theme-primary)' : 'var(--theme-text-muted)' }}
+                    className={`flex flex-col items-center gap-1 transition-all ${isActive ? 'scale-110' : ''} ${btnDisabled ? 'opacity-30' : ''}`}
+                  >
+                    <Icon size={20} strokeWidth={isActive || isSelectionMode ? 3 : 2} />
+                    <span className="text-[9px] font-black uppercase tracking-tighter truncate w-16 text-center">
+                      {st?.label || item.name} {item.isAction && isSelectionMode ? `(${selectedRowKeys.length})` : ''}
+                    </span>
+                  </button>
+                );
+              });
+            })()}
           </div>
         )}
       </div>
@@ -1168,7 +1439,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       {/* ─── 입력/수정 모달 ─── */}
       <CurrentInsertModal
         isOpen={isInputModalOpen}
-        onClose={() => { setIsInputModalOpen(false); setActionQueue([]); }}
+        onClose={() => { setIsInputModalOpen(false); setActionQueue([]); setBatchSourceRows(null); }}
         action={activeInsertAction}
         formData={formData}
         setFormData={setFormData}
@@ -1177,7 +1448,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
       />
       <CurrentUpdateModal
         isOpen={isUpdateModalOpen}
-        onClose={() => { setIsUpdateModalOpen(false); setActionQueue([]); }}
+        onClose={() => { setIsUpdateModalOpen(false); setActionQueue([]); setBatchSourceRows(null); }}
         action={activeUpdateAction}
         rowData={activeRowData}
         formData={updateFormData}
