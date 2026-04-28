@@ -8,7 +8,7 @@ import { supabase } from '@/app/supabaseClient';
  * 2. {{ }} 가 포함된 템플릿
  * 3. JS 수식
  */
-export const processMappingValue = (value: string, rowData: any): any => {
+export const processMappingValue = (value: string, rowData: any, userProfile?: any): any => {
   if (value === undefined || value === null || value === '') return '';
   
   const strVal = String(value).trim();
@@ -19,7 +19,7 @@ export const processMappingValue = (value: string, rowData: any): any => {
   }
   
   // 2단계: {{ }}가 포함되어 있거나 수식 기호가 있는 경우 스마트 엔진 실행
-  return evaluateExpression(strVal, rowData);
+  return evaluateExpression(strVal, rowData, userProfile);
 };
 
 /**
@@ -68,12 +68,30 @@ const expressionCache = new Map<string, { type: 'js' | 'string', func?: Function
 /**
  * 스마트 수식 평가 엔진
  */
-export const evaluateExpression = (expr: string, rowData: any): any => {
+export const evaluateExpression = (expr: string, rowData: any, userProfile?: any): any => {
   if (!expr) return '';
 
   try {
-    const dateHelpers = getKSTHelpers();
-    const context = { ...(rowData || {}), ...dateHelpers };
+    const helpers = getKSTHelpers();
+    const todayStr = helpers.today;
+
+    // 헬퍼 함수 정의
+    const isToday = (d: any) => {
+      if (!d) return false;
+      const s = String(d);
+      if (s.startsWith(todayStr)) return true;
+      try {
+        const kst = new Date(new Date(d).getTime() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
+        return kst === todayStr;
+      } catch { return false; }
+    };
+
+    const context = { 
+      ...(rowData || {}), 
+      ...helpers,
+      isToday,
+      currentUser: () => userProfile
+    };
 
     let cached = expressionCache.get(expr);
 
@@ -285,7 +303,7 @@ export const applyClientFilters = (data: any[], view: any, userProfile?: any): a
     result = result.filter((row: any) => {
       try {
         // evaluateExpression은 utils.ts 내부에 정의되어 있으므로 바로 호출 가능
-        return !!evaluateExpression(view.filterExpr!, row);
+        return !!evaluateExpression(view.filterExpr!, row, userProfile);
       } catch (e) {
         console.error("Filter Expression Error:", e);
         return true; // 오류 시 데이터 유실 방지를 위해 통과시킴

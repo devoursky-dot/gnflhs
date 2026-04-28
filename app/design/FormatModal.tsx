@@ -205,6 +205,15 @@ const FormatModal = ({ cell, onClose, onSave, availableColumns }: FormatModalPro
                 <div className="space-y-3">
                   <label className="text-[11px] font-black text-slate-500 pl-1 uppercase tracking-wider">버튼 컬러 팔레트 (Color)</label>
                   <div className="flex flex-wrap gap-3">
+                    {/* 테마 기본 컬러 옵션 추가 */}
+                    <button 
+                      onClick={() => setData({...data, buttonColor: ''})}
+                      className={`w-10 h-10 rounded-full bg-slate-100 border-2 border-dashed border-slate-300 transition-all relative flex items-center justify-center ${!data.buttonColor ? 'ring-4 ring-indigo-200 scale-110' : 'hover:scale-110'}`}
+                      title="테마 기본색 사용"
+                    >
+                      {!data.buttonColor ? <div className="text-indigo-600 font-black text-[10px]">THEME</div> : <div className="text-slate-400 font-bold text-[8px]">AUTO</div>}
+                    </button>
+
                     {[
                       { id: 'slate', color: 'bg-slate-900' },
                       { id: 'indigo', color: 'bg-indigo-600' },
@@ -218,9 +227,9 @@ const FormatModal = ({ cell, onClose, onSave, availableColumns }: FormatModalPro
                       <button 
                         key={c.id}
                         onClick={() => setData({...data, buttonColor: c.id})}
-                        className={`w-10 h-10 rounded-full ${c.color} transition-all relative ${data.buttonColor === c.id || (!data.buttonColor && c.id === 'slate') ? 'ring-4 ring-indigo-200 scale-110' : 'hover:scale-110'}`}
+                        className={`w-10 h-10 rounded-full ${c.color} transition-all relative ${data.buttonColor === c.id ? 'ring-4 ring-indigo-200 scale-110' : 'hover:scale-110'}`}
                       >
-                        {(data.buttonColor === c.id || (!data.buttonColor && c.id === 'slate')) && <div className="absolute inset-0 flex items-center justify-center text-white text-[10px]">✓</div>}
+                        {data.buttonColor === c.id && <div className="absolute inset-0 flex items-center justify-center text-white text-[10px]">✓</div>}
                       </button>
                     ))}
                   </div>

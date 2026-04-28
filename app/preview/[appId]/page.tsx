@@ -243,7 +243,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   const buildPayloadFromMappings = (mappings: any[] | undefined, row: any): Record<string, any> => {
     const payload: Record<string, any> = {};
     mappings?.forEach((m: any) => {
-      if (m.mappingType === 'card_data') payload[m.targetColumn] = utils.processMappingValue(m.sourceValue, row);
+      if (m.mappingType === 'card_data') payload[m.targetColumn] = utils.processMappingValue(m.sourceValue, row, userProfile);
       else if (m.mappingType === 'static') payload[m.targetColumn] = m.sourceValue;
       else if (m.mappingType === 'user_name') payload[m.targetColumn] = userProfile?.name || '';
       else if (m.mappingType === 'user_email') payload[m.targetColumn] = userProfile?.email || '';
@@ -521,7 +521,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
         }
       }
       let message = action.smsMessageTemplate || '';
-      message = message.replace(/{{(.*?)}}/g, (_: string, col: string) => {
+      message = message.replace(/\{\{(.*?)\}\}/g, (_: string, col: string) => {
         const key = col.trim();
         const val = rowData[key];
         return val !== undefined && val !== null ? String(val) : '';

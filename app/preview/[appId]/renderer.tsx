@@ -155,36 +155,118 @@ export default function RenderPreviewLayout({ rows, rowData, actions, onExecuteA
                 {cell.contentType === 'action' && (() => {
                   const act = actions?.find((a: any) => a.id === cell.contentValue);
                   if (!act) return null;
-                  const shapeClass = 'rounded-none';
+
+                  // ── 버튼 모양 (SHAPE) ──
+                  const shapeClass = 
+                    cell.buttonShape === 'rounded' ? 'rounded-xl' : 
+                    cell.buttonShape === 'pill' ? 'rounded-full' : 
+                    cell.buttonShape === 'none' ? 'rounded-none' : 'rounded-none';
+
+                  // ── 버튼 배치 및 너비 (ALIGN) ──
                   const btnAlign = cell.buttonAlign || 'full';
                   const wrapperAlignClass = btnAlign === 'left' ? 'justify-start' : btnAlign === 'right' ? 'justify-end' : btnAlign === 'center' ? 'justify-center' : 'justify-stretch';
-                  const btnWidthClass = btnAlign === 'full' ? 'w-full h-full' : 'px-3 py-1.5';
+                  const btnWidthClass = btnAlign === 'full' ? 'w-full h-full' : 'px-4 py-2';
+                  
+                  // ── 버튼 구성 (STYLE: 글자만, 아이콘만, 둘다) ──
                   const bStyle = cell.buttonStyle || 'both';
+                  
+                  // ── 버튼 스타일 (VARIANT) ──
                   const variant = cell.buttonVariant || 'default';
-                  const colorKey = cell.buttonColor || 'slate';
                   const ActIcon = act.icon && IconMap[act.icon] ? IconMap[act.icon] : MousePointerClick;
                   
-                  // 디자인 토큰 기반의 동적 버튼 스타일 계산
-                  const isOutline = variant === 'outline';
-                  const isGhost = shapeClass === 'rounded-none';
-                  
-                  const btnStyle: React.CSSProperties = {
-                    backgroundColor: (isOutline || isGhost) ? 'transparent' : 'var(--theme-primary)',
-                    color: (isOutline || isGhost) ? 'var(--theme-primary)' : 'var(--theme-text-on-primary)',
-                    borderColor: isOutline ? 'var(--theme-primary)' : 'transparent',
+                  // ── 글자 크기 분석을 통한 아이콘 크기 자동 계산 ──
+                  const textSizeStr = cell.textSize || 'text-[10px]';
+                  const numericSizeMatch = textSizeStr.match(/\[(\d+)px\]/);
+                  const baseSize = numericSizeMatch ? parseInt(numericSizeMatch[1]) : (textSizeStr.includes('lg') ? 18 : textSizeStr.includes('xl') ? 20 : 14);
+                  const iconSize = Math.max(12, Math.floor(baseSize * 0.95));
+
+                  // ── 컬러 팔레트 매핑 (slate, indigo 등 ID를 CSS 변수나 실제 색상으로) ──
+                  const colorMap: Record<string, string> = {
+                    slate: '#1e293b', indigo: '#4f46e5', blue: '#2563eb', emerald: '#059669',
+                    rose: '#e11d48', amber: '#d97706', violet: '#7c3aed', cyan: '#0891b2'
                   };
+                  const primaryColor = cell.buttonColor && colorMap[cell.buttonColor] ? colorMap[cell.buttonColor] : 'var(--theme-primary)';
+                  const onPrimaryColor = 'var(--theme-text-on-primary)';
+                  
+                  let variantStyles: React.CSSProperties = {};
+                  let variantClasses = "";
+
+                  switch(variant) {
+                    case 'outline':
+                      variantStyles = {
+                        backgroundColor: 'transparent',
+                        color: primaryColor,
+                        borderColor: primaryColor,
+                        borderWidth: '2px'
+                      };
+                      break;
+                    case 'raised': // 돌출형 (입체)
+                      variantStyles = {
+                        backgroundColor: primaryColor,
+                        color: onPrimaryColor,
+                        boxShadow: `0 5px 0 ${cell.buttonColor ? 'rgba(0,0,0,0.3)' : 'var(--theme-border-strong)'}`,
+                        borderTop: '1px solid rgba(255,255,255,0.3)',
+                        transform: 'translateY(-2px)'
+                      };
+                      variantClasses = "active:translate-y-[1px] active:shadow-[0_2px_0_rgba(0,0,0,0.2)]";
+                      break;
+                    case 'inset': // 움푹패인형 (음각)
+                      variantStyles = {
+                        backgroundColor: 'var(--theme-bg-subtle)',
+                        color: primaryColor,
+                        boxShadow: 'inset 0 3px 6px rgba(0,0,0,0.15)',
+                        borderColor: 'var(--theme-border)',
+                        borderWidth: '2px'
+                      };
+                      variantClasses = "active:shadow-inner active:scale-[0.98]";
+                      break;
+                    case 'shadow': // 그림자형
+                      variantStyles = {
+                        backgroundColor: primaryColor,
+                        color: onPrimaryColor,
+                        boxShadow: '0 8px 20px -4px rgba(0,0,0,0.2)',
+                      };
+                      variantClasses = "hover:-translate-y-0.5 hover:shadow-xl";
+                      break;
+                    case 'glass': // 유리광택
+                      variantStyles = {
+                        backgroundColor: 'rgba(255,255,255,0.15)',
+                        backdropFilter: 'blur(12px)',
+                        color: primaryColor,
+                        borderColor: 'rgba(255,255,255,0.25)',
+                        borderWidth: '1px',
+                        boxShadow: '0 4px 15px rgba(0,0,0,0.05)'
+                      };
+                      break;
+                    case '3d': // 3D 입체형
+                      variantStyles = {
+                        backgroundColor: primaryColor,
+                        color: onPrimaryColor,
+                        backgroundImage: 'linear-gradient(to bottom, rgba(255,255,255,0.2), rgba(0,0,0,0.1))',
+                        boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.4), 0 1px 2px rgba(0,0,0,0.2)',
+                        border: '1px solid rgba(0,0,0,0.1)'
+                      };
+                      break;
+                    default: // 기본형
+                      variantStyles = {
+                        backgroundColor: primaryColor,
+                        color: onPrimaryColor,
+                        boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
+                      };
+                      break;
+                  }
 
                   const textColorIsHex = cell.textColor?.startsWith('#');
-                  const btnInlineStyle = textColorIsHex ? { color: cell.textColor } : {};
+                  const customTextColorStyle = textColorIsHex ? { color: cell.textColor } : {};
 
                   return (
                     <div className={`w-full h-full flex items-center p-0.5 ${wrapperAlignClass}`}>
                       <button 
                          onClick={(e) => { e.stopPropagation(); onExecuteAction(act, rowData); }} 
-                         className={`${cell.textSize || 'text-[10px]'} ${cell.textWeight || 'font-bold'} flex items-center justify-center gap-1 overflow-hidden transition-all active:scale-95 ${shapeClass} ${btnWidthClass} ${isGhost ? 'hover:bg-[var(--theme-bg-subtle)]' : 'hover:opacity-90'} ${isOutline ? 'border-2' : ''}`}
-                         style={{ ...btnStyle, ...btnInlineStyle }}
+                         className={`${textSizeStr} ${cell.textWeight || 'font-bold'} flex items-center justify-center gap-1.5 overflow-hidden transition-all active:scale-95 ${shapeClass} ${btnWidthClass} ${variantClasses} hover:opacity-90`}
+                         style={{ ...variantStyles, ...customTextColorStyle }}
                       >
-                         {(bStyle === 'icon' || bStyle === 'both') && <ActIcon size={cell.textSize?.includes('lg') || cell.textSize?.includes('xl') ? 16 : 12} className="shrink-0" />}
+                         {(bStyle === 'icon' || bStyle === 'both') && <ActIcon size={iconSize} className="shrink-0" />}
                          {(bStyle === 'text' || bStyle === 'both') && <span className="truncate">{act.name}</span>}
                       </button>
                     </div>
