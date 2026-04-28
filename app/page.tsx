@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Search, Plus, LayoutGrid, Star, ArrowRight, LogIn, LogOut, Mail, Lock, ShieldCheck, User as UserIcon, X, CheckCircle2, Copy, Database, Loader2 } from 'lucide-react';
+import { Search, Plus, LayoutGrid, Star, ArrowRight, LogIn, LogOut, Mail, Lock, ShieldCheck, User as UserIcon, X, CheckCircle2, Copy, Database, Loader2, Smartphone, Download, Share } from 'lucide-react';
 import { IconMap } from './design/picker';
 import { useAuth } from './useAuth';
 import { supabase } from './supabaseClient';
@@ -51,6 +51,48 @@ export default function MainAppLauncher() {
   const [cloningApp, setCloningApp] = useState<any>(null);
   const [tableMappings, setTableMappings] = useState<Record<string, { action: 'reuse' | 'clone', newName: string }>>({});
   const [isCloning, setIsCloning] = useState(false);
+  
+  // ── PWA 설치 관련 상태 ──
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallButton, setShowInstallButton] = useState(false);
+  const [isIOSGuideOpen, setIsIOSGuideOpen] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallButton(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // iOS 감지
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
+    
+    if (isIOS && !isStandalone) {
+      setShowInstallButton(true);
+    }
+
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallClick = async () => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    
+    if (isIOS) {
+      setIsIOSGuideOpen(true);
+      return;
+    }
+
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+      setShowInstallButton(false);
+    }
+  };
 
   // ── 앱 목록 로드 ──
   const fetchApps = async () => {
@@ -308,38 +350,54 @@ export default function MainAppLauncher() {
 
       {/* 헤더 */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shrink-0">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
-              <LayoutGrid className="text-white" size={20} />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md border border-slate-200 overflow-hidden shrink-0 p-1">
+              <img 
+                src="/app-logo-v1.png" 
+                alt="GNFLHS Logo" 
+                className="w-full h-full object-contain rounded-full"
+                onError={(e) => {
+                  (e.target as any).style.display = 'none';
+                  (e.target as any).parentElement.innerHTML = '<div class="text-indigo-600 font-black">GN</div>';
+                }}
+              />
             </div>
-            <div>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">경남외고</h1>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${isAdmin ? 'text-indigo-600 bg-indigo-50' : profile?.role === 'student' ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'}`}>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight truncate">경남외고</h1>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                <span className={`flex items-center gap-1 text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${isAdmin ? 'text-indigo-600 bg-indigo-50' : profile?.role === 'student' ? 'text-blue-600 bg-blue-50' : 'text-emerald-600 bg-emerald-50'}`}>
                   <UserIcon size={10} /> {isAdmin ? 'Super Admin' : profile?.role === 'student' ? 'Student' : 'Teacher'}
                 </span>
-                <span className="text-[11px] font-bold text-slate-400">{profile?.name} ({user?.id || user?.email})</span>
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 truncate max-w-[150px]">{profile?.name} ({user?.id || user?.email})</span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button onClick={() => setIsPasswordModalOpen(true)} className="flex items-center gap-2 px-4 py-2.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl text-sm font-black transition-all" title="비밀번호 변경">
-              <Lock size={18} /> <span className="hidden sm:inline">비밀번호 변경</span>
+          <div className="flex flex-wrap items-center justify-center md:justify-end gap-2 w-full md:w-auto">
+            {showInstallButton && (
+              <button 
+                onClick={handleInstallClick}
+                className="flex items-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl text-xs sm:text-sm font-black transition-all shadow-sm"
+              >
+                <Download size={16} /> <span className="inline">앱 설치</span>
+              </button>
+            )}
+            <button onClick={() => setIsPasswordModalOpen(true)} className="flex items-center gap-2 px-3 py-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl text-xs sm:text-sm font-black transition-all" title="비밀번호 변경">
+              <Lock size={16} /> <span className="hidden lg:inline">비밀번호 변경</span>
             </button>
-            <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl text-sm font-black transition-all" title="로그아웃">
-              <LogOut size={18} /> <span className="hidden sm:inline">로그아웃</span>
+            <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl text-xs sm:text-sm font-black transition-all" title="로그아웃">
+              <LogOut size={16} /> <span className="hidden lg:inline">로그아웃</span>
             </button>
             <Link
               href="/design"
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-md active:scale-95 
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md active:scale-95 
                 ${isAdmin
                   ? 'bg-slate-900 hover:bg-indigo-600 text-white opacity-100'
                   : 'bg-slate-100 text-slate-400 cursor-not-allowed grayscale'}`}
               onClick={(e) => !isAdmin && e.preventDefault()}
             >
-              <Plus size={18} /> 빌더 열기
+              <Plus size={16} /> 빌더
             </Link>
           </div>
         </div>
@@ -684,6 +742,59 @@ export default function MainAppLauncher() {
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* iOS 설치 안내 모달 */}
+      {isIOSGuideOpen && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white w-full max-w-sm rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
+            <div className="p-8">
+              <div className="flex justify-between items-start mb-6">
+                <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100">
+                  <Smartphone className="text-white" size={32} />
+                </div>
+                <button onClick={() => setIsIOSGuideOpen(false)} className="p-2 bg-slate-100 text-slate-400 rounded-full hover:bg-slate-200 transition-all">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <h3 className="text-2xl font-black text-slate-900 leading-tight mb-2">iPhone에 앱 설치하기</h3>
+              <p className="text-slate-500 font-bold text-sm mb-8 leading-relaxed">
+                Safari 브라우저의 기능을 사용하여 홈 화면에 추가할 수 있습니다.
+              </p>
+
+              <div className="space-y-6">
+                <div className="flex items-center gap-4 group">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-900 font-black shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-all">1</div>
+                  <p className="text-slate-700 font-bold text-[15px]">
+                    브라우저 하단의 <span className="inline-flex items-center px-2 py-1 bg-slate-100 rounded-lg mx-1"><Share size={14} className="text-blue-500" /> 공유 버튼</span>을 누르세요.
+                  </p>
+                </div>
+                
+                <div className="flex items-center gap-4 group">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-900 font-black shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-all">2</div>
+                  <p className="text-slate-700 font-bold text-[15px]">
+                    스크롤을 내려 <span className="font-black text-slate-900 underline underline-offset-4 decoration-indigo-300">홈 화면에 추가</span>를 선택하세요.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-4 group">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-900 font-black shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-all">3</div>
+                  <p className="text-slate-700 font-bold text-[15px]">
+                    우측 상단의 <span className="text-indigo-600 font-black">추가</span> 버튼을 누르면 끝!
+                  </p>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setIsIOSGuideOpen(false)}
+                className="w-full mt-10 py-4 bg-slate-900 text-white rounded-2xl font-black shadow-lg active:scale-95 transition-all"
+              >
+                알겠습니다
+              </button>
+            </div>
+            <div className="h-2 bg-indigo-600 w-full"></div>
           </div>
         </div>
       )}
