@@ -32,7 +32,13 @@ export default function withAuth<P extends object>(
             return;
           }
 
-          const sessionData = JSON.parse(session);
+          const { decryptSession } = await import('@/app/cryptoHelper');
+          const sessionData = await decryptSession(session);
+          if (!sessionData) {
+            router.replace('/');
+            return;
+          }
+
           const type = sessionData.type || 'teacher';
           const loginId = sessionData.id || sessionData.email;
 

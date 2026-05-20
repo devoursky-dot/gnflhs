@@ -48,19 +48,30 @@ export function useAuth() {
 
   // ── 초기 세션 복원 ──
   useEffect(() => {
-    const savedSession = Cookies.get(SESSION_KEY);
-    if (savedSession) {
-      try {
-        const sessionData = JSON.parse(savedSession);
-        const sid = sessionData.id || sessionData.email;
-        setUser(sessionData);
-        fetchUserProfile(sid, sessionData.type || 'teacher').finally(() => setLoading(false));
-      } catch {
+    const restoreSession = async () => {
+      const savedSession = Cookies.get(SESSION_KEY);
+      if (savedSession) {
+        try {
+          const { decryptSession } = await import('@/app/cryptoHelper');
+          const sessionData = await decryptSession(savedSession);
+          if (sessionData) {
+            const sid = sessionData.id || sessionData.email;
+            setUser(sessionData);
+            await fetchUserProfile(sid, sessionData.type || 'teacher');
+          } else {
+            setUser(null);
+          }
+        } catch {
+          setUser(null);
+        } finally {
+          setLoading(false);
+        }
+      } else {
         setLoading(false);
       }
-    } else {
-      setLoading(false);
-    }
+    };
+
+    restoreSession();
 
     // Supabase Auth 리스너 (Google 등 외부 인증 대비)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async () => {});
@@ -102,7 +113,9 @@ export function useAuth() {
 
       // 세션 쿠키 저장
       const sessionInfo: UserSession = { id: loginId, email: loginId, type: loginType };
-      Cookies.set(SESSION_KEY, JSON.stringify(sessionInfo), {
+      const { encryptSession } = await import('@/app/cryptoHelper');
+      const encryptedSession = await encryptSession(sessionInfo);
+      Cookies.set(SESSION_KEY, encryptedSession, {
         expires: 7,
         path: '/',
         sameSite: 'lax'
