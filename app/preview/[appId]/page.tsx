@@ -75,12 +75,14 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   }, [currentView?.id, currentView?.onInitActionId, appData?.app_config?.actions]);
 
   const pressTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const justSelectedRef = React.useRef<boolean>(false);
 
   const onCardPointerDown = (r: any) => {
     if (!currentView?.enableMultiSelect) return;
     pressTimerRef.current = setTimeout(() => {
       setIsSelectionMode(true);
       setSelectedRowKeys((prev: string[]) => prev.includes(r.id) ? prev : [...prev, r.id]);
+      justSelectedRef.current = true;
     }, 500); 
   };
 
@@ -89,6 +91,11 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   };
 
   const onCardClick = (r: any) => {
+    if (justSelectedRef.current) {
+      justSelectedRef.current = false;
+      return;
+    }
+
     if (isSelectionMode) {
       setSelectedRowKeys((prev: string[]) => prev.includes(r.id) ? prev.filter((k: string) => k !== r.id) : [...prev, r.id]);
     } else {
@@ -686,7 +693,8 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                                         onPointerDown={() => onCardPointerDown(r)}
                                         onPointerUp={onCardPointerUp}
                                         onPointerLeave={onCardPointerUp}
-                                        style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)' }}
+                                        onContextMenu={(e) => e.preventDefault()}
+                                        style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
                                         className={`rounded-none border overflow-hidden hover:border-[var(--theme-primary)] transition-all cursor-pointer ${isSelectionMode ? (selectedRowKeys.includes(r.id) ? 'border-[3px] !border-[var(--theme-primary)] scale-[0.98]' : 'border-[3px] border-transparent opacity-60') : ''}`}
                                       >
                                         <CurrentRenderer rows={currentView.layoutRows} rowData={r} actions={appData.app_config.actions} onExecuteAction={handleAction} />
@@ -706,7 +714,8 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                                 onPointerDown={() => onCardPointerDown(r)}
                                 onPointerUp={onCardPointerUp}
                                 onPointerLeave={onCardPointerUp}
-                                style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)' }}
+                                onContextMenu={(e) => e.preventDefault()}
+                                style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
                                 className={`rounded-none border overflow-hidden hover:border-[var(--theme-primary)] transition-all cursor-pointer ${isSelectionMode ? (selectedRowKeys.includes(r.id) ? 'border-[3px] !border-[var(--theme-primary)] scale-[0.98]' : 'border-[3px] border-transparent opacity-60') : ''}`}
                               >
                                 <CurrentRenderer rows={currentView.layoutRows} rowData={r} actions={appData.app_config.actions} onExecuteAction={handleAction} />
@@ -729,7 +738,8 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
                   onPointerDown={() => onCardPointerDown(r)}
                   onPointerUp={onCardPointerUp}
                   onPointerLeave={onCardPointerUp}
-                  style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)' }}
+                  onContextMenu={(e) => e.preventDefault()}
+                  style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
                   className={`rounded-none border overflow-hidden hover:border-[var(--theme-primary)] transition-all cursor-pointer ${isSelectionMode ? (selectedRowKeys.includes(r.id) ? 'border-[3px] !border-[var(--theme-primary)] scale-[0.98]' : 'border-[3px] border-transparent opacity-60') : ''}`}
                 >
                   <CurrentRenderer rows={currentView.layoutRows} rowData={r} actions={appData.app_config.actions} onExecuteAction={handleAction} />

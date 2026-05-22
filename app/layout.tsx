@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -15,12 +15,15 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "경남외국어고등학교 (GNFLHS)",
   description: "경남외국어고등학교 설치형 웹 앱",
-  themeColor: "#4B2C20",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "GNFLHS",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#4B2C20",
 };
 
 export default function RootLayout({

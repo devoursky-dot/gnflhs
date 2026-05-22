@@ -42,8 +42,8 @@ export default function RenderPreviewLayout({ rows, rowData, actions, onExecuteA
               const imgClass = `object-cover w-full h-full ${shapeClass}`;
               const paddingClass = cell.imagePadding || 'p-0';
               return (
-                <div key={cell.id} style={{ flex: cell.flex }} className={`flex flex-col justify-center items-center min-w-0 overflow-hidden relative border-slate-100/50 bg-slate-50/30 ${paddingClass}`}>
-                  <img src={String(cellValue)} alt="img" className={imgClass} />
+                <div key={cell.id} style={{ flex: cell.flex, WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }} onContextMenu={(e) => e.preventDefault()} className={`flex flex-col justify-center items-center min-w-0 overflow-hidden relative border-slate-100/50 bg-slate-50/30 ${paddingClass}`}>
+                  <img src={String(cellValue)} alt="img" className={imgClass} draggable={false} />
                   
                   {/* 🔥 [신규] 이미지 지능형 오버레이 레이어 */}
                   {(() => {
