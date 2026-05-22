@@ -59,7 +59,7 @@ export default function ActionEditor({
     if (!action.steps || action.steps.length === 0) {
       // 레거시 데이터를 기반으로 첫 번째 스텝 생성 (디자인 유지)
       const initialStep: ActionStep = {
-        id: `step_${Date.now()}`,
+        id: `step_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
         type: action.type,
         tableName: action.tableName,
         insertTableName: action.insertTableName,
@@ -293,7 +293,7 @@ export default function ActionEditor({
               ))}
               <button
                 onClick={() => {
-                  const newStep: ActionStep = { id: `step_${Date.now()}`, type: 'alert', message: '새로운 동작' };
+                  const newStep: ActionStep = { id: `step_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, type: 'alert', message: '새로운 동작' };
                   const newSteps = [...(action.steps || []), newStep];
                   onUpdate({ ...action, steps: newSteps });
                   setSelectedStepId(newStep.id);
@@ -421,7 +421,7 @@ export default function ActionEditor({
                     <label className="block text-sm font-bold text-slate-700 whitespace-nowrap">필드 매핑 및 타입 설정</label>
                     <button
                       onClick={() => {
-                        const nm: InsertMapping = { id: `m_${Date.now()}`, targetColumn: '', mappingType: 'prompt', sourceValue: '', valueType: 'string' };
+                        const nm: InsertMapping = { id: `m_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, targetColumn: '', mappingType: 'prompt', sourceValue: '', valueType: 'string' };
                         updateCurrentStep({ insertMappings: [...(currentStep.insertMappings || []), nm] });
                       }}
                       className="text-xs bg-slate-800 text-white px-3 py-2 rounded-lg font-bold flex items-center gap-1 whitespace-nowrap shrink-0"
@@ -648,7 +648,7 @@ export default function ActionEditor({
                     <label className="block text-sm font-bold text-slate-700 whitespace-nowrap">수정할 필드 매핑 및 타입 설정</label>
                     <button
                       onClick={() => {
-                        const nm: UpdateMapping = { id: `m_${Date.now()}`, targetColumn: '', mappingType: 'prompt', sourceValue: '', valueType: 'string' };
+                        const nm: UpdateMapping = { id: `m_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, targetColumn: '', mappingType: 'prompt', sourceValue: '', valueType: 'string' };
                         updateCurrentStep({ updateMappings: [...(currentStep.updateMappings || []), nm] });
                       }}
                       className="text-xs bg-slate-800 text-white px-3 py-2 rounded-lg font-bold flex items-center gap-1 whitespace-nowrap shrink-0"

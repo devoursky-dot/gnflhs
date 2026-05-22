@@ -295,7 +295,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
     callback(next); onUpdate({ ...view, layoutRows: next });
   };
 
-  const addRootRow = () => onUpdate({ ...view, layoutRows: [...view.layoutRows, { id: `r_${Date.now()}`, flex: 1, cells: [{ id: `c_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }] });
+  const addRootRow = () => onUpdate({ ...view, layoutRows: [...view.layoutRows, { id: `r_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, flex: 1, cells: [{ id: `c_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, flex: 1, contentType: 'empty', contentValue: null }] }] });
 
   const RenderRowEditor = ({ row, depth = 0 }: { row: LayoutRow, depth: number }) => {
     // 깊이에 따른 스타일 차별화 (부모일수록 더 크고 뚜렷하게)
@@ -320,7 +320,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
             <div className="flex items-center gap-1">
               {/* 3단계 제한 로직: depth가 2 미만일 때만 중첩 버튼 노출 */}
               {depth < 2 && (
-                <button onClick={() => mutate((rows: LayoutRow[]) => { const f = (arr: LayoutRow[]) => arr.forEach((r: LayoutRow) => r.cells.forEach((c: LayoutCell) => { if(c.id === cell.id) { c.contentType = 'nested'; c.nestedRows = [{ id: `nr_${Date.now()}`, flex: 1, cells: [{ id: `nc_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }]; } else if(c.nestedRows) f(c.nestedRows); })); f(rows); })} className="text-indigo-400 hover:text-indigo-700 p-1" title="내부에 세로 레이아웃 추가"><Rows size={18}/></button>
+                <button onClick={() => mutate((rows: LayoutRow[]) => { const f = (arr: LayoutRow[]) => arr.forEach((r: LayoutRow) => r.cells.forEach((c: LayoutCell) => { if(c.id === cell.id) { c.contentType = 'nested'; c.nestedRows = [{ id: `nr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, flex: 1, cells: [{ id: `nc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, flex: 1, contentType: 'empty', contentValue: null }] }]; } else if(c.nestedRows) f(c.nestedRows); })); f(rows); })} className="text-indigo-400 hover:text-indigo-700 p-1" title="내부에 세로 레이아웃 추가"><Rows size={18}/></button>
               )}
               {row.cells.length > 1 && <button onClick={() => mutate((rows: LayoutRow[]) => { const f = (arr: LayoutRow[]) => arr.forEach((r: LayoutRow) => { const idx = r.cells.findIndex((c: LayoutCell) => c.id === cell.id); if (idx > -1) r.cells.splice(idx, 1); else r.cells.forEach((c: LayoutCell) => { if(c.nestedRows) f(c.nestedRows); }); }); f(rows); })} className="text-rose-300 hover:text-rose-600 p-1 transition-colors"><Trash2 size={16}/></button>}
             </div>
@@ -331,7 +331,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
               {cell.nestedRows?.map(nr => <RenderRowEditor key={nr.id} row={nr} depth={depth + 1} />)}
               {/* 자식 Row 추가 시에도 3단계 검증 (이미 depth+1이 렌더링되므로 여기서도 depth 체크) */}
               {depth < 2 && (
-                <button onClick={() => mutate((rows: LayoutRow[]) => { const f = (arr: LayoutRow[]) => arr.forEach((r: LayoutRow) => r.cells.forEach((c: LayoutCell) => { if(c.id === cell.id) (c.nestedRows || (c.nestedRows = [])).push({ id: `nr_${Date.now()}`, flex: 1, cells: [{ id: `nc_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }] }); if(c.nestedRows) f(c.nestedRows); })); f(rows); })} className="w-full py-3 border-2 border-dashed border-slate-200 text-[10px] font-black text-slate-400 rounded-xl hover:bg-slate-50 transition-colors">+ 세로 분할 추가</button>
+                <button onClick={() => mutate((rows: LayoutRow[]) => { const f = (arr: LayoutRow[]) => arr.forEach((r: LayoutRow) => r.cells.forEach((c: LayoutCell) => { if(c.id === cell.id) (c.nestedRows || (c.nestedRows = [])).push({ id: `nr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, flex: 1, cells: [{ id: `nc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, flex: 1, contentType: 'empty', contentValue: null }] }); if(c.nestedRows) f(c.nestedRows); })); f(rows); })} className="w-full py-3 border-2 border-dashed border-slate-200 text-[10px] font-black text-slate-400 rounded-xl hover:bg-slate-50 transition-colors">+ 세로 분할 추가</button>
               )}
             </div>
           ) : (
@@ -348,7 +348,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
           )}
         </div>
       ))}
-      <button onClick={() => mutate((rows: LayoutRow[]) => { const f = (arr: LayoutRow[]) => arr.forEach((r: LayoutRow) => { if(r.id === row.id) r.cells.push({ id: `c_${Date.now()}`, flex: 1, contentType: 'empty', contentValue: null }); r.cells.forEach((c: LayoutCell) => { if(c.nestedRows) f(c.nestedRows); }); }); f(rows); })} className="w-12 shrink-0 flex items-center justify-center bg-indigo-600 text-white rounded-2xl shadow-md hover:bg-indigo-700 transition-colors hover:scale-105"><Columns size={20}/></button>
+      <button onClick={() => mutate((rows: LayoutRow[]) => { const f = (arr: LayoutRow[]) => arr.forEach((r: LayoutRow) => { if(r.id === row.id) r.cells.push({ id: `c_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, flex: 1, contentType: 'empty', contentValue: null }); r.cells.forEach((c: LayoutCell) => { if(c.nestedRows) f(c.nestedRows); }); }); f(rows); })} className="w-12 shrink-0 flex items-center justify-center bg-indigo-600 text-white rounded-2xl shadow-md hover:bg-indigo-700 transition-colors hover:scale-105"><Columns size={20}/></button>
     </div>
     );
   };
@@ -670,7 +670,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                     <div className="flex items-center justify-between px-1">
                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">그룹 요약 통계 (Aggregations)</label>
                       <button 
-                        onClick={() => onUpdate({ ...view, groupAggregations: [...(view.groupAggregations || []), { id: `agg_${Date.now()}`, type: 'count', label: '합계', color: 'bg-indigo-50 text-indigo-600' }] })}
+                        onClick={() => onUpdate({ ...view, groupAggregations: [...(view.groupAggregations || []), { id: `agg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, type: 'count', label: '합계', color: 'bg-indigo-50 text-indigo-600' }] })}
                         className="flex items-center gap-1 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black hover:bg-indigo-100 transition-all border border-indigo-100"
                       >
                         <Plus size={12}/> 통계 추가
@@ -887,7 +887,7 @@ export default function ViewEditor({ view, schemaData, actions, virtualTables = 
                     <div className="flex items-center justify-between px-1">
                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">2차 그룹 요약 통계</label>
                       <button 
-                        onClick={() => onUpdate({ ...view, groupAggregations2: [...(view.groupAggregations2 || []), { id: `agg2_${Date.now()}`, type: 'count', label: '소계', color: 'bg-violet-50 text-violet-600', displayStyle: 'button' }] })}
+                        onClick={() => onUpdate({ ...view, groupAggregations2: [...(view.groupAggregations2 || []), { id: `agg2_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, type: 'count', label: '소계', color: 'bg-violet-50 text-violet-600', displayStyle: 'button' }] })}
                         className="flex items-center gap-1 px-3 py-1 bg-violet-50 text-violet-600 rounded-lg text-[10px] font-black hover:bg-violet-100 transition-all border border-violet-100"
                       >
                         <Plus size={12}/> 통계 추가

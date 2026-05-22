@@ -21,7 +21,7 @@ export function VirtualTableManager({
   const virtualTables = appState.virtualTables || [];
 
   const handleAddTable = () => {
-    const newId = `vt_${Date.now()}`;
+    const newId = `vt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const newTable: VirtualTable = {
       id: newId,
       name: '새 가상 테이블',
@@ -122,7 +122,7 @@ export function VirtualTableEditor({
   const availableColumns = editingTable.baseTableName ? schemaData[editingTable.baseTableName] || [] : [];
 
   const handleAddColumn = (type: 'join' | 'formula') => {
-    const newId = `vc_${Date.now()}`;
+    const newId = `vc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const newCol: VirtualColumn = {
       id: newId,
       name: type === 'join' ? '새 조인 컬럼' : '새 수식 컬럼',

@@ -13,16 +13,13 @@ import {
   evaluateExpression, processMappingValue, applyViewQuery, getSortedGroupKeys, resolveVirtualData, applyClientFilters,
   getKSTDate, getKSTHelpers
 } from './utils';
-import * as UtilsV1 from '../../engines/v1/utils';
 import DefaultRenderer from './renderer';
 import { InsertModal, UpdateModal } from './modals';
 import { GroupAggregation } from '@/app/design/types';
 import dynamic from 'next/dynamic';
-
-// --- 버전별 엔진 컴포넌트 동적 로드 ---
-const RenderV1 = dynamic(() => import('../../engines/v1/renderer'));
-const InsertModalV1 = dynamic(() => import('../../engines/v1/modals').then(m => m.InsertModal));
-const UpdateModalV1 = dynamic(() => import('../../engines/v1/modals').then(m => m.UpdateModal));
+import { useAppRuntime } from './useAppRuntime';
+import { useActionRunner } from './useActionRunner';
+import { EngineComponentsRegistry } from '../../engines/engineRegistry';
 
 // 🔥 [업데이트] 그룹 헤더 Sticky 스타일 계산 헬퍼 (사용자 요청: 2단계 Stacked Sticky 지원)
 const getStickyStyles = (isSticky: boolean, showTopBar: boolean, level: number = 1, isParentSticky: boolean = false, headerHeight: number = 64) => {
@@ -46,53 +43,44 @@ const getStickyStyles = (isSticky: boolean, showTopBar: boolean, level: number =
 
 function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   const params = useParams();
+  const appId = params?.appId as string;
   const router = useRouter();
-  const appId = params?.appId;
 
-  // ── 앱 & 뷰 상태 ──
-  const [loading, setLoading] = useState(true);
-  const [appData, setAppData] = useState<any>(null);
-  const [currentViewId, setCurrentViewId] = useState<string>('');
-  const [tableData, setTableData] = useState<Record<string, any[]>>({});
+  const runtime = useAppRuntime(appId, userProfile);
+  const actionRunner = useActionRunner(runtime, userProfile);
 
-  // ── 모달 상태 ──
-  const [isInputModalOpen, setIsInputModalOpen] = useState(false);
-  const [activeInsertAction, setActiveInsertAction] = useState<any>(null);
-  const [formData, setFormData] = useState<Record<string, any>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const {
+    loading, appData, currentViewId, setCurrentViewId, currentView,
+    tableData, searchTerm, setSearchTerm, expandedGroups, setExpandedGroups,
+    toast, viewStates, isMobileSidebarOpen, setIsMobileSidebarOpen,
+    isSelectionMode, setIsSelectionMode, selectedRowKeys, setSelectedRowKeys, utils
+  } = runtime;
 
-  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-  const [activeUpdateAction, setActiveUpdateAction] = useState<any>(null);
-  const [activeRowData, setActiveRowData] = useState<any>(null);
-  const [updateFormData, setUpdateFormData] = useState<Record<string, any>>({});
-  const [isUpdating, setIsUpdating] = useState(false);
+  const {
+    isInputModalOpen, setIsInputModalOpen, activeInsertAction, formData, setFormData, isSubmitting,
+    isUpdateModalOpen, setIsUpdateModalOpen, activeUpdateAction, activeRowData, updateFormData, setUpdateFormData, isUpdating,
+    isAutomating, automationProgress, automationLog,
+    executeBatchAction, handleInitAutomation, handleAction, handleSubmitInsert, handleSubmitUpdate,
+    setActionQueue, setBatchSourceRows
+  } = actionRunner;
 
-  // ── UI 상태 ──
-  const [searchTerm, setSearchTerm] = useState('');
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  useEffect(() => {
+    if (currentView?.onInitActionId && appData?.app_config?.actions) {
+      const initAct = appData.app_config.actions.find((a: any) => a.id === currentView.onInitActionId);
+      if (initAct) {
+        handleInitAutomation(initAct, currentView);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentView?.id, currentView?.onInitActionId, appData?.app_config?.actions]);
 
-  // ── 자동화 및 어댑티브 상태 ──
-  const [isAutomating, setIsAutomating] = useState(false);
-  const [automationProgress, setAutomationProgress] = useState(0);
-  const [automationLog, setAutomationLog] = useState("");
-  const [viewStates, setViewStates] = useState<Record<string, { hidden: boolean, disabled: boolean, label?: string }>>({});
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [actionQueue, setActionQueue] = useState<any[]>([]); // 🔥 [신규] 다단계 동작 큐
-  const [pendingRowData, setPendingRowData] = useState<any>(null); // 현재 동작의 기준 데이터
-  const [batchSourceRows, setBatchSourceRows] = useState<any[] | null>(null); // 🔥 배치 데이터 모달 연동用
-  
-  // 🔥 [신규] 다중 선택(Multi-select) 및 Long Press 상태
-  const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
-  const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
   const pressTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const onCardPointerDown = (r: any) => {
     if (!currentView?.enableMultiSelect) return;
     pressTimerRef.current = setTimeout(() => {
       setIsSelectionMode(true);
-      setSelectedRowKeys(prev => prev.includes(r.id) ? prev : [...prev, r.id]);
+      setSelectedRowKeys((prev: string[]) => prev.includes(r.id) ? prev : [...prev, r.id]);
     }, 500); 
   };
 
@@ -102,658 +90,22 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
 
   const onCardClick = (r: any) => {
     if (isSelectionMode) {
-      setSelectedRowKeys(prev => prev.includes(r.id) ? prev.filter(k => k !== r.id) : [...prev, r.id]);
+      setSelectedRowKeys((prev: string[]) => prev.includes(r.id) ? prev.filter((k: string) => k !== r.id) : [...prev, r.id]);
     } else {
       const ac = appData.app_config.actions?.find((a: any) => a.id === currentView.onClickActionId); 
       if (ac) handleAction(ac, r);
     }
   };
 
+  const unitText = appData?.app_config?.unitText || '건';
+  const unclassifiedText = appData?.app_config?.unclassifiedText || '미분류';
 
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 800); // 🔥 1500 -> 800ms로 단축 (경쾌한 반응성)
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
+  const version = appData?.engine_version;
+  const registryEntry = version ? EngineComponentsRegistry[version as keyof typeof EngineComponentsRegistry] : null;
 
-  useEffect(() => {
-    if (!appId) return;
-    async function fetchAppConfig() {
-      try {
-        const { data } = await supabase.from('apps').select('*').eq('id', appId).single();
-        if (data) {
-          const urlParams = new URLSearchParams(window.location.search);
-          const mode = urlParams.get('mode');
-          let activeConfig = mode === 'draft' ? (data.draft_config || data.app_config) : data.app_config;
-
-          const config = activeConfig || {};
-          const isPublic = config.isPublic !== false;
-          if (userProfile?.role !== 'admin' && !isPublic) {
-            if (!config.allowedUsers || !config.allowedUsers.includes(userProfile?.email)) {
-              alert("이 앱에 접근할 권한이 없습니다.");
-              router.push('/');
-              return;
-            }
-          }
-
-          document.title = mode === 'draft' ? `[Draft] ${data.name}` : data.name;
-          setAppData({ ...data, app_config: activeConfig, engine_version: activeConfig?.engine_version || null });
-          if (activeConfig?.views?.length > 0) {
-            const vid = urlParams.get('viewId');
-            setCurrentViewId(vid || activeConfig.views[0].id);
-          }
-        }
-      } finally { setLoading(false); }
-    }
-    fetchAppConfig();
-  }, [appId]);
-
-  const currentView = appData?.app_config?.views?.find((v: any) => v.id === currentViewId);
-
-  // --- 버전별 엔진 선택 ---
-  const CurrentRenderer = appData?.engine_version === 'v1' ? RenderV1 : DefaultRenderer;
-  const CurrentInsertModal = appData?.engine_version === 'v1' ? InsertModalV1 : InsertModal;
-  const CurrentUpdateModal = appData?.engine_version === 'v1' ? UpdateModalV1 : UpdateModal;
-
-  // --- 🔥 버전별 유틸리티 함수 선택 (독립 실행 핵심) ---
-  const isV1 = appData?.engine_version === 'v1';
-  const utils = {
-    applyViewQuery: isV1 ? UtilsV1.applyViewQuery : applyViewQuery,
-    resolveVirtualData: isV1 ? UtilsV1.resolveVirtualData : resolveVirtualData,
-    applyClientFilters: isV1 ? UtilsV1.applyClientFilters : applyClientFilters,
-    processMappingValue: isV1 ? UtilsV1.processMappingValue : processMappingValue,
-    evaluateExpression: isV1 ? UtilsV1.evaluateExpression : evaluateExpression,
-    getKSTHelpers: isV1 ? UtilsV1.getKSTHelpers : getKSTHelpers,
-    getSortedGroupKeys: isV1 ? UtilsV1.getSortedGroupKeys : getSortedGroupKeys,
-  };
-
-  const fetchTableData = async (view: any) => {
-    if (!view || !view.tableName) return;
-
-    try {
-      const isVt = view.tableName.startsWith('vt_');
-      const vt = isVt ? appData?.app_config?.virtualTables?.find((v: any) => v.id === view.tableName) : null;
-
-      if (isVt && !vt) {
-        if (appData) {
-          console.error("Virtual table definition not found for:", view.tableName);
-          setTableData(prev => ({ ...prev, [view.tableName]: [] }));
-        }
-        return;
-      }
-
-      const fetchTable = vt ? vt.baseTableName : view.tableName;
-      if (!fetchTable) return;
-
-      let allData: any[] = [];
-      let from = 0;
-      let step = 1000;
-      let hasMore = true;
-
-      while (hasMore) {
-        let query: any = supabase.from(fetchTable).select("*");
-        query = utils.applyViewQuery(query, view, userProfile);
-        const { data, error } = await query.range(from, from + step - 1);
-        
-        if (error) throw error;
-        if (!data || data.length === 0) {
-          hasMore = false;
-        } else {
-          allData = [...allData, ...data];
-          if (data.length < step) {
-            hasMore = false;
-          } else {
-            from += step;
-          }
-        }
-      }
-
-      let finalData = allData;
-      if (vt && finalData.length > 0) {
-        finalData = await utils.resolveVirtualData(finalData, vt);
-      }
-
-      finalData = utils.applyClientFilters(finalData, view, userProfile);
-
-      setTableData(prev => ({ ...prev, [view.id]: finalData }));
-    } catch (err: any) {
-      console.error("Error fetching table data:", err);
-      setToast({ message: `데이터 로드 중 오류가 발생했습니다: ${err.message}`, type: 'error' });
-      setTableData(prev => ({ ...prev, [view.id]: [] }));
-    }
-  };
-
-  useEffect(() => {
-    if (currentView) {
-      fetchTableData(currentView);
-      setExpandedGroups({});
-      if (currentView.onInitActionId) {
-        const initAct = appData?.app_config?.actions?.find((a: any) => a.id === currentView.onInitActionId);
-        if (initAct) handleInitAutomation(initAct, currentView);
-      }
-    }
-  }, [currentViewId, currentView, userProfile]);
-
-  // 🔥 [중요] 데이터가 변경될 때마다 가시성 수식을 재평가하여 실시간 반응성 확보
-  useEffect(() => {
-    evaluateAllViewStates();
-  }, [currentViewId, appData, tableData]);
-
-  const buildPayloadFromMappings = (mappings: any[] | undefined, row: any): Record<string, any> => {
-    const payload: Record<string, any> = {};
-    mappings?.forEach((m: any) => {
-      if (m.mappingType === 'card_data') payload[m.targetColumn] = utils.processMappingValue(m.sourceValue, row, userProfile);
-      else if (m.mappingType === 'static') payload[m.targetColumn] = m.sourceValue;
-      else if (m.mappingType === 'user_name') payload[m.targetColumn] = userProfile?.name || '';
-      else if (m.mappingType === 'user_email') payload[m.targetColumn] = userProfile?.email || '';
-      else if (m.mappingType === 'prompt') {
-        payload[m.targetColumn] = m.valueType === 'number' ? (m.defaultNumberValue ?? 0) : '';
-      }
-      if (m.valueType === 'number') payload[m.targetColumn] = Number(payload[m.targetColumn]) || 0;
-    });
-    return payload;
-  };
-
-  const resolveTableName = (tableId: string | null | undefined): string | null => {
-    if (!tableId) return null;
-    if (tableId.startsWith('vt_')) {
-      const vt = appData?.app_config?.virtualTables?.find((v: any) => v.id === tableId);
-      return vt ? vt.baseTableName : null;
-    }
-    return tableId;
-  };
-
-  // 🔥 [신규] 다중 데이터 고속 일괄 처리 (Insert, Update, Delete)
-  const executeBatchAction = async (action: any, view: any, sourceRows: any[]) => {
-    if (action.requireConfirm) {
-      if (!window.confirm(`선택된 ${sourceRows.length}개의 데이터에 대해 [${action.name}] 작업을 실행하시겠습니까?\n작업 후 되돌릴 수 없습니다.`)) {
-        return;
-      }
-    }
-
-    setIsAutomating(true);
-    setAutomationProgress(0);
-    setAutomationLog(`${action.name} 대량 처리 중...`);
-
-    try {
-      const steps = action.steps && action.steps.length > 0 ? action.steps : [action];
-      const firstStep = steps[0];
-      const stepType = firstStep.type;
-      
-      if (sourceRows.length > 0) {
-        // [1] INSERT (추가)
-        if (stepType === 'insert_row') {
-          const mappings = firstStep.insertMappings;
-          const targetTable = resolveTableName(firstStep.insertTableName);
-          if (targetTable && mappings && mappings.length > 0) {
-            const hasPrompt = mappings.some((m: any) => m.mappingType === 'prompt');
-            if (hasPrompt) {
-              setBatchSourceRows(sourceRows);
-              setActiveInsertAction(firstStep);
-              setActionQueue(steps.length > 1 ? steps.slice(1) : []);
-              setPendingRowData(sourceRows[0]);
-              setFormData(buildPayloadFromMappings(mappings, sourceRows[0]));
-              setIsInputModalOpen(true);
-              setIsSelectionMode(false);
-              setSelectedRowKeys([]);
-              return; // Wait for modal submission
-            }
-            const payloads = sourceRows.map((row: any) => buildPayloadFromMappings(mappings, row));
-            const { error: insertErr } = await supabase.from(targetTable).insert(payloads);
-            if (insertErr) console.warn("Insert error during batch:", insertErr);
-          }
-        }
-        // [2] UPDATE (수정)
-        else if (stepType === 'update_row') {
-          const mappings = firstStep.updateMappings;
-          const targetTable = resolveTableName(firstStep.updateTableName);
-          if (targetTable && mappings && mappings.length > 0) {
-            const hasPrompt = mappings.some((m: any) => m.mappingType === 'prompt');
-            if (hasPrompt) {
-              setBatchSourceRows(sourceRows);
-              setActiveUpdateAction(firstStep);
-              setActionQueue(steps.length > 1 ? steps.slice(1) : []);
-              setActiveRowData(sourceRows[0]); // 모달 참조용
-              setPendingRowData(sourceRows[0]);
-              setUpdateFormData(buildPayloadFromMappings(mappings, sourceRows[0]));
-              setIsUpdateModalOpen(true);
-              setIsSelectionMode(false);
-              setSelectedRowKeys([]);
-              return; // Wait for modal submission
-            }
-            // 빠른 병렬 처리 (청크 단위로 분할하여 서버 부하 방지)
-            const chunkSize = 50;
-            for (let i = 0; i < sourceRows.length; i += chunkSize) {
-              const chunk = sourceRows.slice(i, i + chunkSize);
-              await Promise.all(chunk.map((row: any) => {
-                const init = buildPayloadFromMappings(mappings, row);
-                // 물리 테이블 ID 식별 및 업데이트
-                return supabase.from(targetTable).update(init).eq('id', row.id);
-              }));
-              setAutomationProgress(Math.floor(((i + chunk.length) / sourceRows.length) * 100));
-            }
-          }
-        }
-        // [3] DELETE (삭제)
-        else if (stepType === 'delete_row') {
-          const targetTable = resolveTableName(firstStep.deleteTableName);
-          if (targetTable) {
-            const idsToDelete = sourceRows.map((r: any) => r.id).filter(id => id !== undefined && id !== null);
-            if (idsToDelete.length > 0) {
-              // in 문으로 대량 아이디 한 번에 삭제
-              const { error: delErr } = await supabase.from(targetTable).delete().in('id', idsToDelete);
-              if (delErr) console.warn("Delete error during batch:", delErr);
-            }
-          }
-        }
-      }
-
-      // 후속 스텝 처리
-      if (steps.length > 1) {
-        const remainingSteps = steps.slice(1);
-        await processNextStep(remainingSteps, sourceRows?.[0] || {});
-      } else if (firstStep.targetViewId) {
-        setCurrentViewId(firstStep.targetViewId);
-      }
-      
-      // 처리 완료 후 리프레시
-      fetchTableData(currentView);
-      setIsSelectionMode(false);
-      setSelectedRowKeys([]);
-
-    } catch (e: any) {
-      console.error("Batch Execution Error:", e);
-      alert(`배치 작업 중 오류가 발생했습니다: ${e.message}`);
-    } finally {
-      await evaluateAllViewStates();
-      setAutomationProgress(100);
-      setAutomationLog("실행 완료!");
-      setTimeout(() => setIsAutomating(false), 500);
-    }
-  };
-
-  const handleInitAutomation = async (action: any, view: any) => {
-    setIsAutomating(true);
-    setAutomationProgress(10);
-    setAutomationLog(`${view.name} 자동화 확인 중...`);
-
-    try {
-      const steps = action.steps && action.steps.length > 0 ? action.steps : [action];
-      const firstStep = steps[0];
-      const isBatchMode = !!(firstStep.batchMode || action.batchMode);
-
-      if (isBatchMode && view.tableName) {
-        const isVt = view.tableName.startsWith('vt_');
-        const vt = isVt ? appData?.app_config?.virtualTables?.find((v: any) => v.id === view.tableName) : null;
-        const fetchTable = vt ? vt.baseTableName : view.tableName;
-
-        let query: any = supabase.from(fetchTable).select("*");
-        query = utils.applyViewQuery(query, view, userProfile);
-        const { data: rawRows, error: fetchErr } = await query.limit(1000000000000); 
-        if (fetchErr) throw fetchErr;
-
-        let sourceRows = rawRows || [];
-        if (vt && sourceRows.length > 0) {
-          sourceRows = await utils.resolveVirtualData(sourceRows, vt);
-        }
-
-        if (sourceRows.length > 0) {
-           await executeBatchAction(action, view, sourceRows);
-           return; // executeBatchAction에서 종료 처리함
-        }
-      } else {
-        setAutomationLog("시작 동작 실행 중...");
-        await processNextStep(steps, {});
-      }
-
-      // 모든 자동화 단계 완료 후 즉시 상태 평가 (감독중... 표시 주역)
-      await evaluateAllViewStates();
-      setAutomationProgress(100);
-      setAutomationLog("완료!");
-      setTimeout(() => setIsAutomating(false), 500);
-
-    } catch (err: any) {
-      const errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
-      setToast({ message: `자동화 오류: ${errorMsg}`, type: 'error' });
-      setIsAutomating(false);
-    }
-  };
-
-  const evaluateAllViewStates = async () => {
-    if (!appData?.app_config?.views) return;
-    const newStates: Record<string, any> = {};
-
-    const { today: isoToday, tomorrow: isoTomorrow } = utils.getKSTHelpers();
-
-    // 🔥 [수정] 참조 오류 방지를 위해 함수를 먼저 정의
-    const rowCountFn = async (t: string, f: Record<string, any> = {}) => {
-      const resolvedT = resolveTableName(t) || t;
-      
-      // 1. 서버에 직접 쿼리 (가장 정확한 최신 데이터 보장)
-      try {
-        let q = supabase.from(resolvedT).select("*", { count: "exact", head: true });
-        Object.entries(f).forEach(([k, v]) => {
-          if (v === 'today' || v === isoToday || (typeof v === 'string' && v.includes(isoToday))) {
-            q = q.gte(k, isoToday).lt(k, isoTomorrow);
-          } else {
-            q = q.eq(k, v);
-          }
-        });
-        const { count, error } = await q;
-        if (error) {
-          console.warn(`⚠️ rowCount Server Query Warning (${resolvedT}):`, error.message || error);
-          return 0;
-        }
-        return count || 0;
-      } catch (err) {
-        return 0;
-      }
-    };
-
-    const helpers = {
-      today: isoToday,
-      tomorrow: isoTomorrow,
-      rowCount: rowCountFn,
-      count: rowCountFn,
-      currentUser: () => userProfile,
-      isToday: (d: any) => {
-        if (!d) return false;
-        // KST 기반의 안전한 날짜 체크 (문자열인 경우 prefix 비교, Date/ISO인 경우 KST 변환 후 비교)
-        const dateStr = String(d);
-        if (dateStr.startsWith(isoToday)) return true;
-        try {
-          const kst = new Date(new Date(d).getTime() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
-          return kst === isoToday;
-        } catch { return false; }
-      }
-    };
-    for (const v of appData.app_config.views) {
-      if (v.visibilityExpr) {
-        try {
-          let awaitedExpr = v.visibilityExpr
-            .replace(/(?<!await\s+)\bcount\s*\(/gi, 'await count(')
-            .replace(/(?<!await\s+)\browCount\s*\(/gi, 'await rowCount(');
-
-          const asyncFunc = new Function('helpers', `
-            const { count, rowCount, currentUser, isToday } = helpers;
-            return (async () => {
-              try {
-                const res = await (${awaitedExpr});
-                return res;
-              } catch (e) {
-                return false;
-              }
-            })();
-          `);
-
-          const isMet = await asyncFunc(helpers);
-          if (v.id === currentViewId) {
-            console.log(`[상태평가] ${v.name}: ${isMet ? '조건일치(비활성화)' : '조건불일치(활성)'}`);
-          }
-          newStates[v.id] = isMet ? {
-            hidden: v.visibilityBehavior === 'hide',
-            disabled: v.visibilityBehavior === 'disable',
-            label: v.disabledLabel || '사용 불가'
-          } : { hidden: false, disabled: false };
-
-        } catch (err: any) {
-          console.error(`🔴 가시성 수식 평가 오류 (${v.name}):`, err.message || err);
-          newStates[v.id] = { hidden: false, disabled: false };
-        }
-      } else newStates[v.id] = { hidden: false, disabled: false };
-    }
-    setViewStates(newStates);
-  };
-
-  const handleSmsAction = async (action: any, rowData: any) => {
-    try {
-      let phone = '';
-      if (action.smsTargetColumn) phone = rowData[action.smsTargetColumn];
-      else if (action.smsPhoneColumn) phone = rowData[action.smsPhoneColumn];
-      if (!phone) phone = rowData.phone || rowData.PHONE || rowData['연락처'] || rowData['전화번호'];
-      if (!phone) {
-        const studentIdentifier = rowData.name || rowData.NAME || rowData.students || rowData.STUDENTS || rowData.student_id || rowData.STUDENT_ID;
-        if (studentIdentifier) {
-          // 'students' 테이블에서 학생 정보를 찾을 때도 범용적인 식별자 사용
-          const { data: studentData } = await supabase.from('students').select('phone').or(`name.eq."${studentIdentifier}",student_id.eq."${studentIdentifier}"`).maybeSingle();
-          if (studentData?.phone) phone = studentData.phone;
-        }
-      }
-      let message = action.smsMessageTemplate || '';
-      message = message.replace(/\{\{(.*?)\}\}/g, (_: string, col: string) => {
-        const key = col.trim();
-        const val = rowData[key];
-        return val !== undefined && val !== null ? String(val) : '';
-      });
-      if (!phone) {
-        const proceed = confirm('대상 학생의 전화번호를 찾을 수 없습니다. 메시지를 클립보드에 복사할까요?');
-        if (!proceed) return;
-      }
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (isMobile && phone) {
-        const phoneClean = phone.replace(/[^0-9]/g, '');
-        const smsUrl = isIOS ? `sms:${phoneClean}&body=${encodeURIComponent(message)}` : `sms:${phoneClean}?body=${encodeURIComponent(message)}`;
-        window.location.href = smsUrl;
-      } else {
-        if (navigator.clipboard) {
-          await navigator.clipboard.writeText(message);
-          alert("메시지가 클립보드에 복사되었습니다.\n\n내용:\n" + message);
-        } else {
-          window.prompt("이 메시지를 복사하여 사용하세요:", message);
-        }
-      }
-    } catch (err: any) {
-      alert("문자 전송 처리 중 오류 발생: " + err.message);
-    }
-  };
-
-  const processNextStep = async (queue: any[], rowData: any) => {
-    if (!queue || queue.length === 0) {
-      setActionQueue([]);
-      setPendingRowData(null);
-      return;
-    }
-
-    const [currentStep, ...remaining] = queue;
-    setActionQueue(remaining);
-    setPendingRowData(rowData);
-
-    if (currentStep.type === 'alert') {
-      alert(currentStep.message || '알림');
-      await processNextStep(remaining, rowData);
-
-    } else if (currentStep.type === 'navigate') {
-      if (!currentStep.targetViewId) {
-        await processNextStep(remaining, rowData);
-        return;
-      }
-      setCurrentViewId(currentStep.targetViewId);
-      setSearchTerm('');
-      setExpandedGroups({});
-      if (remaining.length > 0) {
-        setTimeout(() => processNextStep(remaining, rowData), 100);
-      } else {
-        await processNextStep(remaining, rowData);
-      }
-
-    } else if (currentStep.type === 'insert_row') {
-      setActiveInsertAction(currentStep);
-      const init = buildPayloadFromMappings(currentStep.insertMappings, rowData);
-
-      // 🔥 프롬프트가 없으면 모달 없이 즉시 백그라운드 저장
-      const hasPrompt = currentStep.insertMappings?.some((m: any) => m.mappingType === 'prompt');
-
-      if (!hasPrompt) {
-        setFormData(init);
-        (async () => {
-          setIsSubmitting(true);
-          try {
-            const targetTable = resolveTableName(currentStep.insertTableName);
-            if (!targetTable) throw new Error("대상 테이블이 없습니다.");
-            const { error } = await supabase.from(targetTable).insert([init]);
-            if (error) throw error;
-            setToast({ message: "즉시 저장 완료", type: 'success' });
-            fetchTableData(currentView);
-            processNextStep(remaining, rowData);
-            evaluateAllViewStates();
-          } catch (err: any) {
-            setToast({ message: `저장 실패: ${err.message}`, type: 'error' });
-          } finally {
-            setIsSubmitting(false);
-          }
-        })();
-      } else {
-        setFormData(init);
-        setIsInputModalOpen(true);
-      }
-
-    } else if (currentStep.type === 'delete_row') {
-      const targetTable = resolveTableName(currentStep.deleteTableName);
-      if (targetTable && rowData.id) {
-        if (window.confirm("삭제하시겠습니까?")) {
-          await supabase.from(targetTable).delete().eq('id', rowData.id);
-          fetchTableData(currentView);
-        }
-      }
-      await processNextStep(remaining, rowData);
-
-    } else if (currentStep.type === 'update_row') {
-      setActiveUpdateAction(currentStep);
-      setActiveRowData(rowData);
-      const init = buildPayloadFromMappings(currentStep.updateMappings, rowData);
-
-      // 기존 데이터 유지 보강 (수정 액션은 기존 행 데이터를 우선 표시)
-      currentStep.updateMappings?.forEach((m: any) => {
-        const hasExistingData = rowData && rowData[m.targetColumn] !== undefined && rowData[m.targetColumn] !== null;
-        
-        if (m.mappingType === 'prompt') {
-          // 사용자 입력형(prompt)은 기존 값이 있다면 기본값을 무시하고 기존 값을 보여줌
-          if (hasExistingData) init[m.targetColumn] = rowData[m.targetColumn];
-        } else if (!init[m.targetColumn] && init[m.targetColumn] !== 0) {
-          // 그 외 자동 매핑 항목 중 누락된 경우에만 보충
-          if (hasExistingData) init[m.targetColumn] = rowData[m.targetColumn];
-        }
-      });
-
-      const hasPrompt = currentStep.updateMappings?.some((m: any) => m.mappingType === 'prompt');
-
-      if (!hasPrompt) {
-        setUpdateFormData(init);
-        (async () => {
-          setIsUpdating(true);
-          try {
-            const targetTable = resolveTableName(currentStep.updateTableName);
-            if (!targetTable || !rowData.id) throw new Error("대상 데이터가 없습니다.");
-            const { error } = await supabase.from(targetTable).update(init).eq('id', rowData.id);
-            if (error) throw error;
-            setToast({ message: "즉시 수정 완료", type: 'success' });
-            fetchTableData(currentView);
-            processNextStep(remaining, rowData);
-            evaluateAllViewStates();
-          } catch (err: any) {
-            setToast({ message: `수정 실패: ${err.message}`, type: 'error' });
-          } finally {
-            setIsUpdating(false);
-          }
-        })();
-      } else {
-        setUpdateFormData(init);
-        setIsUpdateModalOpen(true);
-      }
-
-    } else if (currentStep.type === 'send_sms') {
-      await handleSmsAction(currentStep, rowData);
-      await processNextStep(remaining, rowData);
-    }
-  };
-
-  const handleAction = async (action: any, rowData: any) => {
-    if (action.requireConfirm) {
-      if (!window.confirm(`[${action.name}] 작업을 실행하시겠습니까?`)) {
-        return;
-      }
-    }
-    const steps = action.steps && action.steps.length > 0 ? action.steps : [action];
-    processNextStep(steps, rowData);
-  };
-
-  const handleSubmitInsert = async (forced?: any) => {
-    if (!activeInsertAction) return;
-    setIsSubmitting(true);
-    try {
-      const targetTableId = activeInsertAction.insertTableName;
-      const targetVt = targetTableId.startsWith('vt_') ? appData?.app_config?.virtualTables?.find((v: any) => v.id === targetTableId) : null;
-      const targetTable = targetVt ? targetVt.baseTableName : targetTableId;
-      const payload = forced || formData;
-
-      if (batchSourceRows && batchSourceRows.length > 0) {
-        const batchedPayloads = batchSourceRows.map((row: any) => {
-           const basePayload = buildPayloadFromMappings(activeInsertAction.insertMappings, row);
-           activeInsertAction.insertMappings?.forEach((m: any) => {
-             if (m.mappingType === 'prompt') basePayload[m.targetColumn] = payload[m.targetColumn];
-           });
-           return basePayload;
-        });
-        const { error } = await supabase.from(targetTable).insert(batchedPayloads);
-        if (error) throw error;
-        setBatchSourceRows(null);
-      } else {
-        const { error } = await supabase.from(targetTable).insert([payload]);
-        if (error) throw error;
-      }
-      
-      setToast({ message: "성공적으로 저장되었습니다.", type: 'success' });
-      setIsInputModalOpen(false);
-      fetchTableData(currentView);
-      processNextStep(actionQueue, pendingRowData);
-      evaluateAllViewStates();
-    } catch (err: any) {
-      setToast({ message: `저장 실패: ${err.message}`, type: 'error' });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleSubmitUpdate = async (forced?: any) => {
-    if (!activeUpdateAction) return; // 배치 모드일땐 activeRowData가 1개지만 실제 다수일수 있음
-    setIsUpdating(true);
-    try {
-      const targetTableId = activeUpdateAction.updateTableName;
-      const targetVt = targetTableId.startsWith('vt_') ? appData?.app_config?.virtualTables?.find((v: any) => v.id === targetTableId) : null;
-      const targetTable = targetVt ? targetVt.baseTableName : targetTableId;
-      const payload = forced || updateFormData;
-
-      if (batchSourceRows && batchSourceRows.length > 0) {
-        const chunkSize = 50;
-        for (let i = 0; i < batchSourceRows.length; i += chunkSize) {
-          const chunk = batchSourceRows.slice(i, i + chunkSize);
-          await Promise.all(chunk.map((row: any) => {
-            const basePayload = buildPayloadFromMappings(activeUpdateAction.updateMappings, row);
-            activeUpdateAction.updateMappings?.forEach((m: any) => {
-              if (m.mappingType === 'prompt') basePayload[m.targetColumn] = payload[m.targetColumn];
-            });
-            return supabase.from(targetTable).update(basePayload).eq('id', row.id);
-          }));
-        }
-        setBatchSourceRows(null);
-      } else {
-        const { error } = await supabase.from(targetTable).update(payload).eq('id', activeRowData.id);
-        if (error) throw error;
-      }
-      
-      setToast({ message: "성공적으로 수정되었습니다.", type: 'success' });
-      setIsUpdateModalOpen(false);
-      fetchTableData(currentView);
-      processNextStep(actionQueue, pendingRowData);
-      evaluateAllViewStates();
-    } catch (err: any) {
-      setToast({ message: `수정 실패: ${err.message}`, type: 'error' });
-    } finally {
-      setIsUpdating(false);
-    }
-  };
+  const CurrentRenderer = registryEntry?.Renderer || DefaultRenderer;
+  const CurrentInsertModal = registryEntry?.InsertModal || InsertModal;
+  const CurrentUpdateModal = registryEntry?.UpdateModal || UpdateModal;
 
   const renderAggregations = (rows: any[], aggs?: GroupAggregation[]) => {
     if (!aggs || aggs.length === 0) return (
@@ -821,7 +173,7 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
   }
 
   const groupKeys = utils.getSortedGroupKeys(groupedData, currentView?.groupSortDirection || 'asc');
-  const isAllExpanded = groupKeys.length > 0 && groupKeys.every(k => expandedGroups[k]);
+  const isAllExpanded = groupKeys.length > 0 && groupKeys.every((k: string) => expandedGroups[k]);
   const handleToggleGroups = () => {
     if (isAllExpanded) setExpandedGroups({});
     else {
@@ -952,8 +304,8 @@ function LiveAppPreview({ userProfile }: { userProfile?: any }) {
 
   const themeColor = theme.primary; 
   const loadingText = appData?.app_config?.loadingText || 'LOADING...';
-  const unitText = appData?.app_config?.unitText || '건';
-  const unclassifiedText = appData?.app_config?.unclassifiedText || '미분류';
+  
+  
 
   if (loading) return (
     <div className="h-screen bg-slate-50 flex flex-col items-center justify-center font-black text-slate-300">
