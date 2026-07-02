@@ -1,6 +1,4 @@
-"use client";
-
-const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_COOKIE_SECRET || "default_secret_key_gnflhs_2026_secure";
+const ENCRYPTION_KEY = process.env.COOKIE_SECRET || "default_secret_key_gnflhs_2026_secure";
 
 /**
  * 텍스트 기반의 비밀키로부터 AES-GCM 256-bit 대칭키를 유도합니다.
