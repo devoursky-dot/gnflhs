@@ -2,10 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import Cookies from 'js-cookie';
 import { supabase } from '@/app/supabaseClient';
-
-const SESSION_KEY = 'gnflhs_session';
 
 export type UserSession = { id: string; email: string; type: 'teacher' | 'student' };
 export type UserProfile = {
@@ -21,121 +18,67 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState('');
 
-  // ── 프로필 패칭 ──
-  const fetchUserProfile = useCallback(async (id: string, type: string) => {
-    if (!id) return;
-
-    if (type === 'student') {
-      const { data } = await supabase
-        .from('students')
-        .select('students, name, pass')
-        .eq('students', id)
-        .single();
-      if (data) {
-        setProfile({ ...data, users: data.students, role: 'student' } as any);
+  // ── 초기 세션 복원 ──
+  const restoreSession = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.authenticated) {
+          setUser(data.user);
+          setProfile(data.profile);
+        } else {
+          setUser(null);
+          setProfile(null);
+        }
+      } else {
+        setUser(null);
+        setProfile(null);
       }
-    } else {
-      const { data } = await supabase
-        .from('teachers')
-        .select('users, name, role, pass')
-        .eq('users', id)
-        .single();
-      if (data) {
-        setProfile(data as any);
-      }
+    } catch (err) {
+      console.error('Session restore failed:', err);
+      setUser(null);
+      setProfile(null);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
-  // ── 초기 세션 복원 ──
   useEffect(() => {
-    const restoreSession = async () => {
-      const savedSession = Cookies.get(SESSION_KEY);
-      if (savedSession) {
-        try {
-          const { decryptSession } = await import('@/app/cryptoHelper');
-          const sessionData = await decryptSession(savedSession);
-          if (sessionData) {
-            const sid = sessionData.id || sessionData.email;
-            setUser(sessionData);
-            await fetchUserProfile(sid, sessionData.type || 'teacher');
-          } else {
-            setUser(null);
-          }
-        } catch {
-          setUser(null);
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        setLoading(false);
-      }
-    };
-
     restoreSession();
-
-    // Supabase Auth 리스너 (Google 등 외부 인증 대비)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async () => {});
-    return () => subscription.unsubscribe();
-  }, [fetchUserProfile]);
+  }, [restoreSession]);
 
   // ── 비밀번호 로그인 ──
   const handlePasswordLogin = useCallback(async (loginId: string, loginPass: string) => {
     setAuthError('');
     try {
-      // 1. 교사 테이블 조회
-      const { data: teacher } = await supabase
-        .from('teachers')
-        .select('*')
-        .eq('users', loginId)
-        .single();
-
-      let loginUser: any = null;
-      let loginType: 'teacher' | 'student' = 'teacher';
-
-      if (teacher && teacher.pass === loginPass) {
-        loginUser = teacher;
-        loginType = 'teacher';
-      } else {
-        // 2. 학생 테이블 조회
-        const { data: student } = await supabase
-          .from('students')
-          .select('*')
-          .eq('students', loginId)
-          .single();
-
-        if (student && student.pass === loginPass) {
-          loginUser = student;
-          loginType = 'student';
-        } else {
-          throw new Error('아이디 또는 비밀번호가 올바르지 않습니다.');
-        }
-      }
-
-      // 세션 쿠키 저장
-      const sessionInfo: UserSession = { id: loginId, email: loginId, type: loginType };
-      const { encryptSession } = await import('@/app/cryptoHelper');
-      const encryptedSession = await encryptSession(sessionInfo);
-      Cookies.set(SESSION_KEY, encryptedSession, {
-        expires: 7,
-        path: '/',
-        sameSite: 'lax'
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginId, loginPass })
       });
 
-      setUser(sessionInfo);
-      setProfile(
-        loginType === 'student'
-          ? { ...loginUser, users: loginUser.students, role: 'student' }
-          : loginUser
-      );
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || '로그인에 실패했습니다.');
+      }
+
+      setUser(data.user);
+      setProfile(data.profile);
     } catch (error: any) {
       setAuthError(error.message);
     }
   }, []);
 
   // ── 로그아웃 ──
-  const handleLogout = useCallback(() => {
-    Cookies.remove(SESSION_KEY, { path: '/' });
-    window.location.reload();
+  const handleLogout = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      window.location.reload();
+    }
   }, []);
 
   // ── 비밀번호 변경 ──
@@ -144,31 +87,23 @@ export function useAuth() {
     newPass: string,
     confirmPass: string
   ): Promise<{ success: boolean; error?: string }> => {
-    if (newPass !== confirmPass) {
-      return { success: false, error: '새 비밀번호가 일치하지 않습니다.' };
-    }
-    if (currentPass !== profile?.pass) {
-      return { success: false, error: '현재 비밀번호가 올바르지 않습니다.' };
-    }
-
     try {
-      const table = user?.type === 'student' ? 'students' : 'teachers';
-      const column = user?.type === 'student' ? 'students' : 'users';
-      const sid = user?.id || user?.email;
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPass, newPass, confirmPass })
+      });
 
-      const { error } = await supabase
-        .from(table)
-        .update({ pass: newPass })
-        .eq(column, sid);
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || '비밀번호 변경에 실패했습니다.' };
+      }
 
-      if (error) throw error;
-
-      setProfile(prev => prev ? { ...prev, pass: newPass } : prev);
       return { success: true };
     } catch (err: any) {
       return { success: false, error: `오류 발생: ${err.message}` };
     }
-  }, [user, profile]);
+  }, []);
 
   // ── 권한 판별 ──
   const isAuthorized = profile?.role === 'admin' || profile?.role === 'tch' || profile?.role === 'student';
@@ -184,7 +119,6 @@ export function useAuth() {
     handlePasswordLogin,
     handleLogout,
     handlePasswordChange,
-    fetchUserProfile,
     supabase,
   };
 }

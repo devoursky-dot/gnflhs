@@ -2,9 +2,7 @@
 
 import React, { useState, useLayoutEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/app/supabaseClient';
 import { Loader2 } from 'lucide-react';
-import Cookies from 'js-cookie';
 
 interface AuthOptions {
   adminOnly?: boolean;
@@ -25,42 +23,20 @@ export default function withAuth<P extends object>(
     useLayoutEffect(() => {
       const verify = async () => {
         try {
-          // 1. 쿠키에서 세션 데이터 획득 (프로젝트 고유 인증 방식)
-          const session = Cookies.get('gnflhs_session');
-          if (!session) {
+          // 1. 서버 API 호출로 세션 및 프로필 조회
+          const res = await fetch('/api/auth/me');
+          if (!res.ok) {
             router.replace('/');
             return;
           }
 
-          const { decryptSession } = await import('@/app/cryptoHelper');
-          const sessionData = await decryptSession(session);
-          if (!sessionData) {
+          const data = await res.json();
+          if (!data.authenticated || !data.user || !data.profile) {
             router.replace('/');
             return;
           }
 
-          const type = sessionData.type || 'teacher';
-          const loginId = sessionData.id || sessionData.email;
-
-          let profile;
-
-          if (type === 'student') {
-            const { data, error } = await supabase
-              .from('students')
-              .select('name')
-              .eq('students', loginId)
-              .single();
-            if (error || !data) throw new Error('Unauthorized');
-            profile = { name: data.name, role: 'student' };
-          } else {
-            const { data, error } = await supabase
-              .from('teachers')
-              .select('role, name')
-              .eq('users', loginId)
-              .single();
-            if (error || !data) throw new Error('Unauthorized');
-            profile = data;
-          }
+          const { user, profile } = data;
 
           // 관리자 전용 페이지 체크
           if (options.adminOnly && profile.role !== 'admin') {
@@ -74,9 +50,16 @@ export default function withAuth<P extends object>(
             return;
           }
 
-          setUserProfile({ email: loginId, id: loginId, name: profile.name, role: profile.role, type });
+          setUserProfile({
+            email: user.email || user.id,
+            id: user.id,
+            name: profile.name,
+            role: profile.role,
+            type: user.type
+          });
           setIsChecking(false);
         } catch (e) {
+          console.error('Auth check error in HOC:', e);
           router.replace('/');
         }
       };
